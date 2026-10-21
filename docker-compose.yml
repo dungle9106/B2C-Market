@@ -1,0 +1,71 @@
+# Whole stack on one machine: docker compose up --build   ->   http://localhost:3000
+# PostgreSQL with pgvector, Redis (cache), RabbitMQ (e-mail queue, console on :15672), backend, frontend (nginx).
+# Secrets (OPENAI_API_KEY, MAIL_*, VNPAY_*, GHN_*, GOOGLE_*) are read from a .env file next to this one (see .env.example).
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: marketplace
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-shoppi}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d marketplace"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 20
+
+  backend:
+    build: ./backend
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+      rabbitmq: { condition: service_healthy }
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/marketplace
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: ${DB_PASSWORD:-shoppi}
+      CACHE_TYPE: redis
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      FRONTEND_URL: http://localhost:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string-of-at-least-32-chars}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+      GHN_TOKEN: ${GHN_TOKEN:-}
+      GHN_SHOP_ID: ${GHN_SHOP_ID:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    volumes:
+      - uploads:/app/uploads
+
+  frontend:
+    build: ./frontend
+    depends_on: [backend]
+    ports:
+      - "3000:80"
+
+volumes:
+  db-data:
+  uploads:

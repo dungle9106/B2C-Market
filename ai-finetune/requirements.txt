@@ -1,0 +1,17 @@
+# Fine-tuning stack for Vistral-7B-Chat with LoRA.
+# Install on Google Colab / Kaggle (with a T4/A100 GPU runtime), NOT on a normal laptop CPU.
+#
+#   pip install -r requirements.txt
+#
+torch>=2.2.0
+transformers>=4.44.0
+peft>=0.12.0
+trl>=0.9.6
+bitsandbytes>=0.43.1
+accelerate>=0.33.0
+datasets>=2.20.0
+psycopg2-binary>=2.9.9
+fastapi>=0.112.0
+uvicorn>=0.30.0
+pydantic>=2.8.0
+scikit-learn>=1.5.0

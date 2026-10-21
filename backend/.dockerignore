@@ -1,0 +1,6 @@
+target
+bin
+uploads
+*.iml
+*.log
+.idea

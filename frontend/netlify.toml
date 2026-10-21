@@ -1,0 +1,9 @@
+# Alternative to Vercel. Set VITE_API_BASE_URL (https://<backend>/api) in the site's environment variables.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

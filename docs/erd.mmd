@@ -1,0 +1,653 @@
+erDiagram
+    ad_campaigns {
+        bigint id PK
+        bigint shop_id FK
+        bigint product_id FK
+        varchar keywords
+        decimal bid_per_click
+        decimal daily_budget
+        enum status
+        bigint impressions
+        bigint clicks
+        decimal spend
+        timestamp created_at
+    }
+    ad_clicks {
+        bigint id PK
+        bigint campaign_id
+        bigint user_id
+        varchar visitor_key
+        decimal cost
+        boolean charged
+        timestamp created_at
+    }
+    ad_transactions {
+        bigint id PK
+        bigint shop_id
+        enum type
+        decimal amount
+        decimal balance_after
+        varchar note
+        timestamp created_at
+    }
+    addresses {
+        bigint id PK
+        bigint user_id FK
+        varchar recipient_name
+        varchar phone
+        varchar address_line
+        varchar ward
+        varchar district
+        varchar province
+        boolean is_default
+    }
+    admin_audit_logs {
+        bigint id PK
+        bigint admin_id
+        varchar admin_name
+        varchar action
+        varchar target_type
+        bigint target_id
+        varchar target_label
+        varchar detail
+        timestamp created_at
+    }
+    ai_usage_logs {
+        bigint id PK
+        varchar feature
+        varchar provider
+        varchar model
+        int prompt_tokens
+        int completion_tokens
+        boolean estimated
+        decimal cost_usd
+        int latency_ms
+        enum status
+        varchar error
+        bigint user_id
+        timestamp created_at
+    }
+    banners {
+        bigint id PK
+        varchar title
+        varchar image_url
+        varchar link_url
+        enum placement
+        int sort_order
+        timestamp start_at
+        timestamp end_at
+        boolean active
+        bigint campaign_id FK
+        bigint views
+        bigint clicks
+        timestamp created_at
+    }
+    broadcasts {
+        bigint id PK
+        enum type
+        enum audience
+        varchar title
+        varchar content
+        varchar link
+        int recipients
+        bigint createdBy_id FK
+        timestamp created_at
+    }
+    cart_items {
+        bigint id PK
+        bigint user_id FK
+        bigint product_id FK
+        bigint variant_id FK
+        int quantity
+    }
+    categories {
+        bigint id PK
+        varchar name
+        bigint parent_id FK
+        int sort_order
+        boolean active
+    }
+    chat_history {
+        bigint id PK
+        bigint user_id FK
+        varchar message
+        varchar response
+        timestamp created_at
+    }
+    chat_messages {
+        bigint id PK
+        bigint conversation_id FK
+        bigint sender_id FK
+        enum sender_side
+        varchar content
+        varchar image_url
+        bigint product_id FK
+        bigint order_id FK
+        boolean auto_reply
+        timestamp created_at
+    }
+    combo_promotions {
+        bigint id PK
+        bigint shop_id FK
+        varchar name
+        timestamp start_at
+        timestamp end_at
+        boolean active
+        varchar tiers
+        varchar products
+        timestamp created_at
+        int min_quantity
+        int discount_percent
+    }
+    conversations {
+        bigint id PK
+        bigint buyer_id FK
+        bigint shop_id FK
+        varchar last_message
+        timestamp last_message_at
+        int buyer_unread
+        int shop_unread
+        boolean awaiting_reply
+        timestamp created_at
+    }
+    dispute_messages {
+        bigint id PK
+        bigint return_request_id
+        enum side
+        bigint author_id
+        varchar author_name
+        varchar content
+        varchar attachments
+        timestamp created_at
+    }
+    email_messages {
+        bigint id PK
+        varchar to_address
+        bigint to_user_id
+        varchar type
+        varchar subject
+        varchar html
+        enum status
+        int attempts
+        varchar last_error
+        timestamp created_at
+        timestamp next_attempt_at
+        timestamp sent_at
+    }
+    email_tokens {
+        bigint id PK
+        bigint user_id
+        enum purpose
+        varchar token_hash
+        timestamp expires_at
+        timestamp used_at
+        timestamp created_at
+    }
+    error_events {
+        bigint id PK
+        varchar fingerprint
+        varchar exception_type
+        varchar message
+        varchar location
+        varchar last_method
+        varchar last_path
+        bigint last_user_id
+        varchar stack_trace
+        bigint occurrences
+        timestamp first_seen
+        timestamp last_seen
+        enum status
+        timestamp resolved_at
+        varchar more_3_columns
+    }
+    flash_sale_events {
+        bigint id PK
+        varchar name
+        timestamp start_at
+        timestamp end_at
+        timestamp registration_deadline
+        int min_discount_percent
+        int max_products_per_shop
+        bigint campaign_id FK
+        boolean cancelled
+        bigint created_by
+        timestamp created_at
+    }
+    flash_sale_registrations {
+        bigint id PK
+        bigint event_id FK
+        bigint product_id FK
+        bigint shop_id FK
+        decimal flash_price
+        decimal price_at_registration
+        int flash_stock
+        int max_per_buyer
+        enum status
+        varchar reject_reason
+        timestamp reviewed_at
+        timestamp created_at
+    }
+    inventory_logs {
+        bigint id PK
+        bigint shop_id
+        bigint product_id
+        varchar product_name
+        bigint variant_id
+        varchar variant_name
+        int change
+        int stock_after
+        enum reason
+        varchar order_code
+        varchar note
+        bigint created_by
+        timestamp created_at
+    }
+    login_events {
+        bigint id PK
+        bigint user_id
+        varchar email
+        enum result
+        varchar method
+        varchar ip
+        varchar device_label
+        boolean new_device
+        timestamp created_at
+    }
+    notifications {
+        bigint id PK
+        bigint user_id FK
+        enum type
+        varchar title
+        varchar content
+        varchar link
+        varchar image_url
+        boolean read
+        timestamp created_at
+    }
+    orders {
+        bigint id PK
+        varchar code
+        bigint buyer_id FK
+        bigint shop_id FK
+        decimal subtotal
+        decimal discount
+        decimal shop_discount
+        decimal combo_discount
+        decimal shop_voucher_discount
+        decimal platform_discount
+        decimal shipping_fee
+        decimal shipping_discount
+        enum shipping_method
+        varchar carrier
+        varchar more_37_columns
+    }
+    order_items {
+        bigint id PK
+        bigint order_id FK
+        bigint product_id FK
+        varchar product_name_snapshot
+        varchar variant_name_snapshot
+        bigint variant_id
+        decimal price_at_purchase
+        int quantity
+        boolean flash_sale
+    }
+    payments {
+        bigint id PK
+        bigint order_id FK
+        enum method
+        enum status
+        decimal amount
+        varchar transaction_id
+        varchar provider
+        varchar card_last4
+        timestamp paid_at
+        varchar gateway_txn_ref
+        varchar gateway_transaction_no
+        varchar gateway_pay_date
+        varchar gateway_bank_code
+        varchar gateway_message
+    }
+    platform_settings {
+        varchar key PK
+        varchar value
+        timestamp updated_at
+        bigint updated_by
+    }
+    policy_versions {
+        bigint id PK
+        varchar policy_key
+        int version
+        varchar title
+        varchar content
+        varchar change_note
+        bigint published_by
+        varchar published_by_name
+        timestamp published_at
+    }
+    products {
+        bigint id PK
+        bigint shop_id FK
+        bigint category_id FK
+        varchar name
+        varchar sku
+        varchar tier1_name
+        varchar tier2_name
+        varchar shop_categories
+        varchar search_text
+        varchar description
+        decimal price
+        decimal original_price
+        decimal flash_sale_price
+        timestamp flash_sale_start
+        varchar more_22_columns
+    }
+    product_events {
+        bigint id PK
+        bigint product_id
+        bigint shop_id
+        enum type
+        bigint user_id
+        varchar visitor_key
+        timestamp created_at
+    }
+    product_questions {
+        bigint id PK
+        bigint product_id FK
+        bigint asker_id FK
+        varchar question
+        varchar answer
+        timestamp answered_at
+        timestamp answer_updated_at
+        boolean hidden
+        timestamp created_at
+    }
+    product_reports {
+        bigint id PK
+        bigint product_id FK
+        bigint reporter_id FK
+        varchar reason
+        varchar detail
+        enum status
+        timestamp created_at
+        timestamp resolved_at
+    }
+    product_variants {
+        bigint id PK
+        bigint product_id FK
+        varchar name
+        varchar option1
+        varchar option2
+        varchar sku
+        varchar image_url
+        decimal extra_price
+        int stock
+    }
+    promo_campaigns {
+        bigint id PK
+        varchar name
+        varchar slug
+        varchar tagline
+        varchar description
+        varchar banner_url
+        varchar theme_color
+        timestamp start_at
+        timestamp end_at
+        boolean active
+        bigint created_by
+        timestamp created_at
+    }
+    refunds {
+        bigint id PK
+        bigint order_id FK
+        bigint return_request_id
+        decimal amount
+        enum source
+        enum channel
+        enum status
+        varchar reference
+        varchar note
+        bigint settlement_id
+        timestamp created_at
+        timestamp completed_at
+        bigint processed_by
+    }
+    reply_templates {
+        bigint id PK
+        bigint shop_id FK
+        enum kind
+        varchar content
+        timestamp created_at
+    }
+    return_requests {
+        bigint id PK
+        bigint order_id FK
+        enum type
+        enum reason
+        varchar description
+        varchar evidence_urls
+        varchar items
+        decimal refund_amount
+        enum status
+        varchar seller_note
+        varchar complaint
+        varchar admin_note
+        timestamp created_at
+        timestamp resolved_at
+        varchar more_5_columns
+    }
+    reviews {
+        bigint id PK
+        bigint product_id FK
+        bigint buyer_id FK
+        bigint orderItem_id FK
+        int rating
+        varchar comment
+        varchar image_urls
+        varchar video_url
+        varchar seller_reply
+        timestamp created_at
+    }
+    settlements {
+        bigint id PK
+        varchar code
+        bigint shop_id FK
+        date period_to
+        int order_count
+        decimal merchandise
+        decimal shop_discounts
+        decimal commission_rate
+        decimal commission
+        decimal refunds
+        decimal net_payout
+        enum status
+        varchar payment_reference
+        timestamp paid_at
+        varchar more_2_columns
+    }
+    shops {
+        bigint id PK
+        bigint seller_id FK
+        varchar name
+        varchar logo_url
+        varchar cover_url
+        varchar description
+        varchar pickup_address
+        varchar province
+        varchar pickup_district
+        varchar pickup_ward
+        varchar pickup_phone
+        int default_return_days
+        varchar return_conditions
+        varchar carriers
+        varchar more_18_columns
+    }
+    shop_categories {
+        bigint id PK
+        bigint shop_id FK
+        varchar name
+        int position
+        timestamp created_at
+    }
+    shop_verifications {
+        bigint id PK
+        bigint shop_id FK
+        enum business_type
+        varchar legal_name
+        varchar id_number
+        varchar tax_code
+        varchar license_number
+        varchar business_address
+        varchar document_urls
+        enum status
+        varchar reject_reason
+        bigint reviewedBy_id FK
+        timestamp submitted_at
+        timestamp reviewed_at
+    }
+    support_tickets {
+        bigint id PK
+        varchar code
+        bigint requester_id FK
+        enum category
+        enum priority
+        enum status
+        varchar subject
+        bigint order_id FK
+        bigint shop_id FK
+        boolean last_reply_by_staff
+        int rating
+        varchar rating_comment
+        timestamp created_at
+        timestamp updated_at
+        varchar more_2_columns
+    }
+    ticket_messages {
+        bigint id PK
+        bigint ticket_id FK
+        bigint sender_id FK
+        boolean staff
+        boolean system_line
+        varchar content
+        varchar attachment_urls
+        timestamp created_at
+    }
+    tracking_events {
+        bigint id PK
+        bigint order_id FK
+        varchar stage
+        varchar title
+        varchar location
+        timestamp created_at
+    }
+    users {
+        bigint id PK
+        varchar email
+        varchar password
+        varchar full_name
+        varchar phone
+        enum role
+        enum auth_provider
+        boolean enabled
+        varchar locked_reason
+        timestamp locked_at
+        timestamp locked_until
+        timestamp deleted_at
+        timestamp last_login_at
+        boolean super_admin
+        varchar more_10_columns
+    }
+    user_sessions {
+        varchar id PK
+        bigint user_id
+        varchar refresh_hash
+        varchar device_key
+        varchar device_label
+        varchar ip
+        varchar user_agent
+        timestamp created_at
+        timestamp last_used_at
+        timestamp expires_at
+        timestamp revoked_at
+        varchar revoke_reason
+    }
+    view_history {
+        bigint id PK
+        bigint user_id FK
+        bigint product_id FK
+        timestamp viewed_at
+    }
+    vouchers {
+        bigint id PK
+        varchar code
+        enum scope
+        bigint shop_id FK
+        enum type
+        decimal discount_value
+        decimal max_discount_amount
+        decimal min_order_amount
+        int usage_limit
+        int used_count
+        int per_user_limit
+        timestamp start_at
+        timestamp end_at
+        boolean active
+        varchar more_6_columns
+    }
+    ad_campaigns }o--|| shops : shop
+    ad_campaigns }o--|| products : product
+    addresses }o--|| users : user
+    banners }o--|| promo_campaigns : campaign
+    broadcasts }o--|| users : createdBy
+    cart_items }o--|| users : user
+    cart_items }o--|| products : product
+    cart_items }o--|| product_variants : variant
+    categories }o--|| categories : parent
+    chat_history }o--|| users : user
+    chat_messages }o--|| conversations : conversation
+    chat_messages }o--|| users : sender
+    chat_messages }o--|| products : product
+    chat_messages }o--|| orders : order
+    combo_promotions }o--|| shops : shop
+    conversations }o--|| users : buyer
+    conversations }o--|| shops : shop
+    flash_sale_events }o--|| promo_campaigns : campaign
+    flash_sale_registrations }o--|| flash_sale_events : event
+    flash_sale_registrations }o--|| products : product
+    flash_sale_registrations }o--|| shops : shop
+    notifications }o--|| users : user
+    orders }o--|| users : buyer
+    orders }o--|| shops : shop
+    orders }o--|| vouchers : voucher
+    orders }o--|| vouchers : platformVoucher
+    order_items }o--|| orders : order
+    order_items }o--|| products : product
+    payments |o--|| orders : order
+    products }o--|| shops : shop
+    products }o--|| categories : category
+    product_questions }o--|| products : product
+    product_questions }o--|| users : asker
+    product_reports }o--|| products : product
+    product_reports }o--|| users : reporter
+    product_variants }o--|| products : product
+    refunds }o--|| orders : order
+    reply_templates }o--|| shops : shop
+    return_requests }o--|| orders : order
+    reviews }o--|| products : product
+    reviews }o--|| users : buyer
+    reviews }o--|| order_items : orderItem
+    settlements }o--|| shops : shop
+    shops |o--|| users : seller
+    shop_categories }o--|| shops : shop
+    shop_verifications }o--|| shops : shop
+    shop_verifications }o--|| users : reviewedBy
+    support_tickets }o--|| users : requester
+    support_tickets }o--|| orders : order
+    support_tickets }o--|| shops : shop
+    ticket_messages }o--|| support_tickets : ticket
+    ticket_messages }o--|| users : sender
+    tracking_events }o--|| orders : order
+    view_history }o--|| users : user
+    view_history }o--|| products : product
+    vouchers }o--|| shops : shop
+    vouchers }o--|| promo_campaigns : campaign
