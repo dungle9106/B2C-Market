@@ -18,12 +18,17 @@
           <label>Nhà cung cấp
             <select v-model="form.provider">
               <option value="openai">OpenAI (hoặc API tương thích)</option>
+              <option value="claude">Anthropic Claude</option>
               <option value="huggingface">Mô hình tự train (Hugging Face)</option>
             </select>
           </label>
           <label v-if="form.provider === 'openai'">Model
             <input v-model.trim="form.openaiModel" list="models" />
-            <datalist id="models"><option v-for="m in cfg.models" :key="m" :value="m" /></datalist>
+            <datalist id="models"><option v-for="m in cfg.models.filter(x => x.startsWith('gpt'))" :key="m" :value="m" /></datalist>
+          </label>
+          <label v-if="form.provider === 'claude'">Model Claude
+            <input v-model.trim="form.claudeModel" list="claude-models" />
+            <datalist id="claude-models"><option v-for="m in cfg.models.filter(x => x.startsWith('claude'))" :key="m" :value="m" /></datalist>
           </label>
         </div>
 
@@ -40,6 +45,19 @@
         <div v-if="form.provider === 'openai' && cfg.canEditKeys" class="grid">
           <label>Endpoint<input v-model.trim="form.openaiUrl" /></label>
         </div>
+        <template v-if="form.provider === 'claude'">
+          <div class="key-row">
+            <div><strong>Claude API key</strong><div class="faint">{{ keyText(cfg.claudeKey) }}</div></div>
+            <template v-if="cfg.canEditKeys">
+              <input v-model.trim="form.claudeKey" type="password" autocomplete="new-password" placeholder="Dán key mới (sk-ant-...) để thay" />
+              <button v-if="cfg.claudeKey.source === 'ADMIN'" type="button" class="link danger" @click="clearKey('clearClaudeKey')">Xóa key</button>
+            </template>
+          </div>
+          <div v-if="cfg.canEditKeys" class="grid">
+            <label>Endpoint<input v-model.trim="form.claudeUrl" /></label>
+          </div>
+          <p class="faint">Tìm kiếm ngữ nghĩa vẫn dùng embeddings của OpenAI: nhập thêm OpenAI key nếu muốn giữ tính năng này.</p>
+        </template>
         <template v-if="form.provider === 'huggingface'">
           <div class="grid">
             <label>Endpoint Hugging Face<input v-model.trim="form.hfUrl" :disabled="!cfg.canEditKeys" placeholder="https://xxxx.endpoints.huggingface.cloud" /></label>
@@ -60,6 +78,26 @@
           <button type="button" class="btn sm ghost" :disabled="testing" @click="runTest">{{ testing ? 'Đang kiểm tra...' : 'Kiểm tra kết nối' }}</button>
           <button type="button" class="btn sm" :disabled="saving" @click="saveConnection">Lưu cấu hình</button>
         </div>
+      </section>
+
+      <!-- review classification model (FastAPI service, folder review-ai-service/) -->
+      <section v-if="rai" class="sc-card">
+        <div class="sc-card-head tw-items-center">
+          <h2 class="sc-card-title">Mô Hình Phân Loại Đánh Giá (FastAPI)</h2>
+          <button type="button" class="btn sm ghost tw-ml-auto" :disabled="training || !rai.configured || rai.status === 'DOWN'" @click="train">
+            {{ training ? 'Đang huấn luyện...' : 'Huấn luyện lại' }}</button>
+        </div>
+        <p v-if="!rai.configured" class="tw-m-0 tw-text-sm tw-text-neutral-500">Chưa bật. Chạy dịch vụ trong thư mục <code>review-ai-service/</code> và đặt biến
+          <code>REVIEW_AI_URL</code> (ví dụ <code>http://localhost:8000</code>). Khi chưa bật, Trung tâm đánh giá dùng bộ luật tiếng Việt và LLM.</p>
+        <div v-else class="tw-grid tw-grid-cols-2 tw-gap-3 tw-text-[13px] md:tw-grid-cols-4">
+          <div><div class="tw-text-neutral-500">Trạng thái</div><b :class="rai.status === 'UP' ? 'tw-text-green-600' : 'tw-text-red-600'">{{ rai.status === 'UP' ? 'Đang chạy' : 'Không kết nối được' }}</b></div>
+          <div><div class="tw-text-neutral-500">Mô hình</div><b>{{ rai.model?.trained ? 'Đã huấn luyện (' + rai.model.samples + ' mẫu)' : 'Chưa huấn luyện: dùng từ điển' }}</b></div>
+          <div><div class="tw-text-neutral-500">F1 trên tập kiểm tra</div><b>{{ rai.model?.metrics?.issuesMicroF1 ?? '—' }}</b></div>
+          <div><div class="tw-text-neutral-500">Dữ liệu đã gán nhãn</div><b>{{ rai.labelled }}</b> đánh giá</div>
+        </div>
+        <p class="tw-mb-0 tw-mt-2 tw-text-xs tw-text-neutral-400">Nhãn huấn luyện: các đánh giá AI (LLM) đã phân loại và các phân loại người bán tự sửa trong Trung tâm đánh giá.
+          Mô hình TF-IDF + Logistic Regression chạy trên CPU, phân loại tức thì và không tốn phí API.</p>
+        <p v-if="trainMsg" class="tw-mb-0 tw-mt-2 tw-text-sm" :class="trainOk ? 'tw-text-green-700' : 'tw-text-red-600'">{{ trainMsg }}</p>
       </section>
 
       <!-- semantic search index (embeddings, pgvector) - Tailwind utilities -->
@@ -196,6 +234,7 @@ import { ref, computed, onMounted } from 'vue'
 import TrendChart from '../../components/analytics/TrendChart.vue'
 import PaginationBar from '../../components/PaginationBar.vue'
 import { aiConfig, saveAiConfig, testAi, aiUsage, aiCalls, aiEmbeddings, reindexEmbeddings } from '../../api/admin'
+import { reviewAiStatus, trainReviewAi } from '../../api/reviewHub'
 import { isoDate, daysAgo } from '../../composables/useAnalyticsRange'
 import { formatVnd, formatDateTime } from '../../utils/format'
 import { extractError } from '../../utils/apiError'
@@ -214,7 +253,8 @@ const saving = ref(false)
 const msg = ref('')
 const error = ref('')
 
-const activeModel = computed(() => (form.value.provider === 'huggingface' ? 'vistral-7b-shoppi' : form.value.openaiModel))
+const activeModel = computed(() => (form.value.provider === 'huggingface' ? 'vistral-7b-shoppi'
+  : form.value.provider === 'claude' ? form.value.claudeModel : form.value.openaiModel))
 const num = (v) => Number(v || 0).toLocaleString('vi-VN')
 const fmtUsd = (v) => {
   const n = Number(v || 0)
@@ -228,6 +268,7 @@ function fill(c) {
   const pricing = {}
   Object.entries(c.pricing).forEach(([m, p]) => { pricing[m] = { input: p.input, output: p.output } })
   form.value = { provider: c.provider, openaiModel: c.openaiModel, openaiUrl: c.openaiUrl, hfUrl: c.hfUrl || '', openaiKey: '', hfToken: '',
+    claudeModel: c.claudeModel, claudeUrl: c.claudeUrl, claudeKey: '',
     budgetUsd: c.budgetUsd ?? '', alertPercent: c.alertPercent, hardStop: c.hardStop, usdRate: c.usdRate, pricing }
 }
 
@@ -248,9 +289,11 @@ async function save(body, okText) {
 
 function saveConnection() {
   const f = form.value
-  const body = { provider: f.provider, openaiModel: f.openaiModel }
+  const body = { provider: f.provider, openaiModel: f.openaiModel, claudeModel: f.claudeModel }
   if (cfg.value.canEditKeys) {
     body.openaiUrl = f.openaiUrl
+    body.claudeUrl = f.claudeUrl
+    if (f.claudeKey) body.claudeKey = f.claudeKey
     body.hfUrl = f.hfUrl
     if (f.openaiKey) body.openaiKey = f.openaiKey
     if (f.hfToken) body.hfToken = f.hfToken
@@ -277,6 +320,26 @@ async function runTest() {
 const loadUsage = () => aiUsage(isoDate(daysAgo(days.value - 1)), isoDate(new Date())).then(({ data }) => { usage.value = data; loadCalls(0) }).catch(() => {})
 const loadCalls = (p = 0) => aiCalls({ status: callStatus.value, page: p }).then(({ data }) => { calls.value = data }).catch(() => {})
 
+const rai = ref(null)
+const training = ref(false)
+const trainMsg = ref('')
+const trainOk = ref(true)
+const loadRai = () => reviewAiStatus().then(({ data }) => { rai.value = data }).catch(() => {})
+async function train() {
+  training.value = true
+  trainMsg.value = ''
+  try {
+    const { data } = await trainReviewAi()
+    trainOk.value = true
+    trainMsg.value = `Đã huấn luyện trên ${data.samples} đánh giá` + (data.metrics?.issuesMicroF1 != null ? `, F1 = ${data.metrics.issuesMicroF1}` : '')
+    loadRai()
+  } catch (e) {
+    trainOk.value = false
+    trainMsg.value = extractError(e)
+  } finally {
+    training.value = false
+  }
+}
 const emb = ref(null)
 const reindexing = ref(false)
 const loadEmb = () => aiEmbeddings().then(({ data }) => { emb.value = data }).catch(() => {})
@@ -296,6 +359,7 @@ onMounted(async () => {
     fill((await aiConfig()).data)
     loadUsage()
     loadEmb()
+    loadRai()
   } catch (e) {
     error.value = extractError(e)
   }

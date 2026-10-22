@@ -10,6 +10,7 @@ project/
 ├── backend/             Spring Boot REST API + WebSocket (Dockerfile)
 ├── frontend/            Vue.js 3 SPA - Vite, Tailwind, Chart.js (Dockerfile, nginx.conf, vercel.json)
 ├── ai-finetune/         Fine-tuning Vistral-7B + LoRA (phần "tự train AI")
+├── review-ai-service/   FastAPI: phân loại đánh giá, mô hình huấn luyện được (scikit-learn)
 ├── docs/                ERD.md (sơ đồ CSDL), postman/ (bộ request API)
 ├── docker-compose.yml   Chạy cả hệ thống: PostgreSQL + pgvector, Redis, RabbitMQ, backend, frontend
 ├── render.yaml          Triển khai backend + Redis lên Render
@@ -32,7 +33,8 @@ project/
 | Dữ liệu | PostgreSQL, **pgvector** | `service/search/EmbeddingStore.java` (tự dùng `real[]` khi chưa có pgvector) |
 | | **Redis** | `config/CacheConfig.java` (`CACHE_TYPE=redis`; mặc định cache trong bộ nhớ) |
 | Hàng đợi | **RabbitMQ** | `messaging/` - hàng đợi email (`RABBITMQ_ENABLED=true`; mặc định hàng đợi trong CSDL) |
-| AI | OpenAI API, RAG, Prompt Engineering, embeddings | `AIService`, `ChatbotService`, `service/search/` |
+| AI | OpenAI API, **Claude API**, RAG, Prompt Engineering, embeddings | `AIService`, `service/ai/` (OpenAI, Claude, Hugging Face), `ChatbotService`, `service/search/` |
+| | **FastAPI** + scikit-learn | `review-ai-service/`: phân loại đánh giá, huấn luyện mô hình (Trung tâm đánh giá) |
 | Thanh toán | Mock payment, VNPay Sandbox | `PaymentService`, `VnpayService` |
 | Vận chuyển | GHN API | `GhnService`, `GhnWebhookService` |
 | Triển khai | Docker, Vercel/Netlify, Render, Neon/Supabase, GitHub Actions | xem mục *Chạy bằng Docker* và *Triển khai* |
@@ -627,6 +629,62 @@ Quyền **"Cấu hình & vận hành hệ thống"** (`PERM_SETTINGS`, trước 
   trên hành trình đơn: *picked* → đang giao, *delivered* → đã giao (thu COD), *delivery_fail*, *returned* → hệ thống hủy
   đơn và nhập lại kho, *cancel* → người bán tạo lại vận đơn. Đơn GHN không còn dùng bộ mô phỏng hành trình.
 - Shop cần nhập **Quận/Huyện, Phường/Xã lấy hàng** trong *Hồ sơ shop*. Webhook cũng cần backend có địa chỉ công khai.
+
+### Trung tâm đánh giá (AI quản lý đánh giá & phản hồi)
+
+Trang **Kênh người bán → Chăm sóc khách hàng → Trung Tâm Đánh Giá** (`/seller/review-hub`). Đánh giá ảnh hưởng trực
+tiếp tới doanh số, nhưng người bán không kịp trả lời hết; trang này gom và xử lý đánh giá ở một chỗ.
+
+- **Gom đánh giá từ nhiều sàn**: đánh giá trên Shoppi tự đồng bộ (sự kiện khi khách viết). Shopee, Lazada, Tiki,
+  TikTok Shop: tải lên **file Excel/CSV xuất từ trang người bán của sàn đó**. Cột được nhận theo tiêu đề tiếng Việt
+  hoặc tiếng Anh, tên sản phẩm được khớp với sản phẩm của shop, nhập lại file không tạo bản trùng. Có thêm API
+  `POST /api/seller/review-hub/ingest` (JSON) để nối công cụ khác. API đánh giá chính thức của các sàn chỉ cấp cho
+  đối tác, nên đồ án dùng file xuất là cách thực tế.
+- **Phân loại**: cảm xúc (tích cực / trung lập / tiêu cực) và 9 nhóm vấn đề: chất lượng, mô tả sai, giao hàng, đóng
+  gói, size, thiếu/sai hàng, nghi hàng giả / an toàn, giá, tư vấn / đổi trả. Có 3 tầng xử lý:
+  1. **Bộ luật tiếng Việt** (luôn chạy): xử lý theo từng mệnh đề, có phủ định ("không lỗi" không phải lỗi), nhận cả
+     tiếng Việt không dấu.
+  2. **Mô hình FastAPI** (nếu bật `REVIEW_AI_URL`): phân loại tức thì, không tốn phí API.
+  3. **LLM** (OpenAI hoặc Claude, nếu bật AI): đọc theo lô 15 đánh giá ở chế độ nền, trả về vấn đề, tóm tắt một câu
+     và nhận định đánh giá đáng ngờ.
+
+  Người bán **sửa phân loại** được; bản sửa được giữ qua các lần phân tích lại và dùng làm dữ liệu huấn luyện.
+- **Ưu tiên trả lời**: điểm 0–100 và mức Khẩn cấp / Cao / Bình thường / Thấp, kèm lý do bằng lời: số sao, từ ngữ
+  cảnh báo ("hàng giả", "dị ứng", "lừa đảo"…), vấn đề nghiêm trọng, có ảnh, thời gian đã chờ. Mỗi mức có hạn trả lời:
+  khẩn cấp 12 giờ, cao 24 giờ, bình thường 72 giờ. Đánh giá khẩn cấp mới đến sẽ gửi thông báo ngay cho người bán.
+- **Soạn sẵn phản hồi theo tình huống**: AI viết theo vấn đề, số sao, sàn và tên khách, tuân thủ quy tắc (không đổ
+  lỗi, không hứa quá, không để liên hệ ngoài sàn). Không có AI thì dùng mẫu theo từng nhóm vấn đề. Người bán sửa rồi
+  **Duyệt**: đánh giá Shoppi được đăng ngay; đánh giá sàn khác được sao chép để dán lên sàn và đánh dấu đã trả lời.
+  Có nút soạn nháp hàng loạt cho 20 đánh giá ưu tiên cao.
+- **Phát hiện bất thường** (điểm 0–100, từ 40 thì cảnh báo): nội dung trùng giữa các tài khoản, số đánh giá tăng
+  đột biến, nhiều đánh giá 1–2 sao ngắn và không ảnh trong 24 giờ (nghi bị chơi xấu), một người đánh giá liên tục,
+  số sao ngược với nội dung, đánh giá xấu không có mã đơn, và nhận định của AI (ví dụ khách được tặng quà để đánh giá).
+  Người bán xác nhận "đánh giá thật" hoặc báo cáo; đánh giá Shoppi bị báo cáo được gửi tới đội kiểm duyệt.
+- **Vấn đề lặp lại**: gom theo *sản phẩm × vấn đề* trên mọi sàn, so với kỳ trước (đang tăng hay giảm), đánh dấu
+  **nghi lỗi sản phẩm thật** (chất lượng, an toàn, mô tả sai lặp lại từ 3 lần). Nút "Phân tích nguyên nhân" cho AI
+  đọc các đánh giá và đề xuất cách sửa từ gốc. Vấn đề tăng (từ 3 lần trong 14 ngày) sẽ gửi cảnh báo cho người bán.
+- **Dashboard**: tổng số đánh giá, điểm trung bình, tỷ lệ tiêu cực, số cần trả lời, khẩn cấp, quá hạn, tỷ lệ và thời
+  gian phản hồi; biểu đồ diễn biến; phân bố vấn đề; so sánh theo sàn; danh sách cần trả lời ngay.
+
+**Dịch vụ FastAPI** (`review-ai-service/`, tùy chọn):
+
+```bash
+cd review-ai-service
+python -m venv .venv && .venv\Scripts\activate      # Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --port 8000
+# backend: REVIEW_AI_URL=http://localhost:8000      (docker compose đã cấu hình sẵn)
+```
+
+`POST /analyze` (phân loại), `POST /similar` (đánh giá gần giống nhau, TF-IDF + cosine), `POST /train` (huấn luyện).
+Mô hình: TF-IDF (từ + ký tự) với Logistic Regression cho từng nhãn, chạy trên CPU. Admin bấm **Huấn luyện lại**
+ở trang *AI & chi phí LLM*: hệ thống gửi các đánh giá đã gán nhãn (AI phân loại và người bán sửa) để huấn luyện, rồi
+báo F1 trên tập kiểm tra. Cần ít nhất 20 đánh giá có nhãn.
+
+**Claude**: ở *AI & chi phí LLM* chọn nhà cung cấp **Anthropic Claude**, nhập API key và model (mặc định
+`claude-sonnet-5-5`, rẻ hơn thì dùng `claude-haiku-4-5-20251001`), hoặc đặt biến `ANTHROPIC_API_KEY`. Mọi tính năng AI
+(chatbot, viết mô tả, trung tâm đánh giá…) dùng Claude. Riêng tìm kiếm ngữ nghĩa vẫn cần OpenAI key cho embeddings.
+Giá theo token của model Claude nhập ở bảng giá trên cùng trang để tính chi phí.
 
 ### Chat realtime, cache, hàng đợi, tìm kiếm ngữ nghĩa
 

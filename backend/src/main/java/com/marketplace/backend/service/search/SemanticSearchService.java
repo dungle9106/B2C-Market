@@ -50,7 +50,7 @@ public class SemanticSearchService {
     /** Usable now? (AI on, OpenAI configured: the self-hosted model has no embeddings) */
     public boolean available() {
         AiSettings s = ops.settings();
-        return !s.huggingFace() && ops.blockReason(s) == null;
+        return s.openaiReady() && ops.blockReason(s) == null;
     }
 
     // ==================== indexing ====================

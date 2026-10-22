@@ -24,6 +24,7 @@ public class AIService {
 
     private final OpenAiProvider openAiProvider;
     private final HuggingFaceProvider huggingFaceProvider;
+    private final com.marketplace.backend.service.ai.ClaudeProvider claudeProvider;
     private final AiOpsService ops;
 
     public String complete(String systemPrompt, String userPrompt) {
@@ -35,10 +36,14 @@ public class AIService {
             return "[AI tạm dừng] " + blocked;
         }
         long start = System.nanoTime();
-        AIProvider.Completion c = (s.huggingFace() ? huggingFaceProvider : openAiProvider).call(s, systemPrompt, userPrompt);
+        AIProvider.Completion c = provider(s).call(s, systemPrompt, userPrompt);
         ops.record(feature, s, c, (int) ((System.nanoTime() - start) / 1_000_000), null);
         if (c.error() != null) return "Xin lỗi, trợ lý AI hiện không phản hồi được. Vui lòng thử lại sau.";
         return c.text();
+    }
+
+    private AIProvider provider(AiSettings s) {
+        return s.huggingFace() ? huggingFaceProvider : s.claude() ? claudeProvider : openAiProvider;
     }
 
     public boolean isConfigured() {
@@ -65,9 +70,9 @@ public class AIService {
     /** Admin "Kiem tra ket noi": one tiny call with the current settings, even when AI is switched off. */
     public Map<String, Object> testConnection() {
         AiSettings s = ops.settings();
-        if (!s.configured()) return AdminUserService.map("ok", false, "message", "Chưa cấu hình " + (s.huggingFace() ? "endpoint Hugging Face" : "API key OpenAI"));
+        if (!s.configured()) return AdminUserService.map("ok", false, "message", "Chưa cấu hình " + (s.huggingFace() ? "endpoint Hugging Face" : s.claude() ? "API key Claude" : "API key OpenAI"));
         long start = System.nanoTime();
-        AIProvider.Completion c = (s.huggingFace() ? huggingFaceProvider : openAiProvider)
+        AIProvider.Completion c = provider(s)
                 .call(s, "Bạn là trợ lý kiểm tra kết nối. Chỉ trả lời đúng một từ.", "Trả lời: OK");
         int ms = (int) ((System.nanoTime() - start) / 1_000_000);
         ops.record("CONNECTION_TEST", s, c, ms, null);

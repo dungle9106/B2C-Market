@@ -71,6 +71,7 @@ const routes = [
       { path: 'ads', name: 'seller-ads', component: () => import('../views/seller/SellerAdsView.vue'), meta: { title: 'Quảng cáo' } },
       { path: 'vouchers', name: 'seller-vouchers', component: () => import('../views/seller/SellerVouchersView.vue'), meta: { title: 'Mã giảm giá' } },
       { path: 'ai/assistant', name: 'seller-ai-assistant', component: () => import('../views/seller/ai/SellerAIAssistantView.vue'), meta: { title: 'Trợ lý doanh thu AI' } },
+      { path: 'review-hub', name: 'seller-review-hub', component: () => import('../views/seller/ReviewHubView.vue'), meta: { title: 'Trung tâm đánh giá' } },
       { path: 'ai/reviews', name: 'seller-ai-reviews', component: () => import('../views/seller/ai/SellerAIReviewsView.vue'), meta: { title: 'AI phân tích đánh giá' } },
       { path: 'ai/promotions', name: 'seller-ai-promo', component: () => import('../views/seller/ai/SellerAIPromoView.vue'), meta: { title: 'Gợi ý thời điểm khuyến mãi' } },
       { path: 'care-settings', name: 'seller-care-settings', component: () => import('../views/seller/SellerCareSettingsView.vue'), meta: { title: 'Tin nhắn tự động & mẫu' } },

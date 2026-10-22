@@ -181,6 +181,7 @@ const menu = [
       { label: 'Viết Mô Tả & Gợi Ý Giá', to: { name: 'seller-product-new', query: { ai: '1' } } },
       { label: 'Hỏi Đáp Doanh Thu', to: { name: 'seller-ai-assistant' } },
       { label: 'Phân Tích Đánh Giá', to: { name: 'seller-ai-reviews' } },
+      { label: 'AI Trả Lời & Xử Lý Đánh Giá', to: { name: 'seller-review-hub', query: { tab: 'inbox' } } },
       { label: 'Gợi Ý Thời Điểm Khuyến Mãi', to: { name: 'seller-ai-promo' } }
     ]
   },
@@ -190,7 +191,7 @@ const menu = [
     items: [
       { label: 'Chat với Người mua', to: { name: 'seller-chat' }, badge: () => notifications.chat },
       { label: 'Hỏi Đáp Sản Phẩm', to: { name: 'seller-questions' }, badge: () => engagement.value.unansweredQuestions },
-      { label: 'Quản Lý Đánh Giá', to: { name: 'seller-analytics-reviews' }, badge: () => engagement.value.unrepliedReviews },
+      { label: 'Trung Tâm Đánh Giá', to: { name: 'seller-review-hub' }, badge: () => engagement.value.unrepliedReviews },
       { label: 'Tin Nhắn Tự Động & Mẫu', to: { name: 'seller-care-settings' } },
       { label: 'Thông Báo', to: { name: 'seller-notifications' }, badge: () => notifications.total },
       { label: 'Hỗ Trợ Từ Shoppi', to: { name: 'seller-support' } }

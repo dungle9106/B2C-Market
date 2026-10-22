@@ -122,7 +122,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/broadcasts/**").hasAuthority("PERM_BROADCAST")
                 .requestMatchers("/api/admin/staff/**", "/api/admin/audit/**").hasAuthority("PERM_STAFF")
                 .requestMatchers("/api/admin/products/**", "/api/admin/categories/**").hasAuthority("PERM_PRODUCTS")
-                .requestMatchers("/api/admin/settings/**", "/api/admin/system/**", "/api/admin/policies/**").hasAuthority("PERM_SETTINGS")
+                .requestMatchers("/api/admin/settings/**", "/api/admin/system/**", "/api/admin/policies/**", "/api/admin/review-ai/**").hasAuthority("PERM_SETTINGS")
                 .requestMatchers("/api/admin/analytics/**").hasAuthority("PERM_REPORTS")
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers("/api/buyer/**", "/api/cart/**", "/api/orders/**", "/api/payments/**", "/api/vouchers/**", "/api/ai/**").hasAuthority("ROLE_BUYER")

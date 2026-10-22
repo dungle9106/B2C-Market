@@ -30,6 +30,12 @@ services:
       interval: 10s
       retries: 20
 
+  # review classification model (FastAPI, scikit-learn); trained from the admin page
+  review-ai:
+    build: ./review-ai-service
+    volumes:
+      - review-model:/app/models
+
   backend:
     build: ./backend
     depends_on:
@@ -44,6 +50,8 @@ services:
       REDIS_URL: redis://redis:6379
       RABBITMQ_ENABLED: "true"
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      REVIEW_AI_URL: http://review-ai:8000
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       FRONTEND_URL: http://localhost:3000
       CORS_ALLOWED_ORIGINS: http://localhost:3000
       JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string-of-at-least-32-chars}
@@ -69,3 +77,4 @@ services:
 volumes:
   db-data:
   uploads:
+  review-model:

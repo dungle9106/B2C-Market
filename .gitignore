@@ -13,3 +13,8 @@ replay_pid*.log
 .idea/
 *.iml
 frontend/vite.e2e.config.js
+
+# review AI service
+review-ai-service/.venv/
+review-ai-service/models/
+__pycache__/

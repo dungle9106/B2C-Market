@@ -34,6 +34,7 @@ public class ReviewService {
     private final ProductRepository productRepository;
     private final ShopRepository shopRepository;
     private final NotificationService notificationService;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     /** filter: "all", "media", or "1".."5" */
     @Transactional(readOnly = true)
@@ -110,6 +111,8 @@ public class ReviewService {
         product.setRatingCount(count + 1);
         product.setRatingAvg(Math.round(avg * 100.0) / 100.0);
         productRepository.save(product);
+        // the shop's review hub picks it up (after commit): analysis, priority, anomaly checks
+        events.publishEvent(new com.marketplace.backend.service.reviewhub.ReviewHubEvents.ReviewWritten(review.getId()));
 
         return ReviewResponse.from(review);
     }
@@ -165,6 +168,7 @@ public class ReviewService {
         }
         boolean first = review.getSellerReply() == null;
         review.setSellerReply(reply);
+        events.publishEvent(new com.marketplace.backend.service.reviewhub.ReviewHubEvents.ReviewReplied(review.getId(), reply));
         if (first) {
             notificationService.notify(review.getBuyer().getId(), NotificationType.MESSAGE,
                     shop.getName() + " đã phản hồi đánh giá của bạn",

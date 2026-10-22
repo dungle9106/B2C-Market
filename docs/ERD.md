@@ -1,6 +1,6 @@
 # Sơ đồ cơ sở dữ liệu (ERD)
 
-Sinh tự động từ 49 entity JPA trong `backend/src/main/java/com/marketplace/backend/entity`
+Sinh tự động từ 50 entity JPA trong `backend/src/main/java/com/marketplace/backend/entity`
 (cộng bảng `product_embeddings` do `EmbeddingStore` tạo, cột `embedding vector(256)` khi có pgvector).
 
 - Xem trực tiếp trên GitHub (GitHub vẽ được Mermaid), hoặc dán khối mã vào <https://mermaid.live>.
@@ -265,7 +265,7 @@ erDiagram
     flash_sale_registrations }o--|| shops : shop
 ```
 
-## 2. Toàn bộ 49 bảng
+## 2. Toàn bộ 50 bảng
 
 ```mermaid
 erDiagram
@@ -717,6 +717,23 @@ erDiagram
         varchar video_url
         varchar seller_reply
         timestamp created_at
+    }
+    review_hub_items {
+        bigint id PK
+        bigint shop_id
+        enum source
+        varchar external_id
+        bigint review_id
+        bigint product_id
+        varchar product_name
+        varchar reviewer_name
+        varchar reviewer_key
+        varchar order_ref
+        int rating
+        varchar content
+        int media_count
+        timestamp reviewed_at
+        varchar more_25_columns
     }
     settlements {
         bigint id PK

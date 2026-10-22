@@ -2,7 +2,7 @@
   "info": {
     "name": "Shoppi API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Sinh tự động từ 35 controller (334 endpoint). Chạy \"Đăng nhập\" trước: token được lưu vào biến {{token}} và dùng cho mọi request (Bearer)."
+    "description": "Sinh tự động từ 36 controller (357 endpoint). Chạy \"Đăng nhập\" trước: token được lưu vào biến {{token}} và dùng cho mọi request (Bearer)."
   },
   "auth": {
     "type": "bearer",
@@ -457,7 +457,12 @@
           "name": "POST /api/auth/logout",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/logout",
               "host": [
@@ -470,9 +475,18 @@
               ],
               "variable": []
             },
-            "description": "Controller: AuthController",
+            "description": "ends this tab's session; body { refreshToken } (optional) also ends that session, e.g. the seed for new tabs\n\nController: AuthController",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -596,6 +610,44 @@
               "variable": []
             },
             "description": "body: { token, newPassword }\n\nController: AuthController",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /api/auth/session/fork",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/session/fork",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "session",
+                "fork"
+              ],
+              "variable": []
+            },
+            "description": "body: { refreshToken } -> a separate session for another browser tab (the given token is not rotated)\n\nController: AuthController",
             "auth": {
               "type": "noauth"
             },
@@ -5217,6 +5269,594 @@
           }
         },
         {
+          "name": "GET /api/seller/review-hub/anomalies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/anomalies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "anomalies"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/drafts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/drafts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "drafts"
+              ],
+              "variable": []
+            },
+            "description": "body: { ids?: [] } - empty: the most urgent unanswered reviews (max 20)\n\nController: ReviewHubController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/import",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "import"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "GET /api/seller/review-hub/import-template",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/import-template",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "import-template"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/ingest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/ingest",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "ingest"
+              ],
+              "variable": []
+            },
+            "description": "body: { source, items: [{ externalId?, rating, content, product, reviewer?, time?, order?, media?, reply? }] }\n\nController: ReviewHubController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /api/seller/review-hub/issue-types",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/issue-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "issue-types"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "GET /api/seller/review-hub/issues",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/issues",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "issues"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/issues/root-cause",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/issues/root-cause",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "issues",
+                "root-cause"
+              ],
+              "variable": []
+            },
+            "description": "body: { key, issue, days? }\n\nController: ReviewHubController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /api/seller/review-hub/items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "items"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "GET /api/seller/review-hub/items/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/items/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "items",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/items/{id}/anomaly",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/items/:id/anomaly",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "items",
+                ":id",
+                "anomaly"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "body: { action: OK | REPORT | RESET, note? }\n\nController: ReviewHubController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/items/{id}/draft",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/items/:id/draft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "items",
+                ":id",
+                "draft"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "PUT /api/seller/review-hub/items/{id}/draft",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/items/:id/draft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "items",
+                ":id",
+                "draft"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "body: { text }\n\nController: ReviewHubController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/items/{id}/ignore",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/items/:id/ignore",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "items",
+                ":id",
+                "ignore"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: ReviewHubController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PUT /api/seller/review-hub/items/{id}/issues",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/items/:id/issues",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "items",
+                ":id",
+                "issues"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "body: { issues: [keys], note? } - the seller's correction (also a training label)\n\nController: ReviewHubController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/items/{id}/reopen",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/items/:id/reopen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "items",
+                ":id",
+                "reopen"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/items/{id}/reply",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/items/:id/reply",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "items",
+                ":id",
+                "reply"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "body: { text } - the approved reply\n\nController: ReviewHubController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /api/seller/review-hub/overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/overview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "overview"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/reanalyze",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/reanalyze",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "reanalyze"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "POST /api/seller/review-hub/sync",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/review-hub/sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "review-hub",
+                "sync"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
           "name": "GET /api/seller/reviews",
           "request": {
             "method": "GET",
@@ -7624,6 +8264,47 @@
                 }
               }
             }
+          }
+        },
+        {
+          "name": "GET /api/admin/review-ai",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/review-ai",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "review-ai"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
+          }
+        },
+        {
+          "name": "POST /api/admin/review-ai/train",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/review-ai/train",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "review-ai",
+                "train"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ReviewHubController"
           }
         },
         {

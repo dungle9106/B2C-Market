@@ -13,6 +13,10 @@ import java.util.List;
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
+    // the review hub syncs a shop's reviews
+    @Query("SELECT r FROM Review r WHERE r.product.shop.id = :shopId AND r.id NOT IN :known ORDER BY r.id")
+    List<Review> notSynced(@Param("shopId") Long shopId, @Param("known") Collection<Long> known);
+
     Page<Review> findByProductIdOrderByCreatedAtDesc(Long productId, Pageable pageable);
 
     Page<Review> findByProductIdAndRatingOrderByCreatedAtDesc(Long productId, Integer rating, Pageable pageable);

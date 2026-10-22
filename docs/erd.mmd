@@ -448,6 +448,23 @@ erDiagram
         varchar seller_reply
         timestamp created_at
     }
+    review_hub_items {
+        bigint id PK
+        bigint shop_id
+        enum source
+        varchar external_id
+        bigint review_id
+        bigint product_id
+        varchar product_name
+        varchar reviewer_name
+        varchar reviewer_key
+        varchar order_ref
+        int rating
+        varchar content
+        int media_count
+        timestamp reviewed_at
+        varchar more_25_columns
+    }
     settlements {
         bigint id PK
         varchar code

@@ -52,6 +52,9 @@ public class AiOpsService {
     static final String OPENAI_MODEL = "ai.openai.model";
     static final String HF_URL = "ai.hf.url";
     static final String HF_TOKEN = "ai.hf.token";
+    static final String CLAUDE_KEY = "ai.claude.key";
+    static final String CLAUDE_URL = "ai.claude.url";
+    static final String CLAUDE_MODEL = "ai.claude.model";
     static final String BUDGET = "ai.budget.monthlyUsd";
     static final String ALERT_PERCENT = "ai.budget.alertPercent";
     static final String HARD_STOP = "ai.budget.hardStop";
@@ -67,6 +70,10 @@ public class AiOpsService {
         DEFAULT_PRICING.put("gpt-4o", new BigDecimal[]{new BigDecimal("2.50"), new BigDecimal("10.00")});
         DEFAULT_PRICING.put("gpt-4.1-mini", new BigDecimal[]{new BigDecimal("0.40"), new BigDecimal("1.60")});
         DEFAULT_PRICING.put("gpt-4.1", new BigDecimal[]{new BigDecimal("2.00"), new BigDecimal("8.00")});
+        // Claude: fill in the prices of the models you use on the admin page (USD per 1M tokens)
+        DEFAULT_PRICING.put("claude-haiku-4-5-20251001", new BigDecimal[]{new BigDecimal("1.00"), new BigDecimal("5.00")});
+        DEFAULT_PRICING.put("claude-sonnet-5-5", new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
+        DEFAULT_PRICING.put("claude-opus-5-5", new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
         DEFAULT_PRICING.put("vistral-7b-shoppi", new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
     }
 
@@ -74,7 +81,8 @@ public class AiOpsService {
     static final Map<String, String> CALLERS = Map.of(
             "ChatbotService", "CHATBOT", "SellerAIService", "PRODUCT_WRITER", "SellerAIController", "PRODUCT_WRITER",
             "ReviewInsightService", "REVIEW_INSIGHT", "SalesAssistantService", "SALES_ASSISTANT", "PromoAdvisorService", "PROMO_ADVISOR",
-            "ReplySuggestService", "REPLY_SUGGEST", "AIService", "CONNECTION_TEST");
+            "ReplySuggestService", "REPLY_SUGGEST", "AIService", "CONNECTION_TEST",
+            "ReviewAiService", "REVIEW_HUB", "ReviewHubService", "REVIEW_HUB");
     static final Map<String, String> FEATURES = new LinkedHashMap<>();
 
     static {
@@ -84,6 +92,7 @@ public class AiOpsService {
         FEATURES.put("SALES_ASSISTANT", "Trợ lý doanh thu");
         FEATURES.put("PROMO_ADVISOR", "Gợi ý khuyến mãi");
         FEATURES.put("REPLY_SUGGEST", "Gợi ý trả lời khách");
+        FEATURES.put("REVIEW_HUB", "Quản lý đánh giá (phân loại, soạn trả lời)");
         FEATURES.put("CONNECTION_TEST", "Kiểm tra kết nối");
         FEATURES.put("OTHER", "Khác");
     }
@@ -107,6 +116,12 @@ public class AiOpsService {
     private String envHfUrl;
     @Value("${app.ai.huggingface.token:}")
     private String envHfToken;
+    @Value("${ANTHROPIC_API_KEY:}")
+    private String envClaudeKey;
+    @Value("${ANTHROPIC_API_URL:https://api.anthropic.com/v1/messages}")
+    private String envClaudeUrl;
+    @Value("${ANTHROPIC_MODEL:claude-sonnet-5-5}")
+    private String envClaudeModel;
 
     // ==================== configuration in force ====================
 
@@ -114,7 +129,8 @@ public class AiOpsService {
     public AiSettings settings() {
         return new AiSettings(!"false".equals(get(ENABLED)), or(get(PROVIDER), envProvider),
                 or(secret(OPENAI_KEY), envOpenaiKey), or(get(OPENAI_URL), envOpenaiUrl), or(get(OPENAI_MODEL), envModel),
-                or(get(HF_URL), envHfUrl), or(secret(HF_TOKEN), envHfToken));
+                or(get(HF_URL), envHfUrl), or(secret(HF_TOKEN), envHfToken),
+                or(secret(CLAUDE_KEY), envClaudeKey), or(get(CLAUDE_URL), envClaudeUrl), or(get(CLAUDE_MODEL), envClaudeModel));
     }
 
     /** Why AI calls can't run now (switched off, not configured, budget used up), or null. */
@@ -149,7 +165,7 @@ public class AiOpsService {
             cost = price[0].multiply(BigDecimal.valueOf(c.promptTokens())).add(price[1].multiply(BigDecimal.valueOf(c.completionTokens())))
                     .divide(BigDecimal.valueOf(1_000_000), 6, RoundingMode.HALF_UP);
         }
-        usageRepository.save(AiUsageLog.builder().feature(feature).provider(s.huggingFace() ? "huggingface" : "openai").model(s.model())
+        usageRepository.save(AiUsageLog.builder().feature(feature).provider(s.providerKey()).model(s.model())
                 .promptTokens(c == null ? 0 : c.promptTokens()).completionTokens(c == null ? 0 : c.completionTokens())
                 .estimated(c != null && c.estimated()).costUsd(cost).latencyMs(c == null ? null : latencyMs).status(status)
                 .error(blocked != null ? blocked : c == null || c.error() == null ? null : OpenAiProviderCut.cut(c.error(), 300))
@@ -182,7 +198,10 @@ public class AiOpsService {
         AiSettings s = settings();
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("enabled", s.enabled());
-        m.put("provider", s.huggingFace() ? "huggingface" : "openai");
+        m.put("provider", s.providerKey());
+        m.put("claudeModel", s.claudeModel());
+        m.put("claudeUrl", s.claudeUrl());
+        m.put("claudeKey", keyView(CLAUDE_KEY, envClaudeKey));
         m.put("openaiModel", s.openaiModel());
         m.put("openaiUrl", s.openaiUrl());
         m.put("openaiKey", keyView(OPENAI_KEY, envOpenaiKey));
@@ -209,7 +228,8 @@ public class AiOpsService {
     @SuppressWarnings("unchecked")
     public Map<String, Object> update(Map<String, Object> body) {
         boolean keysTouched = body.containsKey("openaiKey") || body.containsKey("clearOpenaiKey") || body.containsKey("hfToken")
-                || body.containsKey("clearHfToken") || body.containsKey("openaiUrl") || body.containsKey("hfUrl");
+                || body.containsKey("clearHfToken") || body.containsKey("openaiUrl") || body.containsKey("hfUrl")
+                || body.containsKey("claudeKey") || body.containsKey("clearClaudeKey") || body.containsKey("claudeUrl");
         if (keysTouched && !isSuperAdmin()) throw new ApiException("Chỉ quản trị viên cấp cao được thay đổi API key và endpoint", HttpStatus.FORBIDDEN);
         List<String> changes = new ArrayList<>();
 
@@ -218,10 +238,10 @@ public class AiOpsService {
             changes.add(b ? "Bật các tính năng AI" : "Tắt toàn bộ tính năng AI");
         }
         if (body.get("provider") instanceof String p) {
-            if (!p.equals("openai") && !p.equals("huggingface")) throw bad("Nhà cung cấp không hợp lệ");
-            if (!p.equals(settings().huggingFace() ? "huggingface" : "openai")) {
+            if (!p.equals("openai") && !p.equals("huggingface") && !p.equals("claude")) throw bad("Nhà cung cấp không hợp lệ");
+            if (!p.equals(settings().providerKey())) {
                 put(PROVIDER, p);
-                changes.add("Nhà cung cấp: " + (p.equals("openai") ? "OpenAI" : "Mô hình tự train (Hugging Face)"));
+                changes.add("Nhà cung cấp: " + (p.equals("openai") ? "OpenAI" : p.equals("claude") ? "Anthropic Claude" : "Mô hình tự train (Hugging Face)"));
             }
         }
         if (body.get("openaiModel") instanceof String model) {
@@ -232,6 +252,16 @@ public class AiOpsService {
                 changes.add("Model: " + v);
             }
         }
+        if (body.get("claudeModel") instanceof String model) {
+            String v = model.trim();
+            if (!v.matches("[A-Za-z0-9._:\\-]{2,60}")) throw bad("Tên model không hợp lệ");
+            if (!v.equals(settings().claudeModel())) {
+                put(CLAUDE_MODEL, v);
+                changes.add("Model Claude: " + v);
+            }
+        }
+        url(body, "claudeUrl", CLAUDE_URL, "Endpoint Claude", changes);
+        secretField(body, "claudeKey", "clearClaudeKey", CLAUDE_KEY, "Claude API key", changes);
         url(body, "openaiUrl", OPENAI_URL, "Endpoint OpenAI", changes);
         url(body, "hfUrl", HF_URL, "Endpoint Hugging Face", changes);
         secretField(body, "openaiKey", "clearOpenaiKey", OPENAI_KEY, "OpenAI API key", changes);
