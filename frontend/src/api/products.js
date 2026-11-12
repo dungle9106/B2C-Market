@@ -22,6 +22,7 @@ export const imageSearch = (file, limit = 30) => {
 export const semanticProducts = (q, limit = 12) => http.get('/products/semantic', { params: { q, limit } })
 export const getProduct = (id) => http.get(`/products/${id}`)
 export const similarProducts = (id) => http.get(`/products/${id}/similar`)
+export const productShipping = (id, province) => http.get(`/products/${id}/shipping`, { params: { province } })
 
 export const listCategories = () => http.get('/categories')
 export const categoryTree = () => http.get('/categories/tree')

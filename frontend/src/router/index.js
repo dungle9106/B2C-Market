@@ -12,6 +12,7 @@ const routes = [
   { path: '/register', name: 'register', component: () => import('../views/AuthView.vue'), meta: { mode: 'register' } },
   // backend redirects here after Google OAuth2 login with #token=... or #error=...
   { path: '/oauth2/redirect', name: 'oauth2-redirect', component: () => import('../views/OAuth2RedirectView.vue') },
+  { path: '/products/:id/similar', name: 'similar-products', component: () => import('../views/buyer/SimilarProductsView.vue') },
   { path: '/products/:id', name: 'product-detail', component: () => import('../views/buyer/ProductDetailView.vue') },
   { path: '/search/image', name: 'image-search', component: () => import('../views/buyer/ImageSearchView.vue') },
   { path: '/search', name: 'search', component: () => import('../views/buyer/SearchView.vue') },

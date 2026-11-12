@@ -31,15 +31,19 @@
       </div>
       <div v-if="product.province" class="location">{{ product.province }}</div>
     </div>
+    <!-- hover (mouse only): jump to look-alikes without opening the product -->
+    <button type="button" class="similar" @click.prevent.stop="router.push({ name: 'similar-products', params: { id: product.id } })">Tìm sản phẩm tương tự</button>
   </router-link>
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
 import StarRating from './StarRating.vue'
 import { formatVnd, formatCount } from '../utils/format'
 import { trackAdClick } from '../api/marketing'
 
 const props = defineProps({ product: { type: Object, required: true } })
+const router = useRouter()
 
 // a sponsored search result: the shop pays for the click (charged at most once per visitor)
 function onOpen() {
@@ -70,6 +74,13 @@ const placeholder = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/
 .rating { min-height: 12px; }
 .location { font-size: 11px; color: var(--color-text-faint); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sponsored { position: absolute; left: 0; bottom: 0; background: rgba(0, 0, 0, 0.55); color: white; font-size: 11px; padding: 2px 6px; border-top-right-radius: 3px; }
+.product-card { position: relative; border: 1px solid transparent; }
+.similar { display: none; position: absolute; left: 0; right: 0; bottom: 0; border: none; background: var(--color-primary); color: white;
+  font-size: 12px; padding: 7px 4px; cursor: pointer; }
+@media (hover: hover) {
+  .product-card:hover { border-color: var(--color-primary); z-index: 1; }
+  .product-card:hover .similar { display: block; }
+}
 .tag.fav { background: var(--color-primary); color: white; border-color: var(--color-primary); }
 .tag.mall { background: #d0011b; color: white; border-color: #d0011b; }
 </style>

@@ -47,6 +47,7 @@ public class ProductService {
     private final StockService stockService;
     private final ProductModerationService moderationService;
     private final ProductReportRepository reportRepository;
+    private final ShippingService shippingService;
 
     // ==== Buyer-facing browsing ====
 
@@ -78,6 +79,38 @@ public class ProductService {
     public List<ProductResponse> flashSales(int limit) {
         return productRepository.findActiveFlashSales(LocalDateTime.now(), PageRequest.of(0, Math.min(limit, 30)))
                 .stream().map(ProductResponse::from).toList();
+    }
+
+    /**
+     * The product page's "Van chuyen toi": delivery options to a province, from the same fee table the checkout uses
+     * (carriers connected through their own API may still quote a slightly different fee at checkout).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> shippingEstimate(Long id, String province) {
+        if (!com.marketplace.backend.util.Provinces.isValid(province)) throw new ApiException("Vui lòng chọn tỉnh/thành phố", HttpStatus.BAD_REQUEST);
+        Product product = productRepository.findById(id).filter(p -> p.isActive() && p.getShop().isActive())
+                .orElseThrow(() -> new ApiException("Sản phẩm không tồn tại hoặc đã ngừng bán", HttpStatus.NOT_FOUND));
+        Shop shop = product.getShop();
+        List<ShippingService.ShippingOption> options = shippingService.options(shop.getProvince(), province, 1,
+                ShippingService.carrierCodes(shop.getCarriers()), shop.getHandlingDays() != null ? shop.getHandlingDays() : 1);
+        // a freeship product: the shop covers up to the cheapest economy fee, as at checkout
+        BigDecimal covered = product.isFreeShipping() ? shippingService.economyFee(options) : BigDecimal.ZERO;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("from", shop.getProvince());
+        m.put("to", province);
+        m.put("freeShipping", product.isFreeShipping());
+        m.put("freeShipMinOrder", shop.getFreeShipMinOrder());
+        m.put("options", options.stream().map(o -> {
+            Map<String, Object> x = new LinkedHashMap<>();
+            x.put("carrierName", o.getCarrierName());
+            x.put("methodName", o.getMethodName());
+            x.put("fee", o.getFee());
+            x.put("feeToPay", o.getFee().subtract(covered).max(BigDecimal.ZERO));
+            x.put("etaFrom", o.getEtaFrom());
+            x.put("etaTo", o.getEtaTo());
+            return x;
+        }).toList());
+        return m;
     }
 
     public ProductResponse getDetail(Long id, Long viewerUserId) {

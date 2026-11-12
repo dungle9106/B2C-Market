@@ -23,9 +23,10 @@
       <div class="detail-card">
         <!-- ===== gallery: video first (if any), then images ===== -->
         <div class="gallery">
-          <div class="main-media">
+          <div class="main-media" :class="{ zooming: !!zoom }">
             <video v-if="current && current.type === 'video'" :src="current.url" controls playsinline></video>
-            <img v-else :src="variantImage || (current ? current.url : placeholder)" :alt="product.name" />
+            <img v-else :src="variantImage || (current ? current.url : placeholder)" :alt="product.name"
+                 :style="zoom ? { transform: 'scale(2)', transformOrigin: zoom } : null" @mousemove="onZoom" @mouseleave="zoom = null" />
             <span v-if="product.discountPercent" class="discount-badge">-{{ product.discountPercent }}%</span>
           </div>
           <div v-if="media.length > 1" class="thumbs">
@@ -97,8 +98,27 @@
               <div v-if="product.freeShipping" class="freeship">
                 <span class="freeship-tag">Freeship</span> Miễn phí vận chuyển
               </div>
-              <div v-else>Phí vận chuyển <strong>{{ formatVnd(20000) }}</strong></div>
-              <div v-if="product.province" class="text-muted small">Gửi từ {{ product.province }}</div>
+              <div class="ship-to">
+                <span class="text-muted">Vận chuyển tới</span>
+                <select v-model="shipTo" class="ship-select" aria-label="Tỉnh/thành nhận hàng" @change="onShipTo">
+                  <option v-for="p in PROVINCES" :key="p" :value="p">{{ p }}</option>
+                </select>
+              </div>
+              <div v-if="shipBest" class="ship-best">
+                Phí vận chuyển
+                <s v-if="shipBest.feeToPay < shipBest.fee" class="text-muted">{{ formatVnd(shipBest.fee) }}</s>
+                <strong>{{ formatVnd(shipBest.feeToPay) }}</strong>
+                · Nhận hàng {{ shipDay(shipBest.etaFrom) }} – {{ shipDay(shipBest.etaTo) }}
+                <button v-if="shipChoices.length > 1" type="button" class="ship-more" @click="showAllShip = !showAllShip">
+                  {{ showAllShip ? 'Thu gọn' : 'Giao nhanh hơn' }}
+                </button>
+              </div>
+              <ul v-if="showAllShip && shipping" class="ship-list">
+                <li v-for="o in shipChoices" :key="o.methodName">
+                  {{ o.carrierName }} – {{ o.methodName }}: <strong>{{ formatVnd(o.feeToPay) }}</strong> · {{ shipDay(o.etaFrom) }} – {{ shipDay(o.etaTo) }}
+                </li>
+              </ul>
+              <div v-if="product.province" class="text-muted small">Gửi từ {{ product.province }} · phí ước tính, chốt ở bước thanh toán</div>
               <div v-if="shopInfo?.freeShipMinOrder" class="small freeship-shop">Shop miễn phí vận chuyển cho đơn từ {{ formatVnd(shopInfo.freeShipMinOrder) }}</div>
             </dd>
 
@@ -318,7 +338,9 @@ import StarRating from '../../components/StarRating.vue'
 import ProductReviews from '../../components/product/ProductReviews.vue'
 import ReportProductButton from '../../components/product/ReportProductButton.vue'
 import ProductQuestions from '../../components/product/ProductQuestions.vue'
-import { getProduct, similarProducts, getCategory } from '../../api/products'
+import { getProduct, similarProducts, getCategory, productShipping } from '../../api/products'
+import { myAddresses } from '../../api/orders'
+import { PROVINCES } from '../../utils/provinces'
 import { videoFeed } from '../../api/videos'
 import { getMyShop, publicShop } from '../../api/shop'
 import { productCombos, productAddOnDeals } from '../../api/marketing'
@@ -353,6 +375,50 @@ const similar = ref([])
 const categoryPath = ref([])
 const myShopId = ref(null)
 const videoCount = ref(0)
+
+// ---- image zoom (mouse only): the picture follows the pointer at 2x ----
+const zoom = ref(null)
+const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches
+function onZoom(e) {
+  if (!canHover) return
+  const r = e.currentTarget.getBoundingClientRect()
+  zoom.value = `${((e.clientX - r.left) / r.width) * 100}% ${((e.clientY - r.top) / r.height) * 100}%`
+}
+
+// ---- "Van chuyen toi": an estimate to the buyer's province (their default address, else the last one picked) ----
+const SHIP_KEY = 'shoppi.shipTo'
+const shipping = ref(null)
+const showAllShip = ref(false)
+const shipTo = ref((() => { try { return localStorage.getItem(SHIP_KEY) } catch { return null } })() || 'TP. Hồ Chí Minh')
+const shipBest = computed(() => shipping.value?.options?.[0] || null)
+// the cheapest carrier for each kind of delivery (economy, fast, same day), not every carrier
+const shipChoices = computed(() => {
+  const seen = new Set()
+  return (shipping.value?.options || []).filter(o => !seen.has(o.methodName) && seen.add(o.methodName))
+})
+const shipDay = (d) => { const [, m, day] = String(d).split('-'); return day + '/' + m }
+let shipAddressChecked = false
+async function loadShipping() {
+  if (!product.value) return
+  if (!shipAddressChecked && auth.isBuyer) {
+    shipAddressChecked = true
+    try {
+      const { data } = await myAddresses()
+      const home = data.find(a => a.default) || data[0]
+      if (home?.province && PROVINCES.includes(home.province)) shipTo.value = home.province
+    } catch { /* keep the remembered province */ }
+  }
+  try {
+    shipping.value = (await productShipping(product.value.id, shipTo.value)).data
+  } catch {
+    shipping.value = null
+  }
+}
+function onShipTo() {
+  try { localStorage.setItem(SHIP_KEY, shipTo.value) } catch { /* per-browser convenience only */ }
+  showAllShip.value = false
+  loadShipping()
+}
 const shopInfo = ref(null) // verified badge + shop policies
 const combos = ref([])
 const quantity = ref(1)
@@ -504,6 +570,7 @@ async function load(id) {
   window.scrollTo({ top: 0 })
 
   videoCount.value = 0
+  loadShipping()
   videoFeed({ productId: id, size: 1 }).then(({ data }) => { videoCount.value = data.totalItems }).catch(() => {})
   similarProducts(id).then(({ data }) => { similar.value = data }).catch(() => { similar.value = [] })
   shopInfo.value = null
@@ -535,7 +602,15 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 
 .main-media { position: relative; aspect-ratio: 1; background: #f5f5f5; }
 .main-media img, .main-media video { width: 100%; height: 100%; object-fit: contain; background: #000; }
-.main-media img { background: #f5f5f5; }
+.main-media img { background: #f5f5f5; transition: transform 0.08s; }
+.main-media { overflow: hidden; }
+.main-media.zooming img { cursor: zoom-in; transition: none; }
+.ship-to { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.ship-select { width: auto; margin: 0; padding: 3px 6px; font-size: 13px; }
+.ship-best { margin-top: 6px; }
+.ship-best s { margin-right: 2px; }
+.ship-more { background: none; border: none; color: #2673dd; cursor: pointer; font-size: 13px; padding: 0 0 0 6px; }
+.ship-list { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--color-text-muted); }
 .discount-badge { position: absolute; top: 0; right: 0; background: #ffe97a; color: var(--color-primary); font-weight: 700; padding: 4px 8px; }
 .fav-badge { background: var(--color-primary); color: white; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 2px; margin-left: 6px; }
 .gallery-actions { display: flex; justify-content: center; margin-top: 12px; }

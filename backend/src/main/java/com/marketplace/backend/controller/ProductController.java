@@ -115,6 +115,12 @@ public class ProductController {
         return ResponseEntity.ok(productService.topSelling());
     }
 
+    // public: ?province= -> { from, to, freeShipping, freeShipMinOrder, options: [{ carrierName, methodName, fee, feeToPay, etaFrom, etaTo }] }
+    @GetMapping("/{id}/shipping")
+    public ResponseEntity<Map<String, Object>> shipping(@PathVariable Long id, @RequestParam String province) {
+        return ResponseEntity.ok(productService.shippingEstimate(id, province));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> detail(@PathVariable Long id,
                                                   @AuthenticationPrincipal UserPrincipal principal,
