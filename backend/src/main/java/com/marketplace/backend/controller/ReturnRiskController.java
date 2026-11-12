@@ -40,6 +40,12 @@ public class ReturnRiskController {
         return ResponseEntity.ok(riskService.reanalyze(returnId));
     }
 
+    // lifts the refund hold: the seller may refund (or reject) as usual
+    @PostMapping("/{returnId}/release")
+    public ResponseEntity<Map<String, Object>> release(@PathVariable Long returnId) {
+        return ResponseEntity.ok(riskService.release(returnId));
+    }
+
     // body: { label: "ABUSE" | "LEGIT" | null, note }
     @PostMapping("/{returnId}/review")
     public ResponseEntity<Map<String, Object>> review(@PathVariable Long returnId, @RequestBody Map<String, String> body) {

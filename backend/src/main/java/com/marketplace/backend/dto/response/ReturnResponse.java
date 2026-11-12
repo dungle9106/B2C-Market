@@ -32,6 +32,7 @@ public class ReturnResponse {
     private LocalDateTime escalatedAt;            // a dispute: when the buyer complained
     private LocalDateTime sellerResponseDeadline; // the seller should answer in the dispute thread by then
     private String decision;                      // REFUND_FULL | REFUND_PARTIAL | REJECT once Shoppi decided
+    private LocalDateTime heldUntil;              // Shoppi is checking it: the seller can't refund before this (seller list only)
 
     @Data
     public static class Line {

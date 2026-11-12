@@ -16,8 +16,9 @@
 
     <ReturnCaseCard v-for="rr in filtered" :key="rr.id" :rr="rr">
       <template v-if="rr.status === 'REQUESTED'">
+        <span v-if="held(rr)" class="held">Shoppi đang kiểm tra yêu cầu này, bạn có thể đồng ý hoàn tiền sau khi kiểm tra xong (chậm nhất {{ formatDateTime(rr.heldUntil) }})</span>
         <button class="btn sm ghost" type="button" @click="rejecting = rr">Từ chối</button>
-        <button class="btn sm" type="button" :disabled="busyId === rr.id" @click="onApprove(rr)">Đồng ý hoàn {{ formatVnd(rr.refundAmount) }}</button>
+        <button class="btn sm" type="button" :disabled="busyId === rr.id || held(rr)" @click="onApprove(rr)">Đồng ý hoàn {{ formatVnd(rr.refundAmount) }}</button>
       </template>
       <!-- the buyer complained: the shop explains its side to Shoppi -->
       <template v-if="rr.complaint" #extra>
@@ -47,7 +48,7 @@ import ReturnCaseCard from '../../components/orders/ReturnCaseCard.vue'
 import DisputeThread from '../../components/orders/DisputeThread.vue'
 import { shopReturns, approveReturn, rejectReturn } from '../../api/orders'
 import { extractError } from '../../utils/apiError'
-import { formatVnd } from '../../utils/format'
+import { formatVnd, formatDateTime } from '../../utils/format'
 
 const list = ref([])
 const loading = ref(true)
@@ -75,6 +76,8 @@ async function load() {
     loading.value = false
   }
 }
+
+const held = (rr) => rr.heldUntil && new Date(rr.heldUntil) > new Date()
 
 async function onApprove(rr) {
   if (!confirm(`Đồng ý hoàn ${formatVnd(rr.refundAmount)} cho người mua?`)) return
@@ -111,4 +114,5 @@ onMounted(load)
 .link-btn { background: none; border: none; padding: 0; color: #2673dd; cursor: pointer; font-size: 13px; }
 .hint { font-size: 14px; color: var(--color-text-muted); margin: 0 0 12px; }
 .error { color: #d33; font-size: 13px; margin: 8px 0 0; }
+.held { flex-basis: 100%; color: #8a5a00; background: #fff4e0; border-radius: 3px; padding: 6px 10px; font-size: 13px; }
 </style>

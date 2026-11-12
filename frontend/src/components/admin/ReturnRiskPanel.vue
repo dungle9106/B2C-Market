@@ -16,6 +16,12 @@
           <span class="faint engine">{{ engine }} · {{ formatDateTime(a.updatedAt) }}</span>
         </div>
 
+        <div v-if="a.holdUntil" class="hold">
+          <span>⏸ <b>Đang tạm giữ hoàn tiền</b>: shop chưa thể đồng ý hoàn tiền đến {{ formatDateTime(a.holdUntil) }}. Shop vẫn có thể từ chối.</span>
+          <button type="button" class="btn sm" :disabled="busy" @click="release">Cho phép shop xử lý</button>
+        </div>
+        <p v-else-if="a.holdReleasedAt" class="faint">Đã bỏ tạm giữ lúc {{ formatDateTime(a.holdReleasedAt) }}.</p>
+
         <p v-if="!a.signals.length" class="faint">Không có tín hiệu đáng chú ý.</p>
         <ul class="signals">
           <li v-for="s in a.signals" :key="s.code">
@@ -56,7 +62,7 @@
 
         <div class="verdict">
           <strong>Kết luận của bạn</strong>
-          <span class="faint">Dùng để huấn luyện mô hình, không tự động xử lý tài khoản.</span>
+          <span class="faint">Dùng để huấn luyện mô hình, không tự động xử lý tài khoản. Kết luận "Hợp lệ" sẽ bỏ tạm giữ hoàn tiền.</span>
           <input v-model.trim="note" maxlength="500" placeholder="Ghi chú (không bắt buộc)" />
           <div class="actions">
             <button type="button" class="btn sm" :class="{ ghost: a.label !== 'ABUSE' }" :disabled="busy" @click="label('ABUSE')">Xác nhận lạm dụng</button>
@@ -72,7 +78,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { returnRiskDetail, reanalyzeReturnRisk, reviewReturnRisk } from '../../api/admin'
+import { returnRiskDetail, reanalyzeReturnRisk, reviewReturnRisk, releaseReturnHold } from '../../api/admin'
 import { extractError } from '../../utils/apiError'
 import { formatVnd, formatDateTime } from '../../utils/format'
 import { RETURN_STATUS, RETURN_REASONS, RISK_LEVEL } from '../../utils/returns'
@@ -118,6 +124,7 @@ async function run(call) {
 }
 const reanalyze = () => run(() => reanalyzeReturnRisk(props.returnId))
 const label = (value) => run(() => reviewReturnRisk(props.returnId, value, note.value))
+const release = () => run(() => releaseReturnHold(props.returnId))
 
 watch(() => props.returnId, load, { immediate: true })
 </script>
@@ -134,6 +141,8 @@ watch(() => props.returnId, load, { immediate: true })
 .score.MEDIUM b { color: #d98a00; } .score.MEDIUM em { background: #d98a00; }
 .score.HIGH b { color: #d0011b; } .score.HIGH em { background: #d0011b; }
 .engine { margin-left: auto; }
+.hold { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fff4e0; color: #8a5a00; border-radius: 4px; padding: 8px 12px; margin-bottom: 10px; }
+.hold .btn { margin-left: auto; }
 .signals { list-style: none; padding: 0; margin: 0 0 10px; }
 .signals li { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px dashed rgba(0, 0, 0, 0.09); }
 .signals small { display: block; color: var(--color-text-muted); }

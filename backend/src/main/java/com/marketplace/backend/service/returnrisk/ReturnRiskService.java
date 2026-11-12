@@ -12,6 +12,8 @@ import com.marketplace.backend.repository.*;
 import com.marketplace.backend.security.CurrentUser;
 import com.marketplace.backend.service.AIService;
 import com.marketplace.backend.service.AdminAuditService;
+import com.marketplace.backend.service.NotificationService;
+import com.marketplace.backend.service.TrackingService;
 import com.marketplace.backend.service.UploadService;
 import com.marketplace.backend.service.returnrisk.ReturnRiskRules.Features;
 import com.marketplace.backend.service.returnrisk.ReturnRiskRules.Signal;
@@ -23,6 +25,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -45,7 +49,8 @@ import java.util.stream.Collectors;
  *   3. for risky cases the LLM (OpenAI / Claude) writes a summary and looks at the evidence photo.
  * The LLM never changes the score, so text a buyer writes to fool it can't lower the risk. Nothing here refuses a
  * request or penalises anyone: admins see the result (sellers and buyers don't) and decide; their verdicts go back
- * into the case history and the models.
+ * into the case history and the models. The one effect: a high-risk request still waiting for the seller is held, the
+ * seller can't refund it until an admin lifts the hold, at most HOLD_HOURS later (an honest buyer is never stuck).
  */
 @Slf4j
 @Service
@@ -55,6 +60,7 @@ public class ReturnRiskService {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Set<ReturnStatus> OPEN = EnumSet.of(ReturnStatus.REQUESTED, ReturnStatus.REJECTED, ReturnStatus.ESCALATED);
     private static final Set<OrderStatus> PLACED = EnumSet.of(OrderStatus.DELIVERED, OrderStatus.RETURN_REQUESTED, OrderStatus.REFUNDED);
+    public static final int HOLD_HOURS = 48;
     private static final int SAME_IMAGE_BITS = 3;   // dHash distance under which two photos are the same picture
     private static final double SAME_TEXT = 0.8;
     private static final int MIN_TEXT_WORDS = 10;   // short complaints ("hang loi, mong shop hoan tien") are alike without being copied
@@ -70,6 +76,9 @@ public class ReturnRiskService {
     private final AdminAuditService auditService;
     private final ReturnRiskModelClient modelClient;
     private final TransactionTemplate tx;
+    private final PlatformTransactionManager txManager;
+    private final NotificationService notificationService;
+    private final TrackingService trackingService;
 
     // ==================== analysis ====================
 
@@ -80,7 +89,7 @@ public class ReturnRiskService {
     public void assessPending() {
         for (Long id : returnRepository.needingRiskCheck(OPEN, PageRequest.of(0, 5))) {
             try {
-                assess(id, false);
+                assess(id, false, true);
             } catch (Exception e) {
                 log.warn("Return risk check failed for request {}: {}", id, e.getMessage());
             }
@@ -88,7 +97,7 @@ public class ReturnRiskService {
     }
 
     // outside any transaction: the model and LLM calls can take seconds
-    private void assess(Long returnId, boolean alwaysAskLlm) {
+    private void assess(Long returnId, boolean alwaysAskLlm, boolean allowLlm) {
         Snapshot s = tx.execute(st -> snapshot(returnId));
         List<Signal> signals = new ArrayList<>(s.signals());
         Map<String, Number> features = s.features().toMap();
@@ -96,7 +105,7 @@ public class ReturnRiskService {
         if (model != null) signals.addAll(modelSignals(model));
         int score = ReturnRiskRules.clamp(signals.stream().mapToInt(Signal::points).sum());
         // a closed case is only case history: not worth paying for a review nobody will act on
-        boolean askLlm = alwaysAskLlm || (s.open() && score >= ReturnRiskRules.MEDIUM);
+        boolean askLlm = allowLlm && (alwaysAskLlm || (s.open() && score >= ReturnRiskRules.MEDIUM));
         String ai = askLlm ? aiReview(s, signals, score) : null;
         tx.executeWithoutResult(st -> save(returnId, s, signals, features, model, score, ai, askLlm));
     }
@@ -190,7 +199,18 @@ public class ReturnRiskService {
         else if (ai != null) a.setAiReview(ai);
         a.setEngine("RULES" + (model != null ? "+MODEL" : "") + (a.getAiReview() != null ? "+LLM" : ""));
         a.setUpdatedAt(LocalDateTime.now());
+        // a risky request still waiting for the seller: the refund waits for an admin (once per request)
+        boolean placeHold = "HIGH".equals(level) && rr.getStatus() == ReturnStatus.REQUESTED && a.getHeldAt() == null && !"LEGIT".equals(a.getLabel());
+        if (placeHold) a.setHeldAt(LocalDateTime.now());
         assessmentRepository.save(a);
+        if (placeHold) {
+            // neutral words: neither the seller nor the buyer is told the buyer is suspected
+            Order o = rr.getOrder();
+            notificationService.notify(o.getShop().getSeller().getId(), NotificationType.ORDER, "Shoppi đang kiểm tra yêu cầu trả hàng đơn " + o.getCode(),
+                    "Yêu cầu này cần Shoppi kiểm tra thêm (tối đa " + HOLD_HOURS + " giờ) trước khi bạn đồng ý hoàn tiền. Bạn vẫn có thể từ chối nếu yêu cầu không hợp lệ.",
+                    "/seller/returns");
+            trackingService.add(o, "RETURN_REVIEW", "Shoppi đang kiểm tra yêu cầu trả hàng/hoàn tiền (tối đa " + HOLD_HOURS + " giờ)", null);
+        }
         if ("HIGH".equals(level) && !wasHigh && s.open()) {
             auditService.notifyAdmins(AdminPermission.ORDERS, "Yêu cầu trả hàng rủi ro cao", "Đơn " + s.orderCode() + ": điểm rủi ro " + score + "/100, cần xem trước khi hoàn tiền",
                     "/admin/return-risk?id=" + returnId);
@@ -359,6 +379,69 @@ public class ReturnRiskService {
         }
     }
 
+    // ==================== refund hold ====================
+
+    /** When the hold on this request ends, or null when the seller may refund it now. */
+    @Transactional(readOnly = true)
+    public LocalDateTime holdUntil(Long returnId) {
+        return assessmentRepository.findByReturnRequestId(returnId).map(ReturnRiskService::activeHoldUntil).orElse(null);
+    }
+
+    /** Active holds of these requests: { returnId -> end of the hold }. */
+    @Transactional(readOnly = true)
+    public Map<Long, LocalDateTime> holds(Collection<Long> returnIds) {
+        Map<Long, LocalDateTime> m = new HashMap<>();
+        if (returnIds.isEmpty()) return m;
+        for (ReturnRiskAssessment a : assessmentRepository.findByReturnRequestIdIn(returnIds)) {
+            LocalDateTime until = activeHoldUntil(a);
+            if (until != null) m.put(a.getReturnRequestId(), until);
+        }
+        return m;
+    }
+
+    static LocalDateTime activeHoldUntil(ReturnRiskAssessment a) {
+        if (a.getHeldAt() == null || a.getHoldReleasedAt() != null) return null;
+        LocalDateTime until = a.getHeldAt().plusHours(HOLD_HOURS);
+        return until.isAfter(LocalDateTime.now()) ? until : null;
+    }
+
+    /**
+     * Before a seller refunds: a request filed moments ago may not have been checked yet, so the rules run now (no LLM).
+     * In a transaction of its own: the check is kept whatever happens to the refund, and a failure here never blocks
+     * the refund (fail open).
+     */
+    public void ensureAssessed(Long returnId) {
+        if (assessmentRepository.findByReturnRequestId(returnId).isPresent()) return;
+        TransactionTemplate own = new TransactionTemplate(txManager);
+        own.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        try {
+            own.executeWithoutResult(st -> assess(returnId, false, false));
+        } catch (Exception e) {
+            log.warn("Return risk check before refund failed for request {}: {}", returnId, e.getMessage());
+        }
+    }
+
+    /** "Cho phep shop xu ly": an admin lifts the hold. */
+    @Transactional
+    public Map<String, Object> release(Long returnId) {
+        ReturnRiskAssessment a = assessmentRepository.findByReturnRequestId(returnId).orElseThrow(() -> bad("Yêu cầu này chưa được phân tích"));
+        if (activeHoldUntil(a) == null) throw bad("Yêu cầu này không bị tạm giữ");
+        releaseHold(a, find(returnId));
+        return detail(returnId);
+    }
+
+    private void releaseHold(ReturnRiskAssessment a, ReturnRequest rr) {
+        a.setHoldReleasedAt(LocalDateTime.now());
+        a.setHoldReleasedBy(CurrentUser.id());
+        assessmentRepository.save(a);
+        Order o = rr.getOrder();
+        if (rr.getStatus() == ReturnStatus.REQUESTED) {
+            notificationService.notify(o.getShop().getSeller().getId(), NotificationType.ORDER, "Shoppi đã kiểm tra xong yêu cầu trả hàng đơn " + o.getCode(),
+                    "Bạn có thể xử lý yêu cầu (đồng ý hoàn tiền hoặc từ chối) như bình thường.", "/seller/returns");
+        }
+        auditService.log("RELEASE_RETURN_HOLD", "ORDER", o.getId(), o.getCode(), "Bỏ tạm giữ hoàn tiền");
+    }
+
     // ==================== admin ====================
 
     @Transactional(readOnly = true)
@@ -368,6 +451,8 @@ public class ReturnRiskService {
         m.put("highUnreviewed", assessmentRepository.countByLevelAndLabelIsNull("HIGH"));
         m.put("confirmedAbuse", assessmentRepository.countByLabel("ABUSE"));
         m.put("confirmedLegit", assessmentRepository.countByLabel("LEGIT"));
+        m.put("onHold", assessmentRepository.countActiveHolds(LocalDateTime.now().minusHours(HOLD_HOURS)));
+        m.put("holdHours", HOLD_HOURS);
         m.put("llm", aiService.isConfigured());
         m.put("model", modelClient.status());
         return m;
@@ -409,7 +494,7 @@ public class ReturnRiskService {
 
     /** "Phan tich lai": a fresh check that always asks the LLM. */
     public Map<String, Object> reanalyze(Long returnId) {
-        assess(returnId, true);
+        assess(returnId, true, true);
         return tx.execute(st -> detail(returnId));
     }
 
@@ -424,6 +509,8 @@ public class ReturnRiskService {
         a.setLabeledBy(label == null ? null : CurrentUser.id());
         a.setLabeledAt(label == null ? null : LocalDateTime.now());
         assessmentRepository.save(a);
+        // checked and found fine: the seller may refund now
+        if ("LEGIT".equals(label) && activeHoldUntil(a) != null) releaseHold(a, find(returnId));
         Order o = find(returnId).getOrder();
         auditService.log("REVIEW_RETURN_RISK", "ORDER", o.getId(), o.getCode(), label == null ? "Xóa kết luận AI đổi trả" : "Kết luận: " + label);
         return detail(returnId);
@@ -474,6 +561,7 @@ public class ReturnRiskService {
         m.put("score", a.getScore());
         m.put("level", a.getLevel());
         m.put("label", a.getLabel());
+        m.put("onHold", activeHoldUntil(a) != null);
         m.put("updatedAt", a.getUpdatedAt());
         return m;
     }
@@ -490,6 +578,9 @@ public class ReturnRiskService {
         m.put("label", a.getLabel());
         m.put("labelNote", a.getLabelNote());
         m.put("labeledAt", a.getLabeledAt());
+        m.put("heldAt", a.getHeldAt());
+        m.put("holdUntil", activeHoldUntil(a));
+        m.put("holdReleasedAt", a.getHoldReleasedAt());
         m.put("updatedAt", a.getUpdatedAt());
         return m;
     }

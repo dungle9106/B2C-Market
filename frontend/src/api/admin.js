@@ -75,6 +75,7 @@ export const returnRiskDetail = (returnId) => http.get(`/admin/return-risk/${ret
 export const reanalyzeReturnRisk = (returnId) => http.post(`/admin/return-risk/${returnId}/reanalyze`)
 export const reviewReturnRisk = (returnId, label, note) => http.post(`/admin/return-risk/${returnId}/review`, { label, note })
 export const trainReturnRisk = () => http.post('/admin/return-risk/train')
+export const releaseReturnHold = (returnId) => http.post(`/admin/return-risk/${returnId}/release`)
 
 // ---- buyer / seller disputes ----
 // status: OPEN | RESOLVED | ALL

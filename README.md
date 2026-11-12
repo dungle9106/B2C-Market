@@ -126,6 +126,10 @@ Trang `/admin/return-risk` (quyền Đơn hàng), và bảng phân tích ngay tr
 
 Không có FastAPI hoặc LLM thì phần luật vẫn chạy. Yêu cầu mới được chấm trong vòng khoảng 30 giây và chấm lại khi trở thành tranh chấp.
 
+**Tạm giữ hoàn tiền:** yêu cầu rủi ro cao còn chờ shop xử lý thì shop chưa bấm "Đồng ý hoàn" được (vẫn từ chối được) cho đến khi admin
+bấm "Cho phép shop xử lý" hoặc kết luận "Hợp lệ"; quá 48 giờ thì tự bỏ giữ để người mua thật không bị treo. Nếu shop bấm trước khi
+yêu cầu được chấm, hệ thống chấm ngay lúc đó (lỗi ở bước này thì vẫn cho hoàn tiền). Thông báo cho shop và người mua chỉ ghi "Shoppi đang kiểm tra".
+
 ### Shoppi Xu & Shoppi Mall
 
 - **Shoppi Xu** (`CoinService`, trang `/account/coins`): 1 Xu = 1₫. Tích 1% tiền hàng thực trả mỗi đơn, chốt lúc đặt và cộng

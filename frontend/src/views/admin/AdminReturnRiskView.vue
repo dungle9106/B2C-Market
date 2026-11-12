@@ -7,6 +7,7 @@
 
     <div class="chips">
       <span class="chip HIGH">Rủi ro cao: {{ s.HIGH ?? 0 }} <small>({{ s.highUnreviewed ?? 0 }} chưa xem)</small></span>
+      <span v-if="s.onHold" class="chip hold">⏸ Đang tạm giữ: {{ s.onHold }}</span>
       <span class="chip MEDIUM">Trung bình: {{ s.MEDIUM ?? 0 }}</span>
       <span class="chip LOW">Thấp: {{ s.LOW ?? 0 }}</span>
       <span class="chip">Đã kết luận: {{ s.confirmedAbuse ?? 0 }} lạm dụng / {{ s.confirmedLegit ?? 0 }} hợp lệ</span>
@@ -40,6 +41,7 @@
           <div class="faint">{{ r.buyerName }} ⟷ {{ r.shopName }}</div>
           <div class="item-bottom">
             <span>{{ RETURN_REASONS[r.reason] }} · <strong>{{ formatVnd(r.refundAmount) }}</strong></span>
+            <span v-if="r.onHold" class="held">⏸ Giữ</span>
             <span v-if="r.label" class="verdict" :class="r.label">{{ r.label === 'ABUSE' ? 'Lạm dụng' : 'Hợp lệ' }}</span>
           </div>
         </button>
@@ -132,6 +134,8 @@ onMounted(() => {
 .chip.HIGH { background: #fdecee; color: #d0011b; }
 .chip.MEDIUM { background: #fff4e0; color: #b97500; }
 .chip.LOW { background: #e6f7f4; color: #1a8a7a; }
+.chip.hold { background: #fff4e0; color: #8a5a00; font-weight: 600; }
+.held { font-size: 12px; color: #8a5a00; }
 .model { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; margin-bottom: 10px; }
 .msg { color: var(--color-text-muted); }
 .filters { display: flex; gap: 8px; }

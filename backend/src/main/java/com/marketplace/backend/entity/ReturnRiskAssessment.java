@@ -56,6 +56,11 @@ public class ReturnRiskAssessment {
     private Long labeledBy;
     private LocalDateTime labeledAt;
 
+    // refund hold: a risky request waits for an admin before the seller can refund (ReturnRiskService.HOLD_HOURS at most)
+    private LocalDateTime heldAt;
+    private LocalDateTime holdReleasedAt;
+    private Long holdReleasedBy;
+
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 }

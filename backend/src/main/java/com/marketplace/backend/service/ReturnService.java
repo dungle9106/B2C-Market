@@ -143,12 +143,21 @@ public class ReturnService {
 
     @Transactional(readOnly = true)
     public List<ReturnResponse> forMyShop() {
-        return returnRepository.findByOrderShopIdOrderByCreatedAtDesc(myShop().getId()).stream().map(ReturnResponse::from).toList();
+        List<ReturnResponse> list = returnRepository.findByOrderShopIdOrderByCreatedAtDesc(myShop().getId()).stream().map(ReturnResponse::from).toList();
+        Map<Long, LocalDateTime> holds = riskService.holds(list.stream().filter(r -> r.getStatus() == ReturnStatus.REQUESTED).map(ReturnResponse::getId).toList());
+        list.forEach(r -> r.setHeldUntil(holds.get(r.getId())));
+        return list;
     }
 
     public ReturnResponse approve(Long returnId) {
         ReturnRequest rr = ofMyShop(returnId);
         if (rr.getStatus() != ReturnStatus.REQUESTED) throw bad("Yêu cầu không còn chờ xử lý");
+        riskService.ensureAssessed(returnId);
+        LocalDateTime heldUntil = riskService.holdUntil(returnId);
+        if (heldUntil != null) {
+            throw bad("Shoppi đang kiểm tra yêu cầu này, bạn có thể đồng ý hoàn tiền sau khi kiểm tra xong (chậm nhất "
+                    + heldUntil.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM")) + "). Bạn vẫn có thể từ chối nếu yêu cầu không hợp lệ.");
+        }
         refund(rr, "Người bán đã chấp nhận yêu cầu");
         return ReturnResponse.from(rr);
     }
