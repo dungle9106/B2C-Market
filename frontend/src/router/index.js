@@ -13,6 +13,7 @@ const routes = [
   // backend redirects here after Google OAuth2 login with #token=... or #error=...
   { path: '/oauth2/redirect', name: 'oauth2-redirect', component: () => import('../views/OAuth2RedirectView.vue') },
   { path: '/products/:id', name: 'product-detail', component: () => import('../views/buyer/ProductDetailView.vue') },
+  { path: '/search/image', name: 'image-search', component: () => import('../views/buyer/ImageSearchView.vue') },
   { path: '/search', name: 'search', component: () => import('../views/buyer/SearchView.vue') },
   { path: '/category/:id', name: 'category', component: () => import('../views/buyer/CategoryView.vue') },
   // public shop page: profile, verified badge, policies, products
@@ -27,6 +28,11 @@ const routes = [
   { path: '/payment/vnpay-return', name: 'vnpay-return', component: () => import('../views/buyer/VnpayReturnView.vue') },
   { path: '/payment/:code', name: 'payment', component: () => import('../views/buyer/PaymentView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/orders/:id', name: 'order-detail', component: () => import('../views/buyer/OrderDetailView.vue'), meta: { requiresRole: 'BUYER' } },
+  { path: '/account/vouchers', name: 'voucher-wallet', component: () => import('../views/buyer/VoucherWalletView.vue'), meta: { requiresRole: 'BUYER' } },
+  { path: '/account/wallet', name: 'my-wallet', component: () => import('../views/buyer/WalletView.vue'), meta: { requiresRole: 'BUYER' } },
+  { path: '/account/coins', name: 'my-coins', component: () => import('../views/buyer/CoinsView.vue'), meta: { requiresRole: 'BUYER' } },
+  { path: '/account/likes', name: 'my-likes', component: () => import('../views/buyer/LikesView.vue'), meta: { requiresRole: 'BUYER' } },
+  { path: '/account/following', name: 'my-follows', component: () => import('../views/buyer/FollowingView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/orders', name: 'my-orders', component: () => import('../views/buyer/OrdersView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/chat', name: 'chatbot', component: () => import('../views/buyer/ChatbotView.vue'), meta: { requiresRole: 'BUYER' } },
   // chat with shops; ?shopId=&productId= / ?shopId=&orderId= starts a thread with a card attached, ?c= opens one
@@ -67,6 +73,8 @@ const routes = [
       { path: 'returns', name: 'seller-returns', component: () => import('../views/seller/SellerReturnsView.vue'), meta: { title: 'Trả hàng/Hoàn tiền' } },
       { path: 'flash-events', name: 'seller-flash-events', component: () => import('../views/seller/SellerFlashEventsView.vue'), meta: { title: 'Flash Sale Của Shoppi' } },
       { path: 'flash-sale', name: 'seller-flash-sale', component: () => import('../views/seller/SellerFlashSaleView.vue'), meta: { title: 'Flash Sale' } },
+      { path: 'performance', name: 'seller-performance', component: () => import('../views/seller/SellerPerformanceView.vue'), meta: { title: 'Hiệu quả hoạt động' } },
+      { path: 'addon-deals', name: 'seller-addon-deals', component: () => import('../views/seller/SellerAddOnDealsView.vue'), meta: { title: 'Mua kèm deal sốc' } },
       { path: 'combos', name: 'seller-combos', component: () => import('../views/seller/SellerCombosView.vue'), meta: { title: 'Combo khuyến mãi' } },
       { path: 'ads', name: 'seller-ads', component: () => import('../views/seller/SellerAdsView.vue'), meta: { title: 'Quảng cáo' } },
       { path: 'vouchers', name: 'seller-vouchers', component: () => import('../views/seller/SellerVouchersView.vue'), meta: { title: 'Mã giảm giá' } },
@@ -101,11 +109,13 @@ const routes = [
       { path: '', name: 'admin-dashboard', component: () => import('../views/admin/AdminDashboardView.vue') },
       { path: 'users', name: 'admin-users', component: () => import('../views/admin/AdminUsersView.vue'), meta: { perm: 'USERS' } },
       { path: 'users/:id', name: 'admin-user', component: () => import('../views/admin/AdminUserDetailView.vue'), meta: { perm: 'USERS' } },
+      { path: 'shop-performance', name: 'admin-shop-performance', component: () => import('../views/admin/AdminShopPerformanceView.vue'), meta: { perm: 'SHOPS' } },
       { path: 'shops', name: 'admin-shops', component: () => import('../views/admin/AdminShopsView.vue'), meta: { perm: 'SHOPS' } },
       { path: 'products', name: 'admin-products', component: () => import('../views/admin/AdminProductsView.vue'), meta: { perm: 'PRODUCTS' } },
       { path: 'categories', name: 'admin-categories', component: () => import('../views/admin/AdminCategoriesView.vue'), meta: { perm: 'PRODUCTS' } },
       { path: 'verifications', name: 'admin-verifications', component: () => import('../views/admin/AdminVerificationsView.vue'), meta: { perm: 'SHOPS' } },
       { path: 'orders', name: 'admin-orders', component: () => import('../views/admin/AdminOrdersView.vue'), meta: { perm: 'ORDERS' } },
+      { path: 'return-risk', name: 'admin-return-risk', component: () => import('../views/admin/AdminReturnRiskView.vue'), meta: { perm: 'ORDERS' } },
       { path: 'disputes', name: 'admin-disputes', component: () => import('../views/admin/AdminDisputesView.vue'), meta: { perm: 'ORDERS' } },
       // the old complaints page became the dispute centre
       { path: 'complaints', redirect: { name: 'admin-disputes' } },
@@ -132,6 +142,9 @@ const routes = [
       { path: 'monitoring', name: 'admin-monitoring', component: () => import('../views/admin/AdminMonitoringView.vue'), meta: { perm: 'SETTINGS' } }
     ]
   },
+  { path: '/wrong-account', name: 'wrong-account', component: () => import('../views/WrongAccountView.vue'), meta: { requiresAuth: true } },
+  // anything else (a typo such as "/admin.") gets a page instead of a blank screen
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue') }
 ]
 
 const router = createRouter({
@@ -152,7 +165,8 @@ router.beforeEach((to) => {
     if (auth.role !== to.meta.requiresRole) {
       // a buyer heading into the seller channel hasn't opened a shop yet
       if (sellerArea && auth.isBuyer) return { name: 'seller-register' }
-      return { name: 'home' }
+      // say which account this tab uses and offer to switch it, instead of a silent jump to the home page
+      return { name: 'wrong-account', query: { need: to.meta.requiresRole, redirect: to.fullPath } }
     }
   }
   return true

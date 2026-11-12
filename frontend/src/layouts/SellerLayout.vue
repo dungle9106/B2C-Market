@@ -171,6 +171,7 @@ const menu = [
       { label: 'Flash Sale Của Shop', to: { name: 'seller-flash-sale' } },
       { label: 'Flash Sale Của Shoppi', to: { name: 'seller-flash-events' } },
       { label: 'Combo Khuyến Mãi', to: { name: 'seller-combos' } },
+      { label: 'Mua Kèm Deal Sốc', to: { name: 'seller-addon-deals' } },
       { label: 'Quảng Cáo Shoppi', to: { name: 'seller-ads' } }
     ]
   },
@@ -209,6 +210,7 @@ const menu = [
     icon: ICON('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
     items: [
       { label: 'Tổng Quan Shop', to: { name: 'seller-dashboard' } },
+      { label: 'Hiệu Quả Hoạt Động', to: { name: 'seller-performance' } },
       { label: 'Phân Tích Doanh Thu', to: { name: 'seller-analytics-revenue' } },
       { label: 'Sản Phẩm & Tồn Kho', to: { name: 'seller-analytics-products' } },
       { label: 'Lượt Xem & Chuyển Đổi', to: { name: 'seller-analytics-traffic' } },

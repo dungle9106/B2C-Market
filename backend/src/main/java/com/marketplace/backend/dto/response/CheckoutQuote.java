@@ -24,6 +24,13 @@ public class CheckoutQuote {
     private BigDecimal shopDiscountTotal = BigDecimal.ZERO;
     private BigDecimal comboDiscountTotal = BigDecimal.ZERO;
     private BigDecimal platformDiscountTotal = BigDecimal.ZERO;
+    private long coinBalance;              // the buyer's Shoppi Xu
+    private long coinsUsable;              // how many this checkout accepts
+    private BigDecimal coinDiscountTotal = BigDecimal.ZERO;
+    private long coinsToEarn;              // reward once the orders are completed
+    private String membershipTier;         // name of the buyer's tier
+    private int coinMultiplierPercent;     // its bonus on the reward; 100 = none
+    private BigDecimal walletBalance = BigDecimal.ZERO;  // ShoppiPay
     private BigDecimal total = BigDecimal.ZERO;
     private int itemCount;
 
@@ -54,6 +61,8 @@ public class CheckoutQuote {
         // problems the buyer must fix before ordering (flash sale limits); preview only
         private List<String> notices = new ArrayList<>();
         private BigDecimal platformDiscount = BigDecimal.ZERO;
+        private BigDecimal coinDiscount = BigDecimal.ZERO;
+        private int coinsToEarn;
 
         private BigDecimal total = BigDecimal.ZERO;
     }

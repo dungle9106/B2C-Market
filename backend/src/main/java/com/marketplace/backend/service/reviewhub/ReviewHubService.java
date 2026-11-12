@@ -222,6 +222,7 @@ public class ReviewHubService {
         if (added > 0) {
             refreshShop(shop.getId());
             checkRecurring(shop);
+            alertUrgentImported(shop, source, batch);
         }
         auditless(shop, source, added, origin);
         return AdminMap.of("source", source.name(), "batch", batch, "rows", rows.size(), "added", added, "duplicates", duplicates,
@@ -355,6 +356,20 @@ public class ReviewHubService {
                 ReviewTextAnalyzer.cut(Objects.requireNonNullElse(i.getIssueSummary(), Objects.requireNonNullElse(i.getContent(), "")), 160)
                         + " · Hạn trả lời: " + i.getReplyDueAt().toLocalTime().withNano(0) + " " + i.getReplyDueAt().toLocalDate(),
                 "/seller/review-hub?item=" + i.getId());
+    }
+
+    // one alert per import, however many reviews the file holds, opening the most urgent one
+    private void alertUrgentImported(Shop shop, Source source, String batch) {
+        List<ReviewHubItem> urgent = repository.findByShopIdAndImportBatchAndPriorityLevelAndStatus(shop.getId(), batch, Level.URGENT, Status.NEW);
+        if (urgent.isEmpty()) return;
+        if (urgent.size() == 1) {
+            alertIfUrgent(urgent.get(0), shop);
+            return;
+        }
+        ReviewHubItem top = urgent.stream().max(Comparator.comparingInt(ReviewHubItem::getPriority)).orElseThrow();
+        notificationService.notify(shop.getSeller().getId(), NotificationType.SYSTEM, urgent.size() + " đánh giá cần trả lời gấp từ " + source.name(),
+                ReviewTextAnalyzer.cut(Objects.requireNonNullElse(top.getIssueSummary(), Objects.requireNonNullElse(top.getContent(), "")), 160),
+                "/seller/review-hub?item=" + top.getId());
     }
 
     /** A complaint repeating on one product (3+ in 14 days, more than the 14 days before): tell the seller once. */

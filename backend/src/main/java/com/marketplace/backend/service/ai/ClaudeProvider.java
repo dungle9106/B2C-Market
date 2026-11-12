@@ -23,13 +23,25 @@ public class ClaudeProvider implements AIProvider {
 
     @Override
     public Completion call(AiSettings s, String systemPrompt, String userPrompt) {
-        int estimatedIn = AIProvider.estimateTokens(systemPrompt) + AIProvider.estimateTokens(userPrompt);
+        return send(s, systemPrompt, userPrompt, AIProvider.estimateTokens(systemPrompt) + AIProvider.estimateTokens(userPrompt));
+    }
+
+    // image: a base64 "image" block before the text (all current Claude models read images)
+    @Override
+    public Completion callWithImage(AiSettings s, String systemPrompt, String userPrompt, byte[] image, String mime) {
+        List<Map<String, Object>> content = List.of(
+                Map.of("type", "image", "source", Map.of("type", "base64", "media_type", mime, "data", java.util.Base64.getEncoder().encodeToString(image))),
+                Map.of("type", "text", "text", userPrompt));
+        return send(s, systemPrompt, content, AIProvider.estimateTokens(systemPrompt) + AIProvider.estimateTokens(userPrompt) + 1000);
+    }
+
+    private Completion send(AiSettings s, String systemPrompt, Object userContent, int estimatedIn) {
         if (s.claudeKey() == null || s.claudeKey().isBlank()) return Completion.failed("Chưa cấu hình Claude API key", 0);
         Map<String, Object> body = Map.of(
                 "model", s.claudeModel(),
                 "max_tokens", 2048,
                 "system", systemPrompt,
-                "messages", List.of(Map.of("role", "user", "content", userPrompt)),
+                "messages", List.of(Map.of("role", "user", "content", userContent)),
                 "temperature", 0.7);
         try {
             String raw = webClient.post().uri(s.claudeUrl())

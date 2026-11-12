@@ -236,7 +236,7 @@ public class AdminUserService {
         return m;
     }
 
-    static Map<String, Object> map(Object... kv) {
+    public static Map<String, Object> map(Object... kv) {
         Map<String, Object> m = new LinkedHashMap<>();
         for (int i = 0; i < kv.length; i += 2) m.put((String) kv[i], kv[i + 1]);
         return m;

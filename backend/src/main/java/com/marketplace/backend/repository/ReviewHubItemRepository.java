@@ -34,4 +34,6 @@ public interface ReviewHubItemRepository extends JpaRepository<ReviewHubItem, Lo
 
     @Query("SELECT i FROM ReviewHubItem i WHERE i.issuesManual = true OR i.analyzedBy = 'AI'")
     List<ReviewHubItem> labeled();
+
+    List<ReviewHubItem> findByShopIdAndImportBatchAndPriorityLevelAndStatus(Long shopId, String importBatch, ReviewHubItem.Level level, ReviewHubItem.Status status);
 }

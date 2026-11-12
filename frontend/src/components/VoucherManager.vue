@@ -27,6 +27,7 @@
               <div class="v-title">{{ v.title }}</div>
               <span class="code">{{ v.code }}</span>
               <span v-if="!v.publicVisible" class="hidden-tag" title="Không hiển thị cho người mua, chỉ dùng được khi nhập mã">Ẩn</span>
+              <span v-if="v.audience && v.audience !== 'ALL'" class="hidden-tag aud-tag">{{ v.audienceLabel }}</span>
             </td>
             <td class="small">{{ TYPE_LABELS[v.type] }}<br />{{ v.productIds?.length ? `${v.productIds.length} sản phẩm` : shopMode ? 'Toàn shop' : 'Toàn sàn' }}</td>
             <td>{{ v.minOrder ? formatVnd(v.minOrder) : '—' }}</td>
@@ -116,6 +117,16 @@
             <input v-model="form.endAt" type="datetime-local" />
           </div>
         </div>
+        <div v-if="shopMode">
+          <label>Đối tượng áp dụng</label>
+          <select v-model="form.audience" :disabled="locked">
+            <option value="ALL">Mọi khách hàng</option>
+            <option value="FOLLOWERS">Người theo dõi shop</option>
+            <option value="NEW_CUSTOMERS">Khách mua lần đầu tại shop</option>
+            <option value="RETURNING_CUSTOMERS">Khách đã từng mua tại shop</option>
+          </select>
+          <p v-if="form.audience === 'FOLLOWERS'" class="small">Người mua phải bấm "Theo dõi" shop mới dùng được; voucher được báo cho người theo dõi và giúp tăng lượt theo dõi.</p>
+        </div>
         <label class="check">
           <input v-model="form.publicVisible" type="checkbox" />
           Hiển thị công khai trên trang shop / sản phẩm
@@ -188,7 +199,7 @@ function emptyForm() {
   const start = new Date()
   const end = new Date(start.getTime() + 7 * 24 * 3600 * 1000)
   return { code: '', type: 'PERCENT', value: null, maxDiscount: null, minOrder: 0, usageLimit: 100, perUserLimit: 1,
-    startAt: toLocalInput(start), endAt: toLocalInput(end), publicVisible: true, someProducts: false, productIds: [] }
+    startAt: toLocalInput(start), endAt: toLocalInput(end), publicVisible: true, someProducts: false, productIds: [], audience: 'ALL' }
 }
 const form = ref(emptyForm())
 
@@ -243,7 +254,7 @@ function openEdit(v) {
     code: v.code, type: v.type, value: Number(v.value), maxDiscount: v.maxDiscount ? Number(v.maxDiscount) : null,
     minOrder: v.minOrder ? Number(v.minOrder) : 0, usageLimit: v.usageLimit, perUserLimit: v.perUserLimit,
     startAt: toLocalInput(v.startAt), endAt: toLocalInput(v.endAt), publicVisible: v.publicVisible,
-    someProducts: !!v.productIds?.length, productIds: [...(v.productIds || [])]
+    someProducts: !!v.productIds?.length, productIds: [...(v.productIds || [])], audience: v.audience || 'ALL'
   }
   if (form.value.someProducts) loadProducts()
   creating.value = true
@@ -256,6 +267,7 @@ async function onSave() {
   try {
     const { someProducts, ...f } = form.value
     const body = { ...f, maxDiscount: f.type === 'PERCENT' ? f.maxDiscount || null : null, productIds: someProducts ? f.productIds : [] }
+    if (!props.shopMode) delete body.audience
     if (editing.value) await props.api.update(editing.value.id, body)
     else await props.api.create(body)
     creating.value = false
@@ -286,6 +298,7 @@ onMounted(load)
 .title { font-size: 19px; font-weight: 600; margin: 0; }
 .sub { font-size: 13px; color: var(--color-text-faint); margin: 4px 0 0; }
 .tabs { display: flex; border-bottom: 1px solid var(--color-border); margin-bottom: 12px; overflow-x: auto; }
+.aud-tag { background: #fff0eb; color: var(--color-primary); }
 .tabs button { background: none; border: none; border-bottom: 2px solid transparent; padding: 12px 16px; cursor: pointer; font-size: 14px; white-space: nowrap; }
 .tabs button.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 .count { color: var(--color-text-faint); }

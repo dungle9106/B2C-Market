@@ -112,6 +112,33 @@ Lưu ý: ổ đĩa của Render gói miễn phí không bền, ảnh tải lên 
 - **Upload ảnh/video**: `POST /api/uploads`, lưu ở thư mục `app.upload.dir` (mặc định `uploads/` trong thư mục
   chạy backend, đổi bằng biến `UPLOAD_DIR`). Chỉ nhận JPG/PNG/WEBP/GIF ≤ 5MB và MP4/WEBM ≤ 30MB.
 
+### AI phát hiện lạm dụng đổi trả
+
+Trang `/admin/return-risk` (quyền Đơn hàng), và bảng phân tích ngay trong màn hình Tranh chấp. Chỉ admin thấy; **AI không tự từ chối yêu cầu**.
+
+1. **Luật trên lịch sử ca** (`ReturnRiskRules`) cho điểm 0-100 giải thích được: tần suất và tỷ lệ trả hàng, khiếu nại từng bị bác, ảnh bằng chứng dùng lại
+   hoặc trùng tài khoản khác hoặc trùng ảnh đăng bán (SHA-256 + dHash), mô tả sao chép, nhiều tài khoản chung số nhận hàng. Có cả luật **giảm điểm**: nhiều người
+   cùng trả một sản phẩm, shop có tỷ lệ trả hàng cao, lịch sử mua tốt.
+2. **FastAPI** (`review-ai-service/app/return_risk.py`, cần `REVIEW_AI_URL`): Isolation Forest tìm ca bất thường; khi admin đã kết luận đủ (mỗi loại ít nhất 5 ca)
+   thêm Logistic Regression học từ kết luận đó. Cần ít nhất 30 ca để huấn luyện; tự huấn luyện lại mỗi đêm hoặc bấm trên trang admin.
+3. **OpenAI/Claude** (provider đang chọn ở trang AI, chỉ cho ca từ 40 điểm): tóm tắt ca, nêu điểm đáng ngờ và điểm có lợi cho người mua, đọc ảnh bằng chứng.
+   Nhận xét này **không làm thay đổi điểm**, nên chữ người mua viết để đánh lừa AI không hạ được rủi ro. Không gửi tên, email, số điện thoại lên LLM.
+
+Không có FastAPI hoặc LLM thì phần luật vẫn chạy. Yêu cầu mới được chấm trong vòng khoảng 30 giây và chấm lại khi trở thành tranh chấp.
+
+### Shoppi Xu & Shoppi Mall
+
+- **Shoppi Xu** (`CoinService`, trang `/account/coins`): 1 Xu = 1₫. Tích 1% tiền hàng thực trả mỗi đơn, chốt lúc đặt và cộng
+  sau thời gian giữ tiền nếu không có khiếu nại mở (`coin.earnPercent`); dùng tối đa 50% giá trị đơn (`coin.maxSpendPercent`).
+  Sàn tài trợ nên tiền đối soát của shop không đổi. Hủy đơn hoàn lại Xu; trả một phần hoàn tiền mặt và Xu theo tỷ lệ đã trả.
+- **Điểm danh hàng ngày**: chu kỳ 7 ngày (100, 100, 200, 100, 100, 100, 500 Xu), bỏ lỡ một ngày tính lại từ đầu.
+- **Ví ShoppiPay** (`ShoppiPayService`, trang `/account/wallet`): số dư trả thẳng khi đặt hàng, đơn hủy hoặc trả hàng được hoàn ngay vào ví.
+  Nạp tiền hiện là **mô phỏng**, cần nối cổng thanh toán thật trước khi dùng với tiền thật.
+- **Hạng thành viên** (`MembershipService`): tính từ tiền đã trả cho đơn đã giao trong 6 tháng gần nhất. Bạc từ 2 triệu (Xu x1,25),
+  Vàng từ 10 triệu (x1,5), Kim Cương từ 30 triệu (x2).
+- **Shoppi Mall**: admin cấp cho shop đã xác minh giấy tờ (`POST /api/admin/shops/{id}/mall`); huy hiệu Mall trên sản phẩm
+  và trang shop, bộ lọc `mall=true` khi tìm kiếm.
+
 ### Giỏ hàng & Đặt hàng
 
 - **Giỏ hàng**: chọn theo sản phẩm / theo shop / tất cả, sửa số lượng (giới hạn theo tồn kho), xóa nhiều,
@@ -614,6 +641,40 @@ Quyền **"Cấu hình & vận hành hệ thống"** (`PERM_SETTINGS`, trước 
   chữ ký). Khi triển khai thật, hãy khai báo IPN URL công khai (hoặc dùng ngrok) trong trang merchant VNPay.
 - Các ví MoMo/ZaloPay, thẻ và chuyển khoản vẫn là cổng **mô phỏng** như trước.
 
+### Đơn vị vận chuyển
+
+9 đơn vị, người bán chọn trong *Chính sách shop*; trang *Thanh toán & vận chuyển* của admin có bảng tổng quan:
+
+| Đơn vị | Dịch vụ | Phí & hành trình |
+| --- | --- | --- |
+| Giao Hàng Nhanh (GHN) | Tiết kiệm, Nhanh, Hỏa tốc | **API thật** (khi đã kết nối) |
+| Giao Hàng Tiết Kiệm (GHTK) | Tiết kiệm, Nhanh | **API thật** (khi đã kết nối) |
+| J&T Express, Viettel Post, Ninja Van, SPX Express, VNPost (EMS) | Tiết kiệm, Nhanh (Viettel Post có Hỏa tốc) | Mô phỏng |
+| Ahamove, GrabExpress | Hỏa tốc 1–2 giờ, chỉ nội tỉnh | Mô phỏng |
+
+- Phí mô phỏng = bảng phí theo gói và cùng/khác tỉnh, cộng phụ phí riêng từng hãng (SPX rẻ hơn nhưng chậm hơn 1 ngày, VNPost
+  chậm hơn 1 ngày, GrabExpress đắt nhất trong nhóm hỏa tốc). Shop không thể chỉ bật Ahamove/GrabExpress: phải có ít nhất một
+  đơn vị giao toàn quốc.
+- Kiến trúc: mỗi hãng có API thật là một lớp `CarrierGateway` (`service/shipping/`): báo giá ở bước thanh toán, tạo vận đơn
+  khi người bán bấm *Chuẩn bị hàng*, hủy vận đơn, cấu hình ở trang admin, cùng một webhook nhận trạng thái. Thêm hãng mới chỉ
+  cần thêm một lớp như vậy. Viettel Post, J&T, Ninja Van, SPX, VNPost, GrabExpress chỉ cấp API khi ký hợp đồng đối tác; Ahamove
+  cần tọa độ GPS của địa chỉ, nên các hãng này đang dùng bảng phí và hành trình mô phỏng.
+
+### Vận chuyển Giao Hàng Tiết Kiệm (GHTK, API thật)
+
+- **Cấu hình** ở `/admin/gateways`: API Token (được mã hóa) và mã đối tác (`X-Client-Source`), dự phòng bằng `GHTK_TOKEN`,
+  `GHTK_PARTNER_CODE`. Mặc định dùng môi trường thử nghiệm `https://services-staging.ghtklab.com`. Có nút *Kiểm tra kết nối*.
+- **Phí ship thật** (`GET /services/shipment/fee`): gói Tiết kiệm = đường bộ, gói Nhanh = đường bay; phí = phí vận chuyển +
+  phí bảo hiểm. GHTK báo không giao tới địa chỉ thì ẩn lựa chọn GHTK; GHTK không trả lời thì dùng bảng phí mô phỏng.
+- **Tạo vận đơn** (`POST /services/shipment/order`): địa chỉ gửi theo tên tỉnh/quận/phường, thu hộ COD (`pick_money`),
+  khai giá trị hàng, người mua đã trả phí ship (`is_freeship`), *Gửi tại bưu cục* = `pick_option: post`. Mã vận đơn = label
+  GHTK. Nếu GHTK đã hủy vận đơn trước đó, lần tạo lại dùng mã đơn mới (`<mã đơn>-2`) vì GHTK không cho dùng lại mã cũ.
+- **Hủy vận đơn** khi đơn bị hủy trước lúc lấy hàng (`POST /services/shipment/cancel/{label}`).
+- **Webhook** `POST /api/shipping/ghtk/webhook?key=…` (nhận cả form và JSON): 12 đang lấy hàng, 3 đã lấy hàng → đang giao,
+  4 đang giao, 5/6 đã giao (thu COD), 7/8 lấy hàng chưa thành công, 9/10 giao không thành công, 20 đang hoàn, 21/11 đã hoàn →
+  hủy đơn và nhập lại kho, -1 GHTK hủy vận đơn → người bán tạo lại. Các mã do shipper tự báo (45, 49, 123, 127, 128, 410) chỉ
+  mang tính tham khảo nên được bỏ qua.
+
 ### Vận chuyển Giao Hàng Nhanh (GHN, API thật)
 
 - **Cấu hình** ở `/admin/gateways`: token (được mã hóa) và ShopId, dự phòng bằng `GHN_TOKEN`, `GHN_SHOP_ID`. Mặc định dùng
@@ -629,6 +690,40 @@ Quyền **"Cấu hình & vận hành hệ thống"** (`PERM_SETTINGS`, trước 
   trên hành trình đơn: *picked* → đang giao, *delivered* → đã giao (thu COD), *delivery_fail*, *returned* → hệ thống hủy
   đơn và nhập lại kho, *cancel* → người bán tạo lại vận đơn. Đơn GHN không còn dùng bộ mô phỏng hành trình.
 - Shop cần nhập **Quận/Huyện, Phường/Xã lấy hàng** trong *Hồ sơ shop*. Webhook cũng cần backend có địa chỉ công khai.
+
+### Tính năng bổ sung theo Shopee
+
+- **Yêu thích sản phẩm** (♥ dưới ảnh sản phẩm, trang `/account/likes`) và **Theo dõi shop** (nút trên trang shop và trang
+  sản phẩm, trang `/account/following`, số người theo dõi trên trang shop). Bảng `product_likes`, `shop_follows`.
+- **Voucher theo đối tượng** (voucher của shop): mọi khách, **người theo dõi shop**, khách mua lần đầu tại shop, khách đã
+  từng mua (có đơn đã giao). Voucher cho người theo dõi chỉ được báo cho người theo dõi; trang shop nhắc "Theo dõi shop để
+  dùng N voucher". Người không đủ điều kiện được báo lý do khi thanh toán.
+- **Mua Kèm Deal Sốc / Mua để nhận quà** (Kênh Marketing → Mua Kèm Deal Sốc, `/seller/addon-deals`): mua một sản phẩm chính
+  thì sản phẩm mua kèm có giá sốc, hoặc mua sản phẩm chính đủ số tiền thì quà được miễn phí, tối đa N mỗi loại trong một
+  đơn. Trang sản phẩm chính hiện khối mua kèm / quà, bước thanh toán tự áp dụng và giải thích khoản tiết kiệm. Khoản giảm là
+  khuyến mãi do shop tài trợ (gộp với combo) nên đối soát và báo cáo đã tính đúng. Dòng đã được combo giảm không bị giảm hai lần.
+- **Hiệu quả hoạt động shop & điểm phạt (Sao Quả Tạ)** (người bán: Dữ Liệu → Hiệu Quả Hoạt Động; admin: Shop → Hiệu quả &
+  điểm phạt, quyền SHOPS):
+  - chỉ số 30 ngày: tỷ lệ đơn không thành công (do shop hủy), tỷ lệ giao hàng trễ (giao cho ĐVVC sau thời gian chuẩn bị
+    hàng + 1 ngày), tỷ lệ phản hồi chat, đánh giá shop;
+  - điểm phạt tính theo quý: mỗi thứ Hai, tuần trước có tỷ lệ hủy hoặc giao trễ ≥ 10% (từ 5 đơn) thì +1 điểm mỗi chỉ số;
+    sản phẩm bị admin gỡ do vi phạm +1 (hàng giả, hàng cấm +2; khôi phục thì điểm được hủy); admin phạt thủ công 1–5 điểm
+    hoặc hủy điểm (ghi nhật ký quản trị);
+  - mức xử lý: 3 điểm mất nhãn Yêu thích, 6 điểm không được đăng ký Flash Sale Shoppi, 12 điểm báo admin xem xét đình chỉ;
+  - **nhãn Shop Yêu Thích** xét tự động mỗi ngày (hoạt động ≥ 30 ngày, ≥ 20 đơn giao thành công / 30 ngày, đánh giá ≥ 4,5★,
+    hủy ≤ 5%, giao trễ ≤ 5%, phản hồi chat ≥ 70%, không có điểm phạt). Admin chỉnh các ngưỡng; nhãn hiện trên trang shop,
+    trang sản phẩm và thẻ sản phẩm.
+- **Tìm kiếm bằng hình ảnh** (biểu tượng 📷 trong ô tìm kiếm, `/search/image`, `POST /api/products/image-search`):
+  - luôn có: so sánh ảnh tải lên với ảnh bìa mọi sản phẩm theo màu sắc (histogram RGB 64 ô, bỏ nền trắng, chia phiếu mềm)
+    và hình dáng (dHash 64 bit). Ảnh bìa được lập chỉ mục nền mỗi 2 phút khi đổi ảnh (bảng `product_image_index`), admin có
+    nút "Lập chỉ mục ngay" ở trang AI;
+  - khi bật AI (OpenAI hoặc Claude, mô hình đọc được ảnh) và người dùng đã đăng nhập: AI nhận diện sản phẩm trong ảnh thành
+    mô tả và từ khóa, sản phẩm khớp mô tả được xếp trước, kèm % giống. Lượt gọi được ghi vào chi phí AI ("Tìm kiếm bằng
+    hình ảnh"). Khách chưa đăng nhập chỉ dùng so sánh hình ảnh (không tốn phí).
+- **Kho Voucher** (`/account/vouchers`): nút **Lưu** trên voucher của shop / trang sản phẩm và mục gợi ý (Shoppi Voucher,
+  voucher của shop đang theo dõi); lưu voucher riêng tư bằng cách nhập mã. Mỗi voucher hiện trạng thái (dùng được, chưa đến
+  giờ, đã dùng hết lượt, hết hạn). Voucher đã lưu đứng đầu danh sách ở bước thanh toán (voucher riêng tư đã lưu cũng chọn
+  được). Voucher đã lưu sắp hết hạn trong 24 giờ được nhắc một lần.
 
 ### Trung tâm đánh giá (AI quản lý đánh giá & phản hồi)
 

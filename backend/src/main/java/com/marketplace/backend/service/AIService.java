@@ -67,6 +67,21 @@ public class AIService {
         return answer.trim();
     }
 
+    /** The model's answer about an image, or null (AI off / over budget / no vision / failed): callers fall back. */
+    public String describeImageOrNull(String systemPrompt, String userPrompt, byte[] image, String mime) {
+        AiSettings s = ops.settings();
+        String feature = AiOpsService.featureOfCaller();
+        String blocked = ops.blockReason(s);
+        if (blocked != null) {
+            if (s.configured()) ops.record(feature, s, null, 0, blocked);
+            return null;
+        }
+        long start = System.nanoTime();
+        AIProvider.Completion c = provider(s).callWithImage(s, systemPrompt, userPrompt, image, mime);
+        ops.record(feature, s, c, (int) ((System.nanoTime() - start) / 1_000_000), null);
+        return c.error() != null || c.text() == null || c.text().isBlank() ? null : c.text().trim();
+    }
+
     /** Admin "Kiem tra ket noi": one tiny call with the current settings, even when AI is switched off. */
     public Map<String, Object> testConnection() {
         AiSettings s = ops.settings();

@@ -57,7 +57,13 @@
     <div class="category-strip">
       <div class="container strip-inner">
         <router-link to="/orders" v-if="auth.isBuyer">Đơn hàng của tôi</router-link>
+        <router-link to="/account/vouchers" v-if="auth.isBuyer">🎟 Kho Voucher</router-link>
+        <router-link to="/account/coins" v-if="auth.isBuyer">🪙 Shoppi Xu</router-link>
+        <router-link to="/account/wallet" v-if="auth.isBuyer">💳 ShoppiPay</router-link>
+        <router-link to="/account/likes" v-if="auth.isBuyer">♥ Yêu thích</router-link>
+        <router-link to="/account/following" v-if="auth.isBuyer">Shop theo dõi</router-link>
         <router-link to="/search?q=">Tất cả sản phẩm</router-link>
+        <router-link to="/search?mall=true">Shoppi Mall</router-link>
         <span class="tag">Freeship</span>
         <span class="tag">Voucher giảm giá</span>
       </div>

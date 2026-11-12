@@ -18,6 +18,7 @@ public class ProductSearchCriteria {
     private List<String> provinces;   // shop location
     private Boolean freeShipping;
     private Boolean onSale;           // discounted or in a running flash sale
+    private Boolean mall;             // "Shoppi Mall" shops only
     // relevance | newest | bestselling | price_asc | price_desc | rating
     private String sort = "relevance";
     private int page = 0;

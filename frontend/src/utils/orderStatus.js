@@ -20,6 +20,7 @@ const PAYMENT_METHODS = {
   CARD: 'Thẻ tín dụng/ghi nợ',
   BANK_TRANSFER: 'Chuyển khoản ngân hàng',
   VNPAY: 'VNPay',
+  SHOPPI_PAY: 'Ví ShoppiPay',
   MOCK_ONLINE: 'Thanh toán online'
 }
 const PROVIDERS = { MOMO: 'MoMo', ZALOPAY: 'ZaloPay', VNPAY: 'VNPay', VISA: 'Visa', MASTERCARD: 'Mastercard', JCB: 'JCB' }

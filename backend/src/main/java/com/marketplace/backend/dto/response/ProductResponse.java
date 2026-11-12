@@ -16,6 +16,9 @@ public class ProductResponse {
     // ---- summary (product cards, lists) ----
     private Long id;
     private String name;
+    private Boolean available;         // favourites list: still for sale (null elsewhere)
+    private boolean shopFavorite;      // the shop has the "Yeu thich" badge
+    private boolean shopMall;          // the shop has the "Shoppi Mall" badge
     private BigDecimal price;          // what the buyer pays now (flash sale applied)
     private BigDecimal originalPrice;  // crossed-out price, null when not discounted
     private Integer discountPercent;   // e.g. 25 for "-25%", null when not discounted
@@ -127,6 +130,8 @@ public class ProductResponse {
             r.setShopId(p.getShop().getId());
             r.setShopName(p.getShop().getName());
             r.setProvince(p.getShop().getProvince());
+            r.setShopFavorite(p.getShop().isFavorite());
+            r.setShopMall(p.getShop().isMall());
         }
         if (p.getCategory() != null) {
             r.setCategoryId(p.getCategory().getId());

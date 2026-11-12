@@ -13,12 +13,13 @@
               <span v-else>{{ shop.name.charAt(0).toUpperCase() }}</span>
             </div>
             <div class="identity">
-              <h1>{{ shop.name }}</h1>
+              <h1><span v-if="shop.mall" class="fav-badge mall-badge" title="Cửa hàng chính hãng trên Shoppi Mall">Mall</span><span v-else-if="shop.favorite" class="fav-badge" title="Shop đạt tiêu chí Shop Yêu Thích của Shoppi">Yêu thích</span>{{ shop.name }}</h1>
               <span v-if="shop.verified" class="verified-badge" :title="`${BUSINESS_TYPES[shop.businessType] || 'Shop'} đã được Shoppi xác minh giấy tờ`">
                 ✓ Đã xác minh<template v-if="shop.businessType && shop.businessType !== 'INDIVIDUAL'"> · {{ BUSINESS_TYPES[shop.businessType] }}</template>
               </span>
               <span v-if="!shop.active" class="paused">Shop đang tạm ngưng</span>
               <div class="actions">
+                <FollowButton :shop-id="shop.id" variant="light" @change="onFollow" />
                 <router-link v-if="!auth.isSeller && !auth.isAdmin" :to="{ name: 'messages', query: { shopId: shop.id } }" class="btn sm ghost-light">💬 Chat</router-link>
               </div>
             </div>
@@ -26,6 +27,7 @@
 
           <ul class="stats">
             <li><span class="k">Sản phẩm</span><span class="v">{{ shop.productCount }}</span></li>
+            <li><span class="k">Người theo dõi</span><span class="v">{{ formatCount(follow.count) }}</span></li>
             <li><span class="k">Đánh giá</span><span class="v">{{ shop.ratingAvg ? `${shop.ratingAvg.toFixed(1)} ★ (${shop.ratingCount})` : 'Chưa có' }}</span></li>
             <li><span class="k">Gửi từ</span><span class="v">{{ shop.province || '–' }}</span></li>
             <li v-if="shop.chatResponseRate != null"><span class="k">Phản hồi chat</span><span class="v">{{ shop.chatResponseRate.toLocaleString('vi-VN') }}%<template v-if="shop.chatResponseTime"> ({{ shop.chatResponseTime.toLowerCase() }})</template></span></li>
@@ -52,6 +54,9 @@
           </div>
         </section>
 
+        <p v-if="follow.followerVouchers && !follow.following" class="follow-nudge">
+          🎁 Theo dõi shop để dùng {{ follow.followerVouchers }} voucher dành riêng cho người theo dõi
+        </p>
         <ShopVoucherStrip :shop-id="shop.id" class="shopee-section" />
 
         <!-- "Danh muc cua Shop" tabs -->
@@ -78,11 +83,12 @@ import { useRoute } from 'vue-router'
 import AppHeader from '../../components/AppHeader.vue'
 import ProductBrowser from '../../components/ProductBrowser.vue'
 import ShopVoucherStrip from '../../components/ShopVoucherStrip.vue'
+import FollowButton from '../../components/FollowButton.vue'
 import { publicShop } from '../../api/shop'
 import { publicShopCategories } from '../../api/products'
 import { useAuthStore } from '../../stores/auth'
 import { BUSINESS_TYPES, returnDaysLabel, joinedAgo } from '../../utils/shop'
-import { formatVnd } from '../../utils/format'
+import { formatVnd, formatCount } from '../../utils/format'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -91,6 +97,8 @@ const notFound = ref(false)
 const categories = ref([])
 const activeCat = computed(() => (route.query.cat ? Number(route.query.cat) : null))
 const activeCatName = computed(() => categories.value.find(c => c.id === activeCat.value)?.name)
+const follow = ref({ count: 0, following: false, followerVouchers: 0 })
+const onFollow = (s) => { follow.value = s }
 
 watch(() => route.params.id, async (id) => {
   shop.value = null
@@ -107,6 +115,8 @@ watch(() => route.params.id, async (id) => {
 
 <style scoped>
 .shop-head { background: white; box-shadow: var(--shadow-card); }
+.fav-badge { background: var(--color-primary); color: white; font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
+.follow-nudge { margin: 0 0 8px; padding: 10px 14px; background: #fff6f3; border: 1px dashed #f2b8a9; border-radius: 3px; color: var(--color-primary); font-size: 14px; }
 .head-inner { display: grid; grid-template-columns: 400px 1fr; gap: 32px; align-items: center; padding-top: 20px; padding-bottom: 20px; }
 .card-box {
   position: relative; height: 136px; border-radius: 4px; padding: 16px 20px;
@@ -149,4 +159,5 @@ watch(() => route.params.id, async (id) => {
   .head-inner { grid-template-columns: 1fr; gap: 16px; }
   .about { grid-template-columns: 1fr; }
 }
+.mall-badge { background: #d0011b; color: white; }
 </style>

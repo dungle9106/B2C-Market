@@ -7,6 +7,7 @@ import com.marketplace.backend.exception.ApiException;
 import com.marketplace.backend.repository.PlatformSettingRepository;
 import com.marketplace.backend.security.SecretCipher;
 import com.marketplace.backend.service.ShippingService.ShippingOption;
+import com.marketplace.backend.service.shipping.CarrierGateway;
 import com.marketplace.backend.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class GhnService {
+public class GhnService implements CarrierGateway {
 
     static final String TOKEN = "ghn.token", SHOP_ID = "ghn.shopId", API_URL = "ghn.apiUrl", ENABLED = "ghn.enabled", WEBHOOK_KEY = "ghn.webhookKey";
     static final String SANDBOX_API = "https://dev-online-gateway.ghn.vn/shiip/public-api";
@@ -78,6 +79,12 @@ public class GhnService {
     private final Map<String, Cached<List<Place>>> master = new ConcurrentHashMap<>();
     private final Map<String, Cached<BigDecimal>> fees = new ConcurrentHashMap<>();
 
+    @Override
+    public String code() {
+        return CODE;
+    }
+
+    @Override
     public boolean ready() {
         return settings().ready();
     }
@@ -150,9 +157,6 @@ public class GhnService {
         return CODE.equals(o.getCarrier()) && o.getRecipientPhone() != null && ready();
     }
 
-    public record Booking(String orderCode, BigDecimal fee, LocalDateTime expectedDelivery) {
-    }
-
     /** Books the parcel with GHN; the order_code becomes the tracking number. Throws with GHN's reason. */
     public Booking createOrder(Order o) {
         Settings s = settings();
@@ -206,7 +210,7 @@ public class GhnService {
                 // GHN sends ISO dates; anything else is just not shown
             }
         }
-        return new Booking(code, data.has("total_fee") ? BigDecimal.valueOf(data.path("total_fee").asLong()) : null, eta);
+        return new Booking(code, data.has("total_fee") ? BigDecimal.valueOf(data.path("total_fee").asLong()) : null, eta, "ready_to_pick");
     }
 
     /** Cancels a GHN booking (order cancelled before pick-up); failures are only logged. */

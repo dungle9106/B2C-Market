@@ -1,5 +1,7 @@
 package com.marketplace.backend.service;
 
+import com.marketplace.backend.service.shipping.CarrierGateway;
+import com.marketplace.backend.service.shipping.CarrierGateways;
 import com.marketplace.backend.dto.request.AddToCartRequest;
 import com.marketplace.backend.dto.response.CartItemResponse;
 import com.marketplace.backend.dto.response.OrderResponse;
@@ -40,8 +42,9 @@ public class OrderService {
     private static final Set<ReturnStatus> OPEN_RETURN =
             EnumSet.of(ReturnStatus.REQUESTED, ReturnStatus.REJECTED, ReturnStatus.ESCALATED, ReturnStatus.REFUNDED);
 
-    private final GhnService ghnService;
+    private final CarrierGateways carrierGateways;
     private final RefundService refundService;
+    private final CoinService coinService;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final ProductVariantRepository variantRepository;
@@ -178,10 +181,8 @@ public class OrderService {
      */
     public void cancel(Order order, String by, String reason) {
         if (order.getStatus() == OrderStatus.CANCELLED) return;
-        // booked with GHN but not picked up yet: cancel the booking too
-        if ("GHN".equals(order.getShippingGateway()) && order.getStatus() == OrderStatus.CONFIRMED && order.getTrackingNumber() != null) {
-            ghnService.cancel(order.getTrackingNumber());
-        }
+        // booked with a real carrier (GHN, GHTK...) but not picked up yet: cancel the booking too
+        if (order.getStatus() == OrderStatus.CONFIRMED) carrierGateways.cancelBooking(order);
         Map<Long, Integer> all = order.getItems().stream().collect(Collectors.toMap(OrderItem::getId, OrderItem::getQuantity));
         restock(order, all, InventoryReason.CANCEL);
         order.setStatus(OrderStatus.CANCELLED);
@@ -203,6 +204,7 @@ public class OrderService {
             payment.setStatus(paid ? PaymentStatus.REFUNDED : PaymentStatus.CANCELLED);
             if (paid) refundService.create(order, null, order.getTotal(), Refund.Source.ORDER_CANCELLED, "Hủy đơn: " + reason);
         }
+        coinService.giveBack(order, order.getCoinDiscount().longValue(), order.getCode(), "Hoàn Xu đơn đã hủy " + order.getCode());
         String who = switch (by) {
             case "SELLER" -> "Người bán";
             case "SYSTEM" -> "Hệ thống";
@@ -355,12 +357,13 @@ public class OrderService {
         order.setPickupMethod(method);
         order.setPickupDate(date);
         if (order.getTrackingNumber() == null) {
-            if (ghnService.handles(order)) {
-                // book the parcel with the real GHN: its order code is the tracking number, its webhooks the timeline
-                GhnService.Booking b = ghnService.createOrder(order);
-                order.setTrackingNumber(b.orderCode());
-                order.setShippingGateway("GHN");
-                order.setGatewayStatus("ready_to_pick");
+            CarrierGateway gateway = carrierGateways.forOrder(order).orElse(null);
+            if (gateway != null) {
+                // book the parcel with the real carrier: its code is the tracking number, its webhooks the timeline
+                CarrierGateway.Booking b = gateway.createOrder(order);
+                order.setTrackingNumber(b.trackingNumber());
+                order.setShippingGateway(gateway.code());
+                order.setGatewayStatus(b.status());
                 order.setGatewayFee(b.fee());
             } else {
                 order.setTrackingNumber(TrackingService.newTrackingNumber(order.getCarrier()));

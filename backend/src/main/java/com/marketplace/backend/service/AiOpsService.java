@@ -78,11 +78,11 @@ public class AiOpsService {
     }
 
     /** caller class -> feature key, and the labels shown on the dashboard */
-    static final Map<String, String> CALLERS = Map.of(
-            "ChatbotService", "CHATBOT", "SellerAIService", "PRODUCT_WRITER", "SellerAIController", "PRODUCT_WRITER",
-            "ReviewInsightService", "REVIEW_INSIGHT", "SalesAssistantService", "SALES_ASSISTANT", "PromoAdvisorService", "PROMO_ADVISOR",
-            "ReplySuggestService", "REPLY_SUGGEST", "AIService", "CONNECTION_TEST",
-            "ReviewAiService", "REVIEW_HUB", "ReviewHubService", "REVIEW_HUB");
+    static final Map<String, String> CALLERS = Map.ofEntries(
+            Map.entry("ChatbotService", "CHATBOT"), Map.entry("SellerAIService", "PRODUCT_WRITER"), Map.entry("SellerAIController", "PRODUCT_WRITER"),
+            Map.entry("ReviewInsightService", "REVIEW_INSIGHT"), Map.entry("SalesAssistantService", "SALES_ASSISTANT"),
+            Map.entry("PromoAdvisorService", "PROMO_ADVISOR"), Map.entry("ReplySuggestService", "REPLY_SUGGEST"), Map.entry("AIService", "CONNECTION_TEST"),
+            Map.entry("ReturnRiskService", "RETURN_RISK"), Map.entry("ImageSearchService", "IMAGE_SEARCH"), Map.entry("ReviewAiService", "REVIEW_HUB"), Map.entry("ReviewHubService", "REVIEW_HUB"));
     static final Map<String, String> FEATURES = new LinkedHashMap<>();
 
     static {
@@ -93,6 +93,8 @@ public class AiOpsService {
         FEATURES.put("PROMO_ADVISOR", "Gợi ý khuyến mãi");
         FEATURES.put("REPLY_SUGGEST", "Gợi ý trả lời khách");
         FEATURES.put("REVIEW_HUB", "Quản lý đánh giá (phân loại, soạn trả lời)");
+        FEATURES.put("IMAGE_SEARCH", "Tìm kiếm bằng hình ảnh");
+        FEATURES.put("RETURN_RISK", "Phát hiện lạm dụng đổi trả");
         FEATURES.put("CONNECTION_TEST", "Kiểm tra kết nối");
         FEATURES.put("OTHER", "Khác");
     }

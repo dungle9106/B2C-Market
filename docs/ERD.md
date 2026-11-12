@@ -1,6 +1,6 @@
 # Sơ đồ cơ sở dữ liệu (ERD)
 
-Sinh tự động từ 50 entity JPA trong `backend/src/main/java/com/marketplace/backend/entity`
+Sinh tự động từ 56 entity JPA trong `backend/src/main/java/com/marketplace/backend/entity`
 (cộng bảng `product_embeddings` do `EmbeddingStore` tạo, cột `embedding vector(256)` khi có pgvector).
 
 - Xem trực tiếp trên GitHub (GitHub vẽ được Mermaid), hoặc dán khối mã vào <https://mermaid.live>.
@@ -265,7 +265,7 @@ erDiagram
     flash_sale_registrations }o--|| shops : shop
 ```
 
-## 2. Toàn bộ 50 bảng
+## 2. Toàn bộ 56 bảng
 
 ```mermaid
 erDiagram
@@ -299,6 +299,22 @@ erDiagram
         decimal balance_after
         varchar note
         timestamp created_at
+    }
+    addon_deals {
+        bigint id PK
+        bigint shop_id FK
+        varchar name
+        enum type
+        timestamp start_at
+        timestamp end_at
+        boolean active
+        decimal min_spend
+        int purchase_limit
+        varchar main_products
+        varchar items
+        timestamp created_at
+        bigint product_id
+        decimal deal_price
     }
     addresses {
         bigint id PK
@@ -621,6 +637,19 @@ erDiagram
         varchar visitor_key
         timestamp created_at
     }
+    product_image_index {
+        bigint product_id PK
+        varchar image_url
+        varchar histogram
+        bigint dhash
+        timestamp indexed_at
+    }
+    product_likes {
+        bigint id PK
+        bigint user_id FK
+        bigint product_id FK
+        timestamp created_at
+    }
     product_questions {
         bigint id PK
         bigint product_id FK
@@ -735,6 +764,13 @@ erDiagram
         timestamp reviewed_at
         varchar more_25_columns
     }
+    saved_vouchers {
+        bigint id PK
+        bigint user_id FK
+        bigint voucher_id FK
+        timestamp saved_at
+        timestamp reminded_at
+    }
     settlements {
         bigint id PK
         varchar code
@@ -767,13 +803,32 @@ erDiagram
         int default_return_days
         varchar return_conditions
         varchar carriers
-        varchar more_18_columns
+        varchar more_20_columns
     }
     shop_categories {
         bigint id PK
         bigint shop_id FK
         varchar name
         int position
+        timestamp created_at
+    }
+    shop_follows {
+        bigint id PK
+        bigint user_id FK
+        bigint shop_id FK
+        timestamp created_at
+    }
+    shop_penalties {
+        bigint id PK
+        bigint shop_id FK
+        enum code
+        int points
+        varchar reason
+        varchar ref_key
+        bigint created_by
+        boolean revoked
+        varchar revoke_reason
+        timestamp revoked_at
         timestamp created_at
     }
     shop_verifications {
@@ -879,10 +934,11 @@ erDiagram
         timestamp start_at
         timestamp end_at
         boolean active
-        varchar more_6_columns
+        varchar more_7_columns
     }
     ad_campaigns }o--|| shops : shop
     ad_campaigns }o--|| products : product
+    addon_deals }o--|| shops : shop
     addresses }o--|| users : user
     banners }o--|| promo_campaigns : campaign
     broadcasts }o--|| users : createdBy
@@ -912,6 +968,8 @@ erDiagram
     payments |o--|| orders : order
     products }o--|| shops : shop
     products }o--|| categories : category
+    product_likes }o--|| users : user
+    product_likes }o--|| products : product
     product_questions }o--|| products : product
     product_questions }o--|| users : asker
     product_reports }o--|| products : product
@@ -923,9 +981,14 @@ erDiagram
     reviews }o--|| products : product
     reviews }o--|| users : buyer
     reviews }o--|| order_items : orderItem
+    saved_vouchers }o--|| users : user
+    saved_vouchers }o--|| vouchers : voucher
     settlements }o--|| shops : shop
     shops |o--|| users : seller
     shop_categories }o--|| shops : shop
+    shop_follows }o--|| users : user
+    shop_follows }o--|| shops : shop
+    shop_penalties }o--|| shops : shop
     shop_verifications }o--|| shops : shop
     shop_verifications }o--|| users : reviewedBy
     support_tickets }o--|| users : requester

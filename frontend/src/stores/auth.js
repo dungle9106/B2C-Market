@@ -182,6 +182,13 @@ export const useAuthStore = defineStore('auth', {
       this.setSession({ ...data, token: this.token })
     },
 
+    /** Signs out only this tab, to sign in with another account here: other tabs and newly opened ones are untouched. */
+    async signOutTab() {
+      if (this.token) await apiLogout(null).catch(() => {})
+      useNotificationStore().stop()
+      this.clearTab()
+    },
+
     clearTab() {
       Object.assign(this, empty())
       write(sessionStorage, TAB_KEY, null)

@@ -61,7 +61,7 @@ export const AUDIT_ACTION = {
 export const PRODUCT_STATUS = { PENDING: 'Chờ duyệt', APPROVED: 'Đã duyệt', REJECTED: 'Bị từ chối', REMOVED: 'Đã gỡ' }
 
 // ---- transactions ----
-export const PAYMENT_METHOD = { COD: 'COD', E_WALLET: 'Ví điện tử', CARD: 'Thẻ', BANK_TRANSFER: 'Chuyển khoản', VNPAY: 'VNPay', MOCK_ONLINE: 'Online' }
+export const PAYMENT_METHOD = { COD: 'COD', E_WALLET: 'Ví điện tử', CARD: 'Thẻ', BANK_TRANSFER: 'Chuyển khoản', VNPAY: 'VNPay', SHOPPI_PAY: 'ShoppiPay', MOCK_ONLINE: 'Online' }
 export const PAYMENT_STATUS = { PENDING: 'Chưa thanh toán', PAID: 'Đã thanh toán', FAILED: 'Lỗi', CANCELLED: 'Đã hủy', REFUNDED: 'Đã hoàn tiền' }
 export const SETTLEMENT_STATUS = { PENDING_PAYMENT: 'Chờ thanh toán', PAID: 'Đã thanh toán' }
 export const ANOMALY = {

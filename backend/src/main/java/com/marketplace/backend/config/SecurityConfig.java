@@ -99,10 +99,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/shops/**").permitAll()
                 // clicks on sponsored search results, guests included
-                .requestMatchers(HttpMethod.POST, "/api/ads/*/click", "/api/banners/*/click").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/ads/*/click", "/api/banners/*/click", "/api/products/image-search").permitAll()
                 // payment gateway callbacks (signature-checked) and the list of available gateways
                 .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/return", "/api/payments/vnpay/ipn", "/api/payments/methods").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/shipping/ghn/webhook").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/shipping/ghn/webhook", "/api/shipping/ghtk/webhook").permitAll()
                 // platform marketing shown to everyone: home banners, programme pages, Shoppi Flash Sale slots
                 .requestMatchers(HttpMethod.GET, "/api/banners", "/api/campaigns/**", "/api/flash-sale/**", "/api/policies/**", "/api/policies").permitAll()
                 // must come before the generic /api/seller/** rule below: a BUYER
@@ -114,7 +114,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/shops/**", "/api/admin/verifications/**").hasAuthority("PERM_SHOPS")
                 // a manual refund is a finance action even though it hangs off an order
                 .requestMatchers("/api/admin/orders/*/refund").hasAuthority("PERM_FINANCE")
-                .requestMatchers("/api/admin/complaints/**", "/api/admin/orders/**", "/api/admin/disputes/**").hasAuthority("PERM_ORDERS")
+                .requestMatchers("/api/admin/complaints/**", "/api/admin/orders/**", "/api/admin/disputes/**", "/api/admin/return-risk/**").hasAuthority("PERM_ORDERS")
                 .requestMatchers("/api/admin/refunds/**", "/api/admin/settlements/**", "/api/admin/reconciliation/**").hasAuthority("PERM_FINANCE")
                 .requestMatchers("/api/admin/vouchers/**", "/api/admin/campaigns/**", "/api/admin/banners/**", "/api/admin/flash-sales/**")
                     .hasAuthority("PERM_VOUCHERS")

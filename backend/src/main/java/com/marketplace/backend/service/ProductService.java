@@ -30,6 +30,9 @@ public class ProductService {
 
     private static final int MAX_PAGE_SIZE = 60;
 
+    private final com.marketplace.backend.repository.ProductImageIndexRepository imageIndexRepository;
+    private final com.marketplace.backend.repository.AddOnDealRepository addOnDealRepository;
+    private final com.marketplace.backend.repository.ProductLikeRepository productLikeRepository;
     private final ProductRepository productRepository;
     private final ShopRepository shopRepository;
     private final CategoryRepository categoryRepository;
@@ -173,6 +176,9 @@ public class ProductService {
         reportRepository.deleteByProductId(product.getId());
         cartItemRepository.deleteByProductId(product.getId());
         viewHistoryRepository.deleteByProductId(product.getId());
+        productLikeRepository.deleteByProductId(product.getId());
+        imageIndexRepository.deleteById(product.getId());
+        addOnDealRepository.removeMainProduct(product.getId());
         questionRepository.deleteByProductId(product.getId());
         productRepository.delete(product);
     }

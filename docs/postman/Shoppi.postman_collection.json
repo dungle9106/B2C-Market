@@ -2,7 +2,7 @@
   "info": {
     "name": "Shoppi API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Sinh tự động từ 36 controller (357 endpoint). Chạy \"Đăng nhập\" trước: token được lưu vào biến {{token}} và dùng cho mọi request (Bearer)."
+    "description": "Sinh tự động từ 40 controller (389 endpoint). Chạy \"Đăng nhập\" trước: token được lưu vào biến {{token}} và dùng cho mọi request (Bearer)."
   },
   "auth": {
     "type": "bearer",
@@ -963,6 +963,26 @@
           }
         },
         {
+          "name": "POST /api/products/image-search",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/image-search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "image-search"
+              ],
+              "variable": []
+            },
+            "description": "\"tim bang hinh anh\": multipart \"file\"; the vision model is only used for logged-in users (it costs money)\n\nController: ProductController"
+          }
+        },
+        {
           "name": "GET /api/products/report-reasons",
           "request": {
             "method": "GET",
@@ -1106,6 +1126,35 @@
           }
         },
         {
+          "name": "GET /api/products/{id}/addon-deals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/:id/addon-deals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                ":id",
+                "addon-deals"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "public: the add-on items / gifts unlocked by buying this product\n\nController: AddOnDealController",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
           "name": "GET /api/products/{id}/combos",
           "request": {
             "method": "GET",
@@ -1129,6 +1178,35 @@
               ]
             },
             "description": "combos (\"Mua 2 giam 5%\") the product is in, running or upcoming\n\nController: ProductController",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "GET /api/products/{id}/likes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/:id/likes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                ":id",
+                "likes"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "public counts; \"liked\" / \"following\" when logged in\n\nController: SocialController",
             "auth": {
               "type": "noauth"
             }
@@ -1337,6 +1415,35 @@
               ]
             },
             "description": "Controller: ShopController",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "GET /api/shops/{id}/followers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/shops/:id/followers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "shops",
+                ":id",
+                "followers"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: SocialController",
             "auth": {
               "type": "noauth"
             }
@@ -1688,6 +1795,150 @@
           }
         },
         {
+          "name": "GET /api/buyer/follows",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/follows",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "follows"
+              ],
+              "variable": []
+            },
+            "description": "Controller: SocialController"
+          }
+        },
+        {
+          "name": "POST /api/buyer/follows/{shopId}",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/follows/:shopId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "follows",
+                ":shopId"
+              ],
+              "variable": [
+                {
+                  "key": "shopId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: SocialController"
+          }
+        },
+        {
+          "name": "DELETE /api/buyer/follows/{shopId}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/follows/:shopId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "follows",
+                ":shopId"
+              ],
+              "variable": [
+                {
+                  "key": "shopId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: SocialController"
+          }
+        },
+        {
+          "name": "GET /api/buyer/likes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/likes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "likes"
+              ],
+              "variable": []
+            },
+            "description": "Controller: SocialController"
+          }
+        },
+        {
+          "name": "POST /api/buyer/likes/{productId}",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/likes/:productId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "likes",
+                ":productId"
+              ],
+              "variable": [
+                {
+                  "key": "productId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: SocialController"
+          }
+        },
+        {
+          "name": "DELETE /api/buyer/likes/{productId}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/likes/:productId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "likes",
+                ":productId"
+              ],
+              "variable": [
+                {
+                  "key": "productId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: SocialController"
+          }
+        },
+        {
           "name": "GET /api/buyer/recommendations/for-you",
           "request": {
             "method": "GET",
@@ -1876,6 +2127,134 @@
                 }
               }
             }
+          }
+        },
+        {
+          "name": "GET /api/buyer/voucher-wallet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/voucher-wallet",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "voucher-wallet"
+              ],
+              "variable": []
+            },
+            "description": "Controller: VoucherWalletController"
+          }
+        },
+        {
+          "name": "POST /api/buyer/voucher-wallet/code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/voucher-wallet/code",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "voucher-wallet",
+                "code"
+              ],
+              "variable": []
+            },
+            "description": "body: { code } - also saves a private voucher shared by a shop\n\nController: VoucherWalletController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /api/buyer/voucher-wallet/ids",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/voucher-wallet/ids",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "voucher-wallet",
+                "ids"
+              ],
+              "variable": []
+            },
+            "description": "Controller: VoucherWalletController"
+          }
+        },
+        {
+          "name": "POST /api/buyer/voucher-wallet/{voucherId}",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/voucher-wallet/:voucherId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "voucher-wallet",
+                ":voucherId"
+              ],
+              "variable": [
+                {
+                  "key": "voucherId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: VoucherWalletController"
+          }
+        },
+        {
+          "name": "DELETE /api/buyer/voucher-wallet/{voucherId}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/buyer/voucher-wallet/:voucherId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "buyer",
+                "voucher-wallet",
+                ":voucherId"
+              ],
+              "variable": [
+                {
+                  "key": "voucherId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: VoucherWalletController"
           }
         },
         {
@@ -2481,6 +2860,27 @@
           }
         },
         {
+          "name": "POST /api/shipping/ghtk/webhook",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/shipping/ghtk/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "shipping",
+                "ghtk",
+                "webhook"
+              ],
+              "variable": []
+            },
+            "description": "GHTK's status callbacks: sent form-encoded (some accounts send JSON)\n\nController: ShippingController"
+          }
+        },
+        {
           "name": "GET /api/vouchers/available",
           "request": {
             "method": "GET",
@@ -2916,6 +3316,154 @@
     {
       "name": "5. Người bán",
       "item": [
+        {
+          "name": "GET /api/seller/addon-deals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/addon-deals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "addon-deals"
+              ],
+              "variable": []
+            },
+            "description": "Controller: AddOnDealController"
+          }
+        },
+        {
+          "name": "POST /api/seller/addon-deals",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/addon-deals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "addon-deals"
+              ],
+              "variable": []
+            },
+            "description": "Controller: AddOnDealController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PUT /api/seller/addon-deals/{id}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/addon-deals/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "addon-deals",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: AddOnDealController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /api/seller/addon-deals/{id}/end",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/addon-deals/:id/end",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "addon-deals",
+                ":id",
+                "end"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: AddOnDealController"
+          }
+        },
+        {
+          "name": "PATCH /api/seller/addon-deals/{id}/toggle",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/addon-deals/:id/toggle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "addon-deals",
+                ":id",
+                "toggle"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: AddOnDealController"
+          }
+        },
         {
           "name": "GET /api/seller/ads",
           "request": {
@@ -4460,6 +5008,26 @@
                 }
               }
             }
+          }
+        },
+        {
+          "name": "GET /api/seller/performance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/seller/performance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "seller",
+                "performance"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ShopPerformanceController"
           }
         },
         {
@@ -8566,6 +9134,219 @@
           }
         },
         {
+          "name": "GET /api/admin/shops/performance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/shops/performance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "shops",
+                "performance"
+              ],
+              "variable": []
+            },
+            "description": "?q=&sort=points|nfr|late|orders&page=\n\nController: ShopPerformanceController"
+          }
+        },
+        {
+          "name": "POST /api/admin/shops/performance/evaluate",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/shops/performance/evaluate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "shops",
+                "performance",
+                "evaluate"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ShopPerformanceController"
+          }
+        },
+        {
+          "name": "POST /api/admin/shops/performance/penalties/{id}/revoke",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/shops/performance/penalties/:id/revoke",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "shops",
+                "performance",
+                "penalties",
+                ":id",
+                "revoke"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "body: { reason }\n\nController: ShopPerformanceController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /api/admin/shops/performance/settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/shops/performance/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "shops",
+                "performance",
+                "settings"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ShopPerformanceController"
+          }
+        },
+        {
+          "name": "PUT /api/admin/shops/performance/settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/shops/performance/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "shops",
+                "performance",
+                "settings"
+              ],
+              "variable": []
+            },
+            "description": "Controller: ShopPerformanceController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET /api/admin/shops/performance/{shopId}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/shops/performance/:shopId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "shops",
+                "performance",
+                ":shopId"
+              ],
+              "variable": [
+                {
+                  "key": "shopId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Controller: ShopPerformanceController"
+          }
+        },
+        {
+          "name": "POST /api/admin/shops/performance/{shopId}/penalties",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/shops/performance/:shopId/penalties",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "shops",
+                "performance",
+                ":shopId",
+                "penalties"
+              ],
+              "variable": [
+                {
+                  "key": "shopId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "body: { points 1-5, reason }\n\nController: ShopPerformanceController",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "POST /api/admin/shops/{id}/approve",
           "request": {
             "method": "POST",
@@ -9492,6 +10273,49 @@
           }
         },
         {
+          "name": "GET /api/admin/system/image-search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/system/image-search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "system",
+                "image-search"
+              ],
+              "variable": []
+            },
+            "description": "Controller: AdminSystemController"
+          }
+        },
+        {
+          "name": "POST /api/admin/system/image-search/reindex",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/system/image-search/reindex",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "system",
+                "image-search",
+                "reindex"
+              ],
+              "variable": []
+            },
+            "description": "Controller: AdminSystemController"
+          }
+        },
+        {
           "name": "GET /api/admin/system/logs",
           "request": {
             "method": "GET",
@@ -9663,12 +10487,12 @@
           }
         },
         {
-          "name": "GET /api/admin/system/shipping/ghn",
+          "name": "GET /api/admin/system/shipping/carriers",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/admin/system/shipping/ghn",
+              "raw": "{{baseUrl}}/api/admin/system/shipping/carriers",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -9677,15 +10501,42 @@
                 "admin",
                 "system",
                 "shipping",
-                "ghn"
+                "carriers"
               ],
               "variable": []
+            },
+            "description": "every carrier, its services and whether it runs on a real API\n\nController: AdminSystemController"
+          }
+        },
+        {
+          "name": "GET /api/admin/system/shipping/{carrier}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/system/shipping/:carrier",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "system",
+                "shipping",
+                ":carrier"
+              ],
+              "variable": [
+                {
+                  "key": "carrier",
+                  "value": ""
+                }
+              ]
             },
             "description": "Controller: AdminSystemController"
           }
         },
         {
-          "name": "PUT /api/admin/system/shipping/ghn",
+          "name": "PUT /api/admin/system/shipping/{carrier}",
           "request": {
             "method": "PUT",
             "header": [
@@ -9695,7 +10546,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/admin/system/shipping/ghn",
+              "raw": "{{baseUrl}}/api/admin/system/shipping/:carrier",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -9704,11 +10555,16 @@
                 "admin",
                 "system",
                 "shipping",
-                "ghn"
+                ":carrier"
               ],
-              "variable": []
+              "variable": [
+                {
+                  "key": "carrier",
+                  "value": ""
+                }
+              ]
             },
-            "description": "body: { enabled, shopId, token?, apiUrl? }\n\nController: AdminSystemController",
+            "description": "GHN body: { enabled, shopId, token?, apiUrl? } · GHTK body: { enabled, partnerCode, token?, apiUrl? }\n\nController: AdminSystemController",
             "body": {
               "mode": "raw",
               "raw": "{\n  \n}",
@@ -9721,12 +10577,12 @@
           }
         },
         {
-          "name": "POST /api/admin/system/shipping/ghn/test",
+          "name": "POST /api/admin/system/shipping/{carrier}/test",
           "request": {
             "method": "POST",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/admin/system/shipping/ghn/test",
+              "raw": "{{baseUrl}}/api/admin/system/shipping/:carrier/test",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -9735,10 +10591,15 @@
                 "admin",
                 "system",
                 "shipping",
-                "ghn",
+                ":carrier",
                 "test"
               ],
-              "variable": []
+              "variable": [
+                {
+                  "key": "carrier",
+                  "value": ""
+                }
+              ]
             },
             "description": "Controller: AdminSystemController"
           }

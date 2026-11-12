@@ -72,6 +72,7 @@
         <template v-if="order.platformDiscount > 0"><dt>Shoppi Voucher (sàn tài trợ)</dt><dd>-{{ formatVnd(order.platformDiscount) }}</dd></template>
         <dt>Phí vận chuyển</dt><dd>{{ formatVnd(order.shippingFee) }}</dd>
         <template v-if="order.shippingDiscount > 0"><dt>Giảm phí vận chuyển</dt><dd>-{{ formatVnd(order.shippingDiscount) }}</dd></template>
+        <template v-if="order.coinDiscount > 0"><dt>Shoppi Xu (sàn tài trợ)</dt><dd>-{{ formatVnd(order.coinDiscount) }}</dd></template>
         <dt>Người mua thanh toán</dt><dd class="grand">{{ formatVnd(order.total) }}</dd>
         <dt>Thanh toán</dt><dd>{{ paymentLabel(order) }}</dd>
       </dl>

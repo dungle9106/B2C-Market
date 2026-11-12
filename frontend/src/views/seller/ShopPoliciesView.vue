@@ -41,10 +41,11 @@
           <div>
             <div class="carrier-name">{{ c.name }}</div>
             <div class="carrier-methods">{{ c.methods.join(' · ') }}</div>
+            <div v-if="c.note" class="carrier-methods">{{ c.note }}</div>
           </div>
         </label>
       </div>
-      <p class="hint">Người mua chỉ thấy các đơn vị shop bật. Gói Hỏa tốc chỉ có khi người mua cùng tỉnh với shop.</p>
+      <p class="hint">Người mua chỉ thấy các đơn vị shop bật. Gói Hỏa tốc (gồm Ahamove, GrabExpress) chỉ có khi người mua cùng tỉnh với shop, nên cần bật thêm ít nhất một đơn vị giao toàn quốc.</p>
 
       <div class="sc-form-row">
         <div>

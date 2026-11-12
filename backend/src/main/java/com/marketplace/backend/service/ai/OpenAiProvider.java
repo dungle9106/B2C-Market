@@ -22,14 +22,27 @@ public class OpenAiProvider implements AIProvider {
 
     @Override
     public Completion call(AiSettings s, String systemPrompt, String userPrompt) {
-        int estimatedIn = AIProvider.estimateTokens(systemPrompt) + AIProvider.estimateTokens(userPrompt);
+        return send(s, systemPrompt, userPrompt, userPrompt, AIProvider.estimateTokens(systemPrompt) + AIProvider.estimateTokens(userPrompt));
+    }
+
+    // image: a "data:" URL part next to the text (gpt-4o / gpt-4o-mini read images); ~850 tokens for a low-detail image
+    @Override
+    public Completion callWithImage(AiSettings s, String systemPrompt, String userPrompt, byte[] image, String mime) {
+        List<Map<String, Object>> parts = List.of(
+                Map.of("type", "text", "text", userPrompt),
+                Map.of("type", "image_url", "image_url", Map.of("url", "data:" + mime + ";base64," + java.util.Base64.getEncoder().encodeToString(image),
+                        "detail", "low")));
+        return send(s, systemPrompt, parts, userPrompt, AIProvider.estimateTokens(systemPrompt) + AIProvider.estimateTokens(userPrompt) + 850);
+    }
+
+    private Completion send(AiSettings s, String systemPrompt, Object userContent, String userPrompt, int estimatedIn) {
         if (s.openaiKey() == null || s.openaiKey().isBlank()) return Completion.failed("Chưa cấu hình API key", 0);
 
         Map<String, Object> body = Map.of(
                 "model", s.openaiModel(),
                 "messages", List.of(
                         Map.of("role", "system", "content", systemPrompt),
-                        Map.of("role", "user", "content", userPrompt)
+                        Map.of("role", "user", "content", userContent)
                 ),
                 "temperature", 0.7
         );

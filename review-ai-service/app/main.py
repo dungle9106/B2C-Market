@@ -4,6 +4,9 @@
   POST /analyze   {items: [{id, rating, content}]} -> sentiment, issues, alarming words per review
   POST /similar   {items: [{id, content}], threshold?} -> pairs of near-identical reviews (spam / copied reviews)
   POST /train     {items: [{content, rating, issues, sentiment?}]} -> trains the classifier, returns its metrics
+  GET  /return-risk/status   whether the return abuse models are trained
+  POST /return-risk/train    {items: [{features: {name: number}, label?}]} -> trains them on the case history
+  POST /return-risk/score    {features: {name: number}} -> how unusual the case is, probability of abuse
 
 Run:  uvicorn app.main:app --port 8000      (the backend calls it when REVIEW_AI_URL=http://localhost:8000)
 """
@@ -12,7 +15,7 @@ from pydantic import BaseModel, Field
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from . import lexicon, model
+from . import lexicon, model, return_risk
 
 app = FastAPI(title="Shoppi Review AI", version="1.0.0")
 
@@ -46,6 +49,37 @@ class SimilarItem(BaseModel):
 class SimilarRequest(BaseModel):
     items: list[SimilarItem] = Field(max_length=5000)
     threshold: float = Field(default=0.85, ge=0.5, le=1.0)
+
+
+class RiskScoreRequest(BaseModel):
+    features: dict[str, float]
+
+
+class RiskTrainItem(BaseModel):
+    features: dict[str, float]
+    label: str | None = None
+
+
+class RiskTrainRequest(BaseModel):
+    items: list[RiskTrainItem] = Field(max_length=50000)
+
+
+@app.get("/return-risk/status")
+def return_risk_status():
+    return return_risk.info()
+
+
+@app.post("/return-risk/score")
+def return_risk_score(req: RiskScoreRequest):
+    return return_risk.score(req.features)
+
+
+@app.post("/return-risk/train")
+def return_risk_train(req: RiskTrainRequest):
+    try:
+        return return_risk.train([i.model_dump() for i in req.items])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/health")

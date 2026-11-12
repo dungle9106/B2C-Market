@@ -110,7 +110,8 @@ const menu = [
     items: [
       { label: 'Duyệt shop mới', to: { name: 'admin-shops', query: { status: 'PENDING' } }, badge: () => stats.value.pendingShops },
       { label: 'Tất cả shop', to: { name: 'admin-shops' } },
-      { label: 'Xác minh giấy tờ', to: { name: 'admin-verifications' } }
+      { label: 'Xác minh giấy tờ', to: { name: 'admin-verifications' } },
+      { label: 'Hiệu quả & điểm phạt', to: { name: 'admin-shop-performance' } }
     ]
   },
   {
@@ -128,6 +129,7 @@ const menu = [
       { label: 'Tất cả đơn hàng', to: { name: 'admin-orders' }, perm: 'ORDERS' },
       { label: 'Đơn hàng bị trễ', to: { name: 'admin-orders', query: { status: 'LATE' } }, perm: 'ORDERS' },
       { label: 'Tranh chấp', to: { name: 'admin-disputes' }, perm: 'ORDERS', badge: () => stats.value.openDisputes },
+      { label: 'AI chống gian lận đổi trả', to: { name: 'admin-return-risk' }, perm: 'ORDERS' },
       { label: 'Hoàn tiền', to: { name: 'admin-refunds' }, perm: 'FINANCE', badge: () => stats.value.pendingRefunds },
       { label: 'Đối soát người bán', to: { name: 'admin-settlements' }, perm: 'FINANCE' },
       { label: 'Đối soát thanh toán', to: { name: 'admin-reconciliation' }, perm: 'FINANCE' }

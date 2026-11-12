@@ -66,6 +66,10 @@
           <input type="checkbox" :checked="filters.onSale" @change="update({ onSale: !filters.onSale || null })" />
           Đang giảm giá
         </label>
+        <label class="check">
+          <input type="checkbox" :checked="filters.mall" @change="update({ mall: !filters.mall || null })" />
+          Shoppi Mall
+        </label>
       </section>
 
       <button class="btn block clear" type="button" :disabled="!hasFilters" @click="clearAll">XÓA TẤT CẢ</button>
@@ -158,6 +162,7 @@ const filters = computed(() => {
     provinces: toArray(q.provinces),
     freeShipping: q.freeShipping === 'true',
     onSale: q.onSale === 'true',
+    mall: q.mall === 'true',
     sort: q.sort || props.defaultSort,
     page: Math.max(0, toNum(q.page) || 0)
   }
@@ -165,12 +170,12 @@ const filters = computed(() => {
 
 const hasFilters = computed(() => {
   const f = filters.value
-  return f.minPrice != null || f.maxPrice != null || f.minRating != null || f.provinces.length > 0 || f.freeShipping || f.onSale
+  return f.minPrice != null || f.maxPrice != null || f.minRating != null || f.provinces.length > 0 || f.freeShipping || f.onSale || f.mall
 })
 const activeFilterCount = computed(() => {
   const f = filters.value
   return (f.minPrice != null || f.maxPrice != null ? 1 : 0) + (f.minRating != null ? 1 : 0) +
-    f.provinces.length + (f.freeShipping ? 1 : 0) + (f.onSale ? 1 : 0)
+    f.provinces.length + (f.freeShipping ? 1 : 0) + (f.onSale ? 1 : 0) + (f.mall ? 1 : 0)
 })
 
 // change some filters (null removes a param) and go back to page 1
@@ -213,7 +218,7 @@ function applyPrice() {
 
 function clearAll() {
   const query = { ...route.query }
-  ;['minPrice', 'maxPrice', 'minRating', 'provinces', 'freeShipping', 'onSale', 'page'].forEach(k => delete query[k])
+  ;['minPrice', 'maxPrice', 'minRating', 'provinces', 'freeShipping', 'onSale', 'mall', 'page'].forEach(k => delete query[k])
   router.push({ query })
 }
 
@@ -235,6 +240,7 @@ async function load() {
       provinces: f.provinces.length ? f.provinces : undefined,
       freeShipping: f.freeShipping || undefined,
       onSale: f.onSale || undefined,
+      mall: f.mall || undefined,
       sort: f.sort,
       page: f.page,
       size: PAGE_SIZE

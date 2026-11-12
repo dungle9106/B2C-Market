@@ -19,3 +19,10 @@ export const endPlatformVoucher = (id) => http.post(`/admin/vouchers/${id}/end`)
 
 // public: running vouchers of a shop shown on the shop / product page
 export const shopVouchers = (shopId, productId) => http.get(`/shops/${shopId}/vouchers`, { params: { productId } })
+
+// "Kho Voucher": { items: [{ voucher, state USABLE|UPCOMING|UNAVAILABLE|EXPIRED, reason, savedAt }], collectable, usable }
+export const voucherWallet = () => http.get('/buyer/voucher-wallet')
+export const savedVoucherIds = () => http.get('/buyer/voucher-wallet/ids')
+export const saveVoucher = (voucherId) => http.post(`/buyer/voucher-wallet/${voucherId}`)
+export const saveVoucherCode = (code) => http.post('/buyer/voucher-wallet/code', { code })
+export const unsaveVoucher = (voucherId) => http.delete(`/buyer/voucher-wallet/${voucherId}`)

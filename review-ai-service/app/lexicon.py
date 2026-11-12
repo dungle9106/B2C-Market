@@ -26,33 +26,34 @@ COMPLAINT = {
     "WRONG_DESCRIPTION": ["khong giong hinh", "khac hinh", "khong nhu hinh", "khong dung mo ta", "sai mo ta", "sai mau", "khac mau",
                           "khong giong mo ta", "khac mo ta", "khong giong quang cao"],
     "DELIVERY": ["giao cham", "giao lau", "giao tre", "ship cham", "ship lau", "cham tre", "lau qua", "doi lau", "qua lau",
-                 "giao muon", "tre hen", "khong giao", "giao nham"],
+                 "giao muon", "tre hen", "shipper thai do", "khong giao", "giao nham"],
     "PACKAGING": ["mop", "bep", "bi vo", "vo nat", "bi be", "nat", "dong goi so sai", "dong goi au", "dong goi khong can than",
                   "khong chong soc", "rach hop", "hop rach", "mop hop"],
     "SIZE": ["nho qua", "rong qua", "chat qua", "to qua", "dai qua", "ngan qua", "hoi nho", "hoi rong", "hoi chat", "hoi to", "hoi dai", "hoi ngan", "khong vua", "sai size", "lech size", "khong dung size"],
     "MISSING_ITEM": ["thieu", "giao thieu", "thieu hang", "thieu phu kien", "khong du", "giao sai", "gui sai", "nham hang", "sai hang"],
     "AUTHENTICITY": ["hang gia", "hang nhai", "fake", "nhai", "khong chinh hang", "di ung", "noi man", "ngua", "mui hac", "chay no",
                      "doc hai", "nguy hiem", "giat dien", "kich ung"],
-    "PRICE": ["dat qua", "khong dang tien", "mac qua", "gia cao", "gia hoi cao", "hoi dat", "gia hoi dat", "khong xung dang"],
+    "PRICE": ["dat qua", "khong dang tien", "mac qua", "gia cao", "gia tien cao", "gia hoi cao", "hoi dat", "gia hoi dat", "khong xung dang"],
     "SERVICE": ["khong tra loi", "khong phan hoi", "thai do", "khong ho tro", "lua dao", "khong cho doi", "khong cho tra",
                 "khong hoan tien", "chua hoan tien", "chan tin nhan", "doi tra kho", "tu van sai"],
 }
 
 # words that put a negative clause about this issue (as in the backend)
 TOPIC = {
-    "QUALITY": ["chat luong", "chat lieu", "vai", "duong may", "ben", "mong", "may", "pin", "hoat dong", "su dung", "mau"],
+    "QUALITY": ["chat luong", "chat lieu", "vai", "duong may", "ben", "mong qua", "hoi mong", "may", "pin", "hoat dong", "su dung", "mau"],
     "DELIVERY": ["giao", "giao hang", "ship", "shipper", "van chuyen", "nhan hang", "don vi van chuyen"],
     "PACKAGING": ["dong goi", "goi hang", "hop", "bao bi", "thung"],
-    "SIZE": ["size", "kich thuoc", "kich co", "form", "mac"],
-    "PRICE": ["gia ca", "gia tien", "muc gia", "tien"],
-    "SERVICE": ["shop", "tu van", "phan hoi", "tra loi", "thai do", "ho tro", "doi tra", "doi hang", "hoan tien", "chat"],
+    "SIZE": ["size", "kich thuoc", "kich co", "form"],
+    "PRICE": ["gia ca", "gia tien", "muc gia"],
+    # no bare "chat" ("chat luong"), "shop" or "hoan tien" ("hang te, mong shop hoan tien" is about the goods)
+    "SERVICE": ["shop te", "shop lam an", "chu shop", "nhan vien", "nhan tin", "chat voi shop", "tu van", "phan hoi", "tra loi", "thai do", "ho tro", "doi tra"],
 }
 
 POSITIVE = ["dep", "tot", "nhanh", "chac chan", "can than", "mem", "vua", "vua van", "dung mo ta", "giong hinh", "nhu hinh", "hai long",
             "ung y", "re", "dang tien", "xung dang", "nhiet tinh", "xinh", "chuan", "ok", "oke", "on", "thich", "tuyet voi", "ben",
             "day dan", "min", "thom", "hop ly", "chu dao", "than thien", "chong soc", "ky", "good", "dang mua", "ung ho", "yeu"]
 NEGATIVE = ["xau", "te", "cham", "tre", "lau", "loi", "rach", "khong giong", "khac hinh", "sai", "that vong", "kem", "phai mau",
-            "hong", "hu", "mop", "bep", "vo nat", "nat", "thieu", "cau tha", "xu", "chan qua", "buc", "phi tien", "khong nen mua",
+            "hong", "hu", "mop", "bep", "vo nat", "nat", "thieu", "cau tha", "xu", "chan qua", "kho chiu", "buc", "phi tien", "khong nen mua",
             "dung mua", "lua dao", "hang gia", "nhai", "fake", "moc", "mui hoi", "di ung"]
 NEGATIONS = {"khong", "ko", "k", "chua", "chang", "cha", "khg", "hok"}
 SEVERE = ["lua dao", "hang gia", "hang nhai", "fake", "di ung", "noi man", "kich ung", "chay no", "giat dien", "doc hai", "nguy hiem",
@@ -90,13 +91,15 @@ def analyze(rating: int, content: str) -> dict:
         cn = sum(1 for w in POSITIVE if _has(c, w) and _negated(c, w))
         cn += sum(1 for w in NEGATIVE if _has(c, w) and not _negated(c, w))
         for key, words in COMPLAINT.items():
+            if key == "SERVICE" and _has(c, "shipper"):  # a rude courier is a delivery problem
+                continue
             if any(_has(c, w) and not _negated(c, w) for w in words):
                 if key not in issues:
                     issues.append(key)
                 cn += 1
         if cn > cp:
             for key, words in TOPIC.items():
-                if key not in issues and any(_has(c, w) for w in words):
+                if key not in issues and not (key == "SERVICE" and _has(c, "shipper")) and any(_has(c, w) for w in words):
                     issues.append(key)
         pos += cp
         neg += cn

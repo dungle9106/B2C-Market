@@ -6,11 +6,18 @@
         <div class="hero-banner">
           <div>
             <h2>Siêu Sale Cuối Tháng</h2>
-            <p>Giá sốc mỗi ngày - Freeship đơn từ 0đ - Hoàn xu 10%</p>
+            <p>Giá sốc mỗi ngày - Freeship đơn từ 0đ - Tích Shoppi Xu mỗi đơn</p>
           </div>
           <router-link :to="{ name: 'search', query: { onSale: 'true' } }" class="btn secondary hero-cta">Săn deal ngay</router-link>
         </div>
       </HomeBanners>
+
+      <nav class="quick-links">
+        <router-link :to="{ name: 'search', query: { mall: 'true' } }">🏬 Shoppi Mall</router-link>
+        <router-link :to="auth.isBuyer ? '/account/coins' : '/login'">🪙 Điểm danh nhận Xu</router-link>
+        <router-link :to="auth.isBuyer ? '/account/vouchers' : '/login'">🎟 Kho Voucher</router-link>
+        <router-link :to="{ name: 'search', query: { freeShipping: 'true' } }">🚚 Freeship</router-link>
+      </nav>
 
       <!-- running / coming promotion programmes -->
       <div v-if="campaigns.length" class="campaigns">
@@ -108,6 +115,9 @@ onMounted(async () => {
 <style scoped>
 .home { padding-bottom: 40px; }
 .hero-cta { background: white; flex-shrink: 0; }
+.quick-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.quick-links a { background: white; padding: 12px; border-radius: var(--radius-md); text-align: center; font-size: 14px; color: var(--color-text); }
+.quick-links a:hover { color: var(--color-primary); }
 .campaigns { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .campaign { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: var(--radius-md); color: white;
   background: linear-gradient(120deg, var(--theme), color-mix(in srgb, var(--theme) 70%, #000)); }

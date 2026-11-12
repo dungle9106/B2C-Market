@@ -8,6 +8,8 @@
     </div>
     <div class="info">
       <div class="name">
+        <span v-if="product.shopMall" class="tag mall">Mall</span>
+        <span v-else-if="product.shopFavorite" class="tag fav">Yêu thích</span>
         <span v-if="product.flashSale" class="tag flash">⚡ Flash Sale</span>
         {{ product.name }}
       </div>
@@ -68,4 +70,6 @@ const placeholder = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/
 .rating { min-height: 12px; }
 .location { font-size: 11px; color: var(--color-text-faint); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sponsored { position: absolute; left: 0; bottom: 0; background: rgba(0, 0, 0, 0.55); color: white; font-size: 11px; padding: 2px 6px; border-top-right-radius: 3px; }
+.tag.fav { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+.tag.mall { background: #d0011b; color: white; border-color: #d0011b; }
 </style>

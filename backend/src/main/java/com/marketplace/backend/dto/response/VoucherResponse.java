@@ -28,8 +28,11 @@ public class VoucherResponse {
     private LocalDateTime endAt;
     private boolean active;
     private Integer usedByMe;       // buyer listings only
+    private boolean saved;          // in the buyer's "Kho Voucher"
     private boolean publicVisible;
     private List<Long> productIds;  // empty = whole shop
+    private com.marketplace.backend.entity.VoucherAudience audience;
+    private String audienceLabel;
     // seller / admin statistics (orders not cancelled)
     private Long ordersCount;
     private BigDecimal discountGiven;
@@ -67,6 +70,8 @@ public class VoucherResponse {
         r.setActive(v.isActive());
         r.setPublicVisible(v.isPublicVisible());
         r.setProductIds(v.getProducts().stream().map(p -> p.getId()).toList());
+        r.setAudience(v.getAudience());
+        r.setAudienceLabel(v.getAudience().label());
         r.setCategoryIds(v.getCategoryIds().stream().sorted().toList());
         r.setNewBuyerOnly(v.isNewBuyerOnly());
         r.setBudget(v.getBudget());

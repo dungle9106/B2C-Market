@@ -55,7 +55,7 @@ export const FAQ = [
     topic: 'Vận chuyển',
     icon: '🚚',
     items: [
-      { q: 'Phí vận chuyển được tính thế nào?', a: 'Phí phụ thuộc đơn vị vận chuyển (GHN, GHTK, J&T, Viettel Post), gói (Tiết kiệm, Nhanh, Hỏa tốc) và việc shop với bạn cùng hay khác tỉnh. Hỏa tốc chỉ có khi cùng tỉnh.' },
+      { q: 'Phí vận chuyển được tính thế nào?', a: 'Phí phụ thuộc đơn vị vận chuyển (GHN, GHTK, J&T, Viettel Post, Ninja Van, SPX Express, VNPost, Ahamove, GrabExpress), gói (Tiết kiệm, Nhanh, Hỏa tốc) và việc shop với bạn cùng hay khác tỉnh. Hỏa tốc (gồm Ahamove, GrabExpress giao trong 1–2 giờ) chỉ có khi cùng tỉnh.' },
       { q: 'Freeship hoạt động ra sao?', a: 'Sản phẩm có nhãn Freeship được miễn phí vận chuyển tối đa bằng phí gói Tiết kiệm. Bạn có thể dùng thêm voucher giảm phí ship.' }
     ]
   },

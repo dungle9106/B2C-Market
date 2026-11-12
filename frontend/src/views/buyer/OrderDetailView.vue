@@ -132,10 +132,12 @@
             <dt>Tổng tiền hàng</dt><dd>{{ formatVnd(order.subtotal) }}</dd>
             <dt>Phí vận chuyển</dt><dd>{{ formatVnd(order.shippingFee) }}</dd>
             <template v-if="order.shippingDiscount > 0"><dt>Giảm giá phí vận chuyển</dt><dd>-{{ formatVnd(order.shippingDiscount) }}</dd></template>
-            <template v-if="order.comboDiscount > 0"><dt>Combo khuyến mãi</dt><dd>-{{ formatVnd(order.comboDiscount) }}</dd></template>
+            <template v-if="order.comboDiscount > 0"><dt>Combo & mua kèm deal sốc</dt><dd>-{{ formatVnd(order.comboDiscount) }}</dd></template>
             <template v-if="order.shopDiscount > 0"><dt>Voucher của Shop ({{ order.shopVoucherCode }})</dt><dd>-{{ formatVnd(order.shopDiscount) }}</dd></template>
             <template v-if="order.platformDiscount > 0"><dt>Shoppi Voucher ({{ order.platformVoucherCode }})</dt><dd>-{{ formatVnd(order.platformDiscount) }}</dd></template>
+            <template v-if="order.coinDiscount > 0"><dt>Shoppi Xu</dt><dd>-{{ formatVnd(order.coinDiscount) }}</dd></template>
             <dt>Thành tiền</dt><dd class="grand">{{ formatVnd(order.total) }}</dd>
+            <template v-if="order.coinsToEarn > 0 && !order.coinsAwarded && !['CANCELLED', 'REFUNDED'].includes(order.status)"><dt>Xu nhận được khi đơn hoàn tất</dt><dd>🪙 {{ order.coinsToEarn }}</dd></template>
             <dt>Phương thức thanh toán</dt><dd>{{ paymentLabel(order) }}</dd>
             <template v-if="order.note"><dt>Lời nhắn cho Người bán</dt><dd>{{ order.note }}</dd></template>
           </dl>

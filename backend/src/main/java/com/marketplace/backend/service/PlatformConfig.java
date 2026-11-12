@@ -92,6 +92,20 @@ public class PlatformConfig {
         return integer(DISPUTE_RESPONSE_HOURS, DEFAULT_DISPUTE_HOURS);
     }
 
+    // ==== Shoppi Xu ====
+    public static final String COIN_EARN_PERCENT = "coin.earnPercent";
+    public static final String COIN_MAX_SPEND_PERCENT = "coin.maxSpendPercent";
+
+    /** Coins earned, % of what the buyer paid for the goods. */
+    public int coinEarnPercent() {
+        return integer(COIN_EARN_PERCENT, 1);
+    }
+
+    /** At most this % of a checkout's total can be paid with coins. */
+    public int coinMaxSpendPercent() {
+        return integer(COIN_MAX_SPEND_PERCENT, 50);
+    }
+
     // ==== sign-in security ====
     public static final String MAX_FAILED_LOGINS = "security.maxFailedLogins";
     public static final String LOCK_MINUTES = "security.lockMinutes";

@@ -30,6 +30,7 @@ public class ProductController {
 
     private final com.marketplace.backend.service.search.SemanticSearchService semanticSearch;
     private final ProductService productService;
+    private final com.marketplace.backend.service.search.ImageSearchService imageSearch;
     private final ReviewService reviewService;
     private final QuestionService questionService;
     private final AdService adService;
@@ -38,7 +39,7 @@ public class ProductController {
     private final ProductModerationService moderationService;
 
     // ?q=&categoryId=&minPrice=&maxPrice=&minRating=&provinces=A&provinces=B
-    //  &freeShipping=true&onSale=true&sort=price_asc&page=0&size=30
+    //  &freeShipping=true&onSale=true&mall=true&sort=price_asc&page=0&size=30
     @GetMapping("/search")
     public ResponseEntity<PageResponse<ProductResponse>> search(@ModelAttribute ProductSearchCriteria criteria) {
         PageResponse<ProductResponse> page = productService.search(criteria);
@@ -60,7 +61,8 @@ public class ProductController {
                 && "relevance".equals(c.getSort()) && c.getCategoryId() == null && c.getShopId() == null
                 && c.getShopCategoryId() == null && c.getMinPrice() == null && c.getMaxPrice() == null
                 && c.getMinRating() == null && (c.getProvinces() == null || c.getProvinces().isEmpty())
-                && !Boolean.TRUE.equals(c.getFreeShipping()) && !Boolean.TRUE.equals(c.getOnSale());
+                && !Boolean.TRUE.equals(c.getFreeShipping()) && !Boolean.TRUE.equals(c.getOnSale())
+                && !Boolean.TRUE.equals(c.getMall());
     }
 
     // combos ("Mua 2 giam 5%") the product is in, running or upcoming
@@ -72,6 +74,14 @@ public class ProductController {
     @GetMapping("/suggest")
     public ResponseEntity<SuggestResponse> suggest(@RequestParam(defaultValue = "") String q) {
         return ResponseEntity.ok(productService.suggest(q));
+    }
+
+    // "tim bang hinh anh": multipart "file"; the vision model is only used for logged-in users (it costs money)
+    @PostMapping(value = "/image-search", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> imageSearch(@RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+                                                           @RequestParam(defaultValue = "30") int limit,
+                                                           @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(imageSearch.search(file, principal != null, limit));
     }
 
     // "tìm theo ý nghĩa": products closest in meaning to q (embeddings); empty list when AI is not configured

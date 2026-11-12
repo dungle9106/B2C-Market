@@ -27,6 +27,8 @@ public class CheckoutRequest {
 
     private String platformVoucherCode;   // "Shoppi Voucher"
 
+    private boolean useCoins;             // pay part of it with Shoppi Xu
+
     @Data
     public static class ShopPart {
         @NotEmpty

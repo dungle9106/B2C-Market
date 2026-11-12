@@ -44,6 +44,7 @@
               <span v-if="m.type === 'video'" class="play">▶</span>
             </button>
           </div>
+          <div class="gallery-actions"><LikeButton :product-id="product.id" /></div>
         </div>
 
         <!-- ===== info ===== -->
@@ -184,8 +185,10 @@
         </div>
         <div class="shop-meta">
           <router-link :to="{ name: 'shop', params: { id: product.shopId } }" class="shop-name">
+            <span v-if="product.shopMall" class="mall-badge">Mall</span>
             {{ product.shopName }}
             <span v-if="shopInfo?.verified" class="verified-badge" title="Shop đã được Shoppi xác minh giấy tờ">✓ Đã xác minh</span>
+            <span v-if="shopInfo?.favorite" class="fav-badge" title="Shop đạt tiêu chí Shop Yêu Thích của Shoppi">Yêu thích</span>
           </router-link>
           <div class="text-faint small">
             <span v-if="product.shopRating">★ {{ product.shopRating.toFixed(1) }} đánh giá shop ({{ product.shopRatingCount }})</span>
@@ -198,10 +201,38 @@
         </div>
         <!-- guests are sent to login and come back to the chat (route guard) -->
         <button v-if="!auth.isSeller && !auth.isAdmin" type="button" class="btn sm chat-btn" @click="openChat">💬 Chat ngay</button>
+        <FollowButton :shop-id="product.shopId" />
         <router-link :to="{ name: 'shop', params: { id: product.shopId } }" class="btn secondary sm">Xem Shop</router-link>
       </div>
 
       <!-- ===== combo deals ("Mua 2 giam 5%") ===== -->
+      <!-- ===== "Mua kem deal soc" / gifts unlocked by this product ===== -->
+      <section v-for="d in addOnDeals" :key="'deal' + d.id" class="content-block combo-block deal-block">
+        <div class="combo-head">
+          <span class="combo-tag">{{ d.type === 'GIFT' ? 'Mua để nhận quà' : 'Mua kèm deal sốc' }}</span>
+          <strong>{{ d.name }}</strong>
+        </div>
+        <p class="small text-muted">
+          <template v-if="d.type === 'GIFT'">Mua sản phẩm này{{ d.minSpend > 0 ? ` từ ${formatVnd(d.minSpend)}` : '' }} để được tặng quà dưới đây (thêm quà vào giỏ, quà được miễn phí khi thanh toán).</template>
+          <template v-else>Mua kèm sản phẩm này để được giá sốc, tối đa {{ d.purchaseLimit }} mỗi loại trong một đơn — giá tự động áp dụng khi thanh toán.</template>
+        </p>
+        <div class="deal-items">
+          <div v-for="it in d.items" :key="it.product.id" class="deal-item">
+            <router-link :to="{ name: 'product-detail', params: { id: it.product.id } }" class="deal-img">
+              <img :src="it.product.thumbnailUrl || placeholder" alt="" />
+            </router-link>
+            <div class="deal-info">
+              <router-link :to="{ name: 'product-detail', params: { id: it.product.id } }" class="deal-name">{{ it.product.name }}</router-link>
+              <div><span class="deal-price">{{ Number(it.dealPrice) > 0 ? formatVnd(it.dealPrice) : 'Miễn phí' }}</span> <s class="text-faint small">{{ formatVnd(it.product.price) }}</s></div>
+              <button v-if="!it.hasVariants" type="button" class="btn sm secondary" :disabled="busy" @click="addDealItem(it)">
+                {{ addedDeal === it.product.id ? '✓ Đã thêm' : d.type === 'GIFT' ? 'Nhận quà' : 'Thêm vào giỏ' }}
+              </button>
+              <router-link v-else :to="{ name: 'product-detail', params: { id: it.product.id } }" class="btn sm secondary">Chọn phân loại</router-link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section v-for="c in combos" :key="c.id" class="content-block combo-block">
         <div class="combo-head">
           <span class="combo-tag">Combo khuyến mãi</span>
@@ -273,6 +304,8 @@
 </template>
 
 <script setup>
+import LikeButton from '../../components/LikeButton.vue'
+import FollowButton from '../../components/FollowButton.vue'
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '../../components/AppHeader.vue'
@@ -283,7 +316,7 @@ import ReportProductButton from '../../components/product/ReportProductButton.vu
 import ProductQuestions from '../../components/product/ProductQuestions.vue'
 import { getProduct, similarProducts, getCategory } from '../../api/products'
 import { getMyShop, publicShop } from '../../api/shop'
-import { productCombos } from '../../api/marketing'
+import { productCombos, productAddOnDeals } from '../../api/marketing'
 import ShopVoucherStrip from '../../components/ShopVoucherStrip.vue'
 import ProductChatPopup from '../../components/chat/ProductChatPopup.vue'
 import { useAuthStore } from '../../stores/auth'
@@ -296,6 +329,18 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const cart = useCartStore()
+const addOnDeals = ref([])
+const addedDeal = ref(null)
+// an add-on item / gift goes in the cart as usual; its deal price is applied at checkout next to a main product
+async function addDealItem(it) {
+  if (!auth.isLoggedIn) return router.push({ name: 'login', query: { redirect: route.fullPath } })
+  try {
+    await cart.add(it.product.id, 1, null)
+    addedDeal.value = it.product.id
+  } catch (e) {
+    actionError.value = extractError(e)
+  }
+}
 
 const product = ref(null)
 const notFound = ref(false)
@@ -457,6 +502,8 @@ async function load(id) {
   publicShop(product.value.shopId).then(({ data }) => { shopInfo.value = data }).catch(() => {})
   combos.value = []
   productCombos(id).then(({ data }) => { combos.value = data }).catch(() => {})
+  addOnDeals.value = []
+  productAddOnDeals(id).then(({ data }) => { addOnDeals.value = data }).catch(() => {})
   categoryPath.value = []
   if (product.value.categoryId) {
     getCategory(product.value.categoryId).then(({ data }) => { categoryPath.value = data.path }).catch(() => {})
@@ -482,6 +529,8 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 .main-media img, .main-media video { width: 100%; height: 100%; object-fit: contain; background: #000; }
 .main-media img { background: #f5f5f5; }
 .discount-badge { position: absolute; top: 0; right: 0; background: #ffe97a; color: var(--color-primary); font-weight: 700; padding: 4px 8px; }
+.fav-badge { background: var(--color-primary); color: white; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 2px; margin-left: 6px; }
+.gallery-actions { display: flex; justify-content: center; margin-top: 12px; }
 .thumbs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 8px; }
 .thumb { position: relative; aspect-ratio: 1; padding: 0; border: 2px solid transparent; background: #f5f5f5; cursor: pointer; overflow: hidden; }
 .thumb.active { border-color: var(--color-primary); }
@@ -505,6 +554,12 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 .quota-limit { color: var(--color-text-muted); }
 .voucher-strip { margin: 14px 0 4px; }
 .combo-block { border-left: 3px solid var(--color-primary); }
+.deal-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-top: 8px; }
+.deal-item { display: flex; gap: 10px; border: 1px solid var(--color-border); border-radius: 4px; padding: 8px; }
+.deal-img img { width: 72px; height: 72px; object-fit: cover; border-radius: 2px; }
+.deal-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; align-items: flex-start; }
+.deal-name { color: var(--color-text); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
+.deal-price { color: var(--color-primary); font-weight: 600; }
 .combo-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .combo-tag { background: var(--color-primary); color: white; font-size: 12px; padding: 2px 8px; border-radius: 2px; }
 .combo-tier { border: 1px dashed var(--color-primary); color: var(--color-primary); font-size: 12px; padding: 2px 8px; border-radius: 2px; background: var(--color-primary-light); }
@@ -575,4 +630,5 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 }
 .resp { color: var(--color-primary); font-weight: 500; }
 .report { margin-left: auto; }
+.mall-badge { background: #d0011b; color: white; font-size: 11px; padding: 0 4px; border-radius: 2px; margin-right: 4px; }
 </style>

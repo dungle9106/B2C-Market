@@ -1,0 +1,95 @@
+import React, { useState } from 'react'
+import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from 'react-native'
+import { post, get, serverUrl, setServer, errorText } from '../api'
+import { useAuth } from '../auth'
+import { Button, C, Field, styles } from '../ui'
+
+export default function LoginScreen({ title = 'Shoppi', subtitle }) {
+  const { signIn } = useAuth()
+  const [mode, setMode] = useState('login')
+  const [form, setForm] = useState({ email: '', password: '', fullName: '', phone: '', code: '' })
+  const [challenge, setChallenge] = useState(null)
+  const [server, setServerText] = useState(serverUrl())
+  const [showServer, setShowServer] = useState(false)
+  const [current, setCurrent] = useState(serverUrl())   // the server in use, shown under the form
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }))
+
+  async function submit() {
+    setBusy(true)
+    setMsg('')
+    try {
+      if (server !== serverUrl()) { await setServer(server); setCurrent(serverUrl()) }
+      let res
+      if (challenge) res = await post('/auth/login/2fa', { challenge, code: form.code })
+      else if (mode === 'login') res = await post('/auth/login', { email: form.email, password: form.password })
+      else res = await post('/auth/register', { email: form.email, password: form.password, fullName: form.fullName, phone: form.phone })
+      if (res.twoFactorRequired) {
+        setChallenge(res.challenge)
+        setMsg('Nhập mã 6 số từ ứng dụng xác thực (hoặc mã dự phòng)')
+        return
+      }
+      await signIn(res)
+    } catch (e) {
+      setMsg(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function testServer() {
+    setMsg('')
+    try {
+      await setServer(server)
+      setCurrent(serverUrl())
+      await get('/categories')
+      setMsg('✓ Kết nối máy chủ thành công')
+    } catch (e) {
+      setMsg(errorText(e))
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: 'white' }}>
+      <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 72 }} keyboardShouldPersistTaps="handled">
+        <Text style={{ fontSize: 34, fontWeight: '700', color: C.primary, textAlign: 'center' }}>{title}</Text>
+        {subtitle ? <Text style={[styles.muted, { textAlign: 'center', marginTop: 4 }]}>{subtitle}</Text> : null}
+        <Text style={{ fontSize: 20, fontWeight: '500', marginTop: 32, marginBottom: 16 }}>
+          {challenge ? 'Xác minh 2 bước' : mode === 'login' ? 'Đăng nhập' : 'Đăng ký'}
+        </Text>
+        {challenge ? (
+          <Field label="Mã xác minh" value={form.code} onChangeText={set('code')} keyboardType="number-pad" maxLength={12} />
+        ) : (
+          <>
+            {mode === 'register' ? <Field label="Họ và tên" value={form.fullName} onChangeText={set('fullName')} /> : null}
+            <Field label="Email" value={form.email} onChangeText={set('email')} autoCapitalize="none" keyboardType="email-address" />
+            {mode === 'register' ? <Field label="Số điện thoại" value={form.phone} onChangeText={set('phone')} keyboardType="phone-pad" /> : null}
+            <Field label="Mật khẩu" value={form.password} onChangeText={set('password')} secureTextEntry />
+          </>
+        )}
+        {msg ? <Text style={{ color: msg.startsWith('✓') || challenge ? C.green : C.danger, marginBottom: 12 }}>{msg}</Text> : null}
+        <Button title={busy ? 'Đang xử lý...' : challenge ? 'Xác minh' : mode === 'login' ? 'Đăng nhập' : 'Đăng ký'} onPress={submit} disabled={busy} />
+        {!challenge ? (
+          <Pressable onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setMsg('') }} style={{ marginTop: 18 }}>
+            <Text style={{ textAlign: 'center', color: C.muted }}>
+              {mode === 'login' ? 'Bạn mới biết đến Shoppi? ' : 'Bạn đã có tài khoản? '}
+              <Text style={{ color: C.primary }}>{mode === 'login' ? 'Đăng ký' : 'Đăng nhập'}</Text>
+            </Text>
+          </Pressable>
+        ) : null}
+
+        <Pressable onPress={() => setShowServer(!showServer)} style={{ marginTop: 40 }}>
+          <Text style={{ textAlign: 'center', color: C.faint, fontSize: 12 }}>⚙ Máy chủ: {current}</Text>
+        </Pressable>
+        {showServer ? (
+          <View style={{ marginTop: 10 }}>
+            <Field label="Địa chỉ backend (máy ảo: http://10.0.2.2:8081, điện thoại thật: http://IP-máy-tính:8081)"
+                   value={server} onChangeText={setServerText} autoCapitalize="none" keyboardType="url" />
+            <Button title="Kiểm tra kết nối" kind="ghost" small onPress={testServer} />
+          </View>
+        ) : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
+}
