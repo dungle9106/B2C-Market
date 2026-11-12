@@ -172,7 +172,8 @@ const menu = [
       { label: 'Flash Sale Của Shoppi', to: { name: 'seller-flash-events' } },
       { label: 'Combo Khuyến Mãi', to: { name: 'seller-combos' } },
       { label: 'Mua Kèm Deal Sốc', to: { name: 'seller-addon-deals' } },
-      { label: 'Quảng Cáo Shoppi', to: { name: 'seller-ads' } }
+      { label: 'Quảng Cáo Shoppi', to: { name: 'seller-ads' } },
+      { label: 'Shoppi Video', to: { name: 'seller-videos' } }
     ]
   },
   {

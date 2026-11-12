@@ -130,6 +130,15 @@ Không có FastAPI hoặc LLM thì phần luật vẫn chạy. Yêu cầu mới 
 bấm "Cho phép shop xử lý" hoặc kết luận "Hợp lệ"; quá 48 giờ thì tự bỏ giữ để người mua thật không bị treo. Nếu shop bấm trước khi
 yêu cầu được chấm, hệ thống chấm ngay lúc đó (lỗi ở bước này thì vẫn cho hoàn tiền). Thông báo cho shop và người mua chỉ ghi "Shoppi đang kiểm tra".
 
+### Shoppi Video
+
+- **Người mua** (`/videos`, có lối vào ở thanh đầu trang và trang chủ): lướt video dọc, video đang xem tự phát (tắt tiếng, chạm để bật),
+  thả tim, bấm thẻ sản phẩm để mua ngay. Tab Nổi bật / Mới nhất; trang sản phẩm có nút xem video gắn sản phẩm đó.
+- **Người bán** (Kênh Marketing → Shoppi Video): tải video MP4/WEBM (tối đa 30MB), viết mô tả, gắn 1–6 sản phẩm đang bán của shop;
+  xem lượt xem, lượt thích; sửa, xóa. Tối đa 50 video đang hiển thị mỗi shop.
+- **Kiểm duyệt**: mô tả qua bộ lọc từ khóa cấm và số điện thoại / Zalo / link ngoài sàn như tin đăng sản phẩm; chỉ dùng được video
+  tải lên Shoppi. Admin (Sản phẩm → Kiểm duyệt Shoppi Video) ẩn video kèm lý do gửi shop, hoặc hiện lại. Video của shop bị đình chỉ tự ẩn.
+
 ### Shoppi Xu & Shoppi Mall
 
 - **Shoppi Xu** (`CoinService`, trang `/account/coins`): 1 Xu = 1₫. Tích 1% tiền hàng thực trả mỗi đơn, chốt lúc đặt và cộng

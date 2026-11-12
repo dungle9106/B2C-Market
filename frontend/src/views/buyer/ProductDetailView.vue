@@ -177,6 +177,10 @@
         </div>
       </div>
 
+      <router-link v-if="videoCount" :to="{ name: 'videos', query: { product: product.id } }" class="content-block video-link">
+        ▶ Xem {{ videoCount }} video về sản phẩm này trên Shoppi Video
+      </router-link>
+
       <!-- ===== shop ===== -->
       <div class="content-block shop-row">
         <div class="shop-avatar">
@@ -315,6 +319,7 @@ import ProductReviews from '../../components/product/ProductReviews.vue'
 import ReportProductButton from '../../components/product/ReportProductButton.vue'
 import ProductQuestions from '../../components/product/ProductQuestions.vue'
 import { getProduct, similarProducts, getCategory } from '../../api/products'
+import { videoFeed } from '../../api/videos'
 import { getMyShop, publicShop } from '../../api/shop'
 import { productCombos, productAddOnDeals } from '../../api/marketing'
 import ShopVoucherStrip from '../../components/ShopVoucherStrip.vue'
@@ -347,6 +352,7 @@ const notFound = ref(false)
 const similar = ref([])
 const categoryPath = ref([])
 const myShopId = ref(null)
+const videoCount = ref(0)
 const shopInfo = ref(null) // verified badge + shop policies
 const combos = ref([])
 const quantity = ref(1)
@@ -497,6 +503,8 @@ async function load(id) {
   }
   window.scrollTo({ top: 0 })
 
+  videoCount.value = 0
+  videoFeed({ productId: id, size: 1 }).then(({ data }) => { videoCount.value = data.totalItems }).catch(() => {})
   similarProducts(id).then(({ data }) => { similar.value = data }).catch(() => { similar.value = [] })
   shopInfo.value = null
   publicShop(product.value.shopId).then(({ data }) => { shopInfo.value = data }).catch(() => {})
@@ -631,4 +639,5 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 .resp { color: var(--color-primary); font-weight: 500; }
 .report { margin-left: auto; }
 .mall-badge { background: #d0011b; color: white; font-size: 11px; padding: 0 4px; border-radius: 2px; margin-right: 4px; }
+.video-link { display: block; color: var(--color-primary); font-weight: 500; }
 </style>

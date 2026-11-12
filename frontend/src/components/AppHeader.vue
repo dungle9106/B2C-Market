@@ -64,6 +64,7 @@
         <router-link to="/account/following" v-if="auth.isBuyer">Shop theo dõi</router-link>
         <router-link to="/search?q=">Tất cả sản phẩm</router-link>
         <router-link to="/search?mall=true">Shoppi Mall</router-link>
+        <router-link to="/videos">▶ Shoppi Video</router-link>
         <span class="tag">Freeship</span>
         <span class="tag">Voucher giảm giá</span>
       </div>

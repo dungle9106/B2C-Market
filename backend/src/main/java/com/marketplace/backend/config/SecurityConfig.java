@@ -97,7 +97,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/shops/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/shops/**", "/api/videos").permitAll()
+                // Shoppi Video views, guests included
+                .requestMatchers(HttpMethod.POST, "/api/videos/*/view").permitAll()
                 // clicks on sponsored search results, guests included
                 .requestMatchers(HttpMethod.POST, "/api/ads/*/click", "/api/banners/*/click", "/api/products/image-search").permitAll()
                 // payment gateway callbacks (signature-checked) and the list of available gateways
@@ -121,7 +123,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/support/**").hasAuthority("PERM_SUPPORT")
                 .requestMatchers("/api/admin/broadcasts/**").hasAuthority("PERM_BROADCAST")
                 .requestMatchers("/api/admin/staff/**", "/api/admin/audit/**").hasAuthority("PERM_STAFF")
-                .requestMatchers("/api/admin/products/**", "/api/admin/categories/**").hasAuthority("PERM_PRODUCTS")
+                .requestMatchers("/api/admin/products/**", "/api/admin/categories/**", "/api/admin/videos/**").hasAuthority("PERM_PRODUCTS")
                 .requestMatchers("/api/admin/settings/**", "/api/admin/system/**", "/api/admin/policies/**", "/api/admin/review-ai/**").hasAuthority("PERM_SETTINGS")
                 .requestMatchers("/api/admin/analytics/**").hasAuthority("PERM_REPORTS")
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")

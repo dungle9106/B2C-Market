@@ -19,6 +19,7 @@ const routes = [
   // public shop page: profile, verified badge, policies, products
   { path: '/policies/:slug', name: 'policy', component: () => import('../views/buyer/PolicyView.vue') },
   { path: '/campaigns/:slug', name: 'campaign', component: () => import('../views/buyer/CampaignView.vue') },
+  { path: '/videos', name: 'videos', component: () => import('../views/buyer/VideosView.vue') },
   { path: '/shop/:id', name: 'shop', component: () => import('../views/buyer/ShopView.vue') },
 
   { path: '/cart', name: 'cart', component: () => import('../views/buyer/CartView.vue'), meta: { requiresRole: 'BUYER' } },
@@ -74,6 +75,7 @@ const routes = [
       { path: 'flash-events', name: 'seller-flash-events', component: () => import('../views/seller/SellerFlashEventsView.vue'), meta: { title: 'Flash Sale Của Shoppi' } },
       { path: 'flash-sale', name: 'seller-flash-sale', component: () => import('../views/seller/SellerFlashSaleView.vue'), meta: { title: 'Flash Sale' } },
       { path: 'performance', name: 'seller-performance', component: () => import('../views/seller/SellerPerformanceView.vue'), meta: { title: 'Hiệu quả hoạt động' } },
+      { path: 'videos', name: 'seller-videos', component: () => import('../views/seller/SellerVideosView.vue'), meta: { title: 'Shoppi Video' } },
       { path: 'addon-deals', name: 'seller-addon-deals', component: () => import('../views/seller/SellerAddOnDealsView.vue'), meta: { title: 'Mua kèm deal sốc' } },
       { path: 'combos', name: 'seller-combos', component: () => import('../views/seller/SellerCombosView.vue'), meta: { title: 'Combo khuyến mãi' } },
       { path: 'ads', name: 'seller-ads', component: () => import('../views/seller/SellerAdsView.vue'), meta: { title: 'Quảng cáo' } },
@@ -112,6 +114,7 @@ const routes = [
       { path: 'shop-performance', name: 'admin-shop-performance', component: () => import('../views/admin/AdminShopPerformanceView.vue'), meta: { perm: 'SHOPS' } },
       { path: 'shops', name: 'admin-shops', component: () => import('../views/admin/AdminShopsView.vue'), meta: { perm: 'SHOPS' } },
       { path: 'products', name: 'admin-products', component: () => import('../views/admin/AdminProductsView.vue'), meta: { perm: 'PRODUCTS' } },
+      { path: 'videos', name: 'admin-videos', component: () => import('../views/admin/AdminVideosView.vue'), meta: { perm: 'PRODUCTS' } },
       { path: 'categories', name: 'admin-categories', component: () => import('../views/admin/AdminCategoriesView.vue'), meta: { perm: 'PRODUCTS' } },
       { path: 'verifications', name: 'admin-verifications', component: () => import('../views/admin/AdminVerificationsView.vue'), meta: { perm: 'SHOPS' } },
       { path: 'orders', name: 'admin-orders', component: () => import('../views/admin/AdminOrdersView.vue'), meta: { perm: 'ORDERS' } },

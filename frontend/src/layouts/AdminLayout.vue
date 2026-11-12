@@ -117,6 +117,7 @@ const menu = [
   {
     title: 'Sản phẩm', perm: 'PRODUCTS',
     items: [
+      { label: 'Kiểm duyệt Shoppi Video', to: { name: 'admin-videos' } },
       { label: 'Duyệt sản phẩm', to: { name: 'admin-products', query: { status: 'PENDING' } }, badge: () => stats.value.pendingProducts },
       { label: 'Bị người dùng báo cáo', to: { name: 'admin-products', query: { status: 'REPORTED' } }, badge: () => stats.value.openReports },
       { label: 'Tất cả sản phẩm', to: { name: 'admin-products', query: { status: 'ALL' } } },

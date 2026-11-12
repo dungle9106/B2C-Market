@@ -75,6 +75,23 @@ public class ProductModerationService {
 
     // ==================== automatic content check ====================
 
+    /** Why a free text such as a video caption can't be published as is (banned words, contact off the platform), or null. */
+    public String textProblem(String text) {
+        String raw = text == null ? "" : text;
+        String words = " " + TextNormalizer.normalize(raw).replaceAll("[^a-z0-9]+", " ").trim() + " ";
+        List<String> hits = settings.bannedKeywords().stream()
+                .filter(k -> {
+                    String n = TextNormalizer.normalize(k).replaceAll("[^a-z0-9]+", " ").trim();
+                    return !n.isEmpty() && words.contains(" " + n + " ");
+                }).toList();
+        if (!hits.isEmpty()) return "Chứa từ khóa cấm: " + hits.stream().map(h -> "“" + h + "”").collect(Collectors.joining(", "));
+        String digits = raw.replaceAll("(?<=\\d)[ .\\-](?=\\d)", "");
+        if (PHONE.matcher(digits).find() || CONTACT_WORDS.stream().anyMatch(w -> words.contains(" " + w + " "))) {
+            return "Không được ghi số điện thoại, Zalo hay link liên hệ ngoài sàn";
+        }
+        return null;
+    }
+
     List<Flag> check(Product p) {
         List<Flag> flags = new ArrayList<>();
         String raw = (p.getName() == null ? "" : p.getName()) + " " + (p.getDescription() == null ? "" : p.getDescription());

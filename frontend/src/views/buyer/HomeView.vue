@@ -14,6 +14,7 @@
 
       <nav class="quick-links">
         <router-link :to="{ name: 'search', query: { mall: 'true' } }">🏬 Shoppi Mall</router-link>
+        <router-link to="/videos">▶ Shoppi Video</router-link>
         <router-link :to="auth.isBuyer ? '/account/coins' : '/login'">🪙 Điểm danh nhận Xu</router-link>
         <router-link :to="auth.isBuyer ? '/account/vouchers' : '/login'">🎟 Kho Voucher</router-link>
         <router-link :to="{ name: 'search', query: { freeShipping: 'true' } }">🚚 Freeship</router-link>
