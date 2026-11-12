@@ -37,12 +37,15 @@ public class ProductController {
     private final ComboService comboService;
     private final ProductEventService eventService;
     private final ProductModerationService moderationService;
+    private final com.marketplace.backend.service.TrendingService trendingService;
 
     // ?q=&categoryId=&minPrice=&maxPrice=&minRating=&provinces=A&provinces=B
     //  &freeShipping=true&onSale=true&mall=true&sort=price_asc&page=0&size=30
     @GetMapping("/search")
     public ResponseEntity<PageResponse<ProductResponse>> search(@ModelAttribute ProductSearchCriteria criteria) {
         PageResponse<ProductResponse> page = productService.search(criteria);
+        // a buyer's keyword search: counts towards "Tu khoa hot" (first page only, and only when it found something)
+        if (criteria.getPage() == 0 && criteria.getQ() != null && !criteria.getQ().isBlank()) trendingService.record(criteria.getQ(), page.getTotalItems());
         // "Tai tro": sponsored products on top of the first page of a plain keyword search
         if (isPlainKeywordSearch(criteria)) {
             List<ProductResponse> ads = adService.sponsored(criteria.getQ());
@@ -69,6 +72,18 @@ public class ProductController {
     @GetMapping("/{id}/combos")
     public ResponseEntity<List<Map<String, Object>>> combos(@PathVariable Long id) {
         return ResponseEntity.ok(comboService.forProduct(id));
+    }
+
+    // public: [{ keyword, searches }] for the keywords under the search box
+    @GetMapping("/hot-keywords")
+    public ResponseEntity<List<Map<String, Object>>> hotKeywords(@RequestParam(defaultValue = "8") int limit) {
+        return ResponseEntity.ok(trendingService.hotKeywords(limit));
+    }
+
+    // public: [{ keyword, searches, imageUrl, soldCount }] for "Tim kiem hang dau"
+    @GetMapping("/top-searches")
+    public ResponseEntity<List<Map<String, Object>>> topSearches(@RequestParam(defaultValue = "6") int limit) {
+        return ResponseEntity.ok(trendingService.topSearches(limit));
     }
 
     @GetMapping("/suggest")

@@ -6,7 +6,7 @@
       <router-link v-if="filtered" :to="{ name: 'videos' }" class="clear">✕ Xem tất cả video</router-link>
     </div>
 
-    <div ref="feedEl" class="feed">
+    <div ref="feedEl" class="feed" :style="feedTop ? { height: `calc(100dvh - ${feedTop}px)` } : null">
       <div v-if="!items.length" class="empty">{{ loading ? 'Đang tải...' : error || 'Chưa có video nào.' }}</div>
 
       <section v-for="(v, i) in items" :key="v.id" class="slide" :data-index="i">
@@ -67,6 +67,7 @@ const loading = ref(false)
 const error = ref('')
 const muted = ref(true)        // browsers only autoplay muted videos
 const busyId = ref(null)
+const feedTop = ref(0)         // the feed fills the screen below the header, whatever its height
 const videos = new Map()       // id -> <video>
 const counted = new Set()      // views already counted on this visit
 let observer = null
@@ -152,6 +153,7 @@ async function toggleLike(v) {
 watch(() => [route.query.product, route.query.shop], () => reload())
 
 onMounted(async () => {
+  feedTop.value = Math.round(feedEl.value.getBoundingClientRect().top + window.scrollY)
   observer = new IntersectionObserver(onVisible, { root: feedEl.value, threshold: 0.6 })
   await load(true)
   await nextTick()

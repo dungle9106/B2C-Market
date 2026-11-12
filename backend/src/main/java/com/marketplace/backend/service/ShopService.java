@@ -161,6 +161,19 @@ public class ShopService {
 
     // ==== public ====
 
+    /** [{ id, name, logoUrl, productCount }] of the "Shoppi Mall" shops buyers can see. */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> mallShops() {
+        return shopRepository.findTop12ByMallTrueAndActiveTrueOrderByIdAsc().stream().map(s -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", s.getId());
+            m.put("name", s.getName());
+            m.put("logoUrl", s.getLogoUrl());
+            m.put("productCount", productRepository.countByShopIdAndActiveTrue(s.getId()));
+            return m;
+        }).toList();
+    }
+
     @Transactional(readOnly = true)
     public ShopPublicResponse publicShop(Long id) {
         Shop shop = shopRepository.findById(id)

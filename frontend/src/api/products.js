@@ -10,6 +10,8 @@ export const searchProducts = (params) => http.get('/products/search', {
 export const suggestProducts = (q) => http.get('/products/suggest', { params: { q } })
 export const flashSaleProducts = (limit = 12) => http.get('/products/flash-sale', { params: { limit } })
 export const topSelling = () => http.get('/products/top-selling')
+export const hotKeywords = (limit = 8) => http.get('/products/hot-keywords', { params: { limit } })      // [{ keyword, searches }]
+export const topSearches = (limit = 6) => http.get('/products/top-searches', { params: { limit } })    // [{ keyword, searches, imageUrl, soldCount }]
 // "tìm theo ý nghĩa" (embeddings + pgvector); [] when AI is not configured
 // "tim bang hinh anh": { description, keywords, engine, items: [{ product, similarity, matchedText }] }
 export const imageSearch = (file, limit = 30) => {

@@ -1,9 +1,9 @@
 <template>
-  <form ref="rootEl" class="search-form" role="search" @submit.prevent="submit(keyword)">
+  <form ref="rootEl" class="search-form" role="search" @submit.prevent="submit(keyword || hint)">
     <input
       v-model="keyword"
       type="text"
-      placeholder="Tìm kiếm sản phẩm, thương hiệu và shop..."
+      :placeholder="placeholder"
       autocomplete="off"
       role="combobox"
       aria-autocomplete="list"
@@ -55,6 +55,16 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { suggestProducts } from '../api/products'
 import { pickImage } from '../utils/imageSearch'
+
+// hints: hot keywords shown one after another as the placeholder; searching with an empty box uses the one shown
+const props = defineProps({ hints: { type: Array, default: () => [] } })
+const DEFAULT_PLACEHOLDER = 'Tìm kiếm sản phẩm, thương hiệu và shop...'
+const hintIndex = ref(0)
+const hint = computed(() => (props.hints.length ? props.hints[hintIndex.value % props.hints.length] : ''))
+const placeholder = computed(() => hint.value || DEFAULT_PLACEHOLDER)
+let hintTimer = null
+onMounted(() => { hintTimer = setInterval(() => { hintIndex.value++ }, 4000) })
+onBeforeUnmount(() => clearInterval(hintTimer))
 
 const route = useRoute()
 const router = useRouter()
@@ -125,7 +135,7 @@ function move(step) {
 function onEnter() {
   const e = entries.value[active.value]
   if (open.value && e) choose(e)
-  else submit(keyword.value)
+  else submit(keyword.value || hint.value)
 }
 
 function choose(e) {

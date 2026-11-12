@@ -1,6 +1,7 @@
 import http from './http'
 
 export const getMyShop = () => http.get('/seller/shop')
+export const mallShops = () => http.get('/shops/mall')   // [{ id, name, logoUrl, productCount }]
 export const saveMyShop = (data) => http.post('/seller/shop', data)
 export const becomeSeller = (data) => http.post('/seller/apply', data)
 // after a rejection, once the profile is fixed: REJECTED -> PENDING

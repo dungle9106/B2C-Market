@@ -138,6 +138,10 @@ input:focus, select:focus, textarea:focus {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
 }
+/* phones: always two columns, as on the big marketplaces (one 180px column would fill the screen) */
+@media (max-width: 560px) {
+  .grid-products { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+}
 
 .product-card {
   background: white;
