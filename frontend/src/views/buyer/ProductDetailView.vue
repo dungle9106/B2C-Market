@@ -8,7 +8,23 @@
       </div>
     </div>
 
-    <div v-else-if="product" class="container page">
+    <!-- still loading: the shape of the page (gallery + title, price, buttons) -->
+    <div v-else-if="!product" class="container page" aria-busy="true">
+      <div class="content-block pd-skel">
+        <div class="sk pd-skel-img"></div>
+        <div class="pd-skel-info">
+          <div class="sk" style="height: 22px; width: 90%"></div>
+          <div class="sk" style="height: 22px; width: 55%"></div>
+          <div class="sk" style="height: 14px; width: 40%"></div>
+          <div class="sk" style="height: 64px"></div>
+          <div class="sk" style="height: 14px; width: 70%"></div>
+          <div class="sk" style="height: 14px; width: 60%"></div>
+          <div class="pd-skel-btns"><div class="sk"></div><div class="sk"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="container page">
       <!-- breadcrumb -->
       <nav class="breadcrumb" aria-label="Breadcrumb">
         <router-link to="/">Shoppi</router-link>
@@ -45,7 +61,7 @@
               <span v-if="m.type === 'video'" class="play">▶</span>
             </button>
           </div>
-          <div class="gallery-actions"><LikeButton :product-id="product.id" /></div>
+          <div class="gallery-actions"><LikeButton :product-id="product.id" /><PriceWatchButton v-if="!auth.isSeller && !auth.isAdmin" :product-id="product.id" :price="Number(product.price)" /></div>
         </div>
 
         <!-- ===== info ===== -->
@@ -329,6 +345,7 @@
 
 <script setup>
 import LikeButton from '../../components/LikeButton.vue'
+import PriceWatchButton from '../../components/PriceWatchButton.vue'
 import FollowButton from '../../components/FollowButton.vue'
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -613,7 +630,7 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 .ship-list { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--color-text-muted); }
 .discount-badge { position: absolute; top: 0; right: 0; background: #ffe97a; color: var(--color-primary); font-weight: 700; padding: 4px 8px; }
 .fav-badge { background: var(--color-primary); color: white; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 2px; margin-left: 6px; }
-.gallery-actions { display: flex; justify-content: center; margin-top: 12px; }
+.gallery-actions { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin-top: 12px; }
 .thumbs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 8px; }
 .thumb { position: relative; aspect-ratio: 1; padding: 0; border: 2px solid transparent; background: #f5f5f5; cursor: pointer; overflow: hidden; }
 .thumb.active { border-color: var(--color-primary); }
@@ -701,6 +718,12 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 
 .not-found { text-align: center; padding: 60px; margin-top: 16px; }
 
+.pd-skel { display: grid; grid-template-columns: 450px 1fr; gap: 24px; }
+.pd-skel-img { aspect-ratio: 1; }
+.pd-skel-info { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
+.pd-skel-btns { display: flex; gap: 12px; margin-top: 12px; }
+.pd-skel-btns .sk { height: 46px; width: 180px; }
+@media (max-width: 760px) { .pd-skel { grid-template-columns: 1fr; } }
 .toast { position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background: rgba(0, 0, 0, 0.75); color: white; padding: 28px 32px; border-radius: 4px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .toast-icon { width: 52px; height: 52px; border-radius: 50%; background: #00bfa5; display: flex; align-items: center; justify-content: center; font-size: 26px; }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }

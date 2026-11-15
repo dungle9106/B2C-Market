@@ -15,7 +15,7 @@ import CartScreen from './CartScreen'
 import CheckoutScreen from './CheckoutScreen'
 import OrdersScreen, { OrderDetailScreen, ReviewScreen } from './OrdersScreen'
 import AddressesScreen, { AddressFormScreen } from './AddressesScreen'
-import AccountScreen, { AIChatScreen, CoinsScreen, FollowingScreen, LikesScreen, VoucherWalletScreen, WalletScreen } from './AccountScreens'
+import AccountScreen, { AIChatScreen, CoinsScreen, FollowingScreen, LikesScreen, PriceWatchesScreen, VoucherWalletScreen, WalletScreen } from './AccountScreens'
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -66,6 +66,7 @@ export default function BuyerApp() {
       <Stack.Screen name="Coins" component={CoinsScreen} options={{ title: 'Shoppi Xu' }} />
       <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: 'Ví ShoppiPay' }} />
       <Stack.Screen name="Likes" component={LikesScreen} options={{ title: 'Đã thích' }} />
+      <Stack.Screen name="PriceWatches" component={PriceWatchesScreen} options={{ title: 'Theo dõi giá' }} />
       <Stack.Screen name="Following" component={FollowingScreen} options={{ title: 'Shop đang theo dõi' }} />
       <Stack.Screen name="AIChat" component={AIChatScreen} options={{ title: '🤖 Trợ lý mua sắm AI' }} />
       <Stack.Screen name="ChatThread" options={({ route }) => ({ title: route.params?.title || 'Chat' })}>

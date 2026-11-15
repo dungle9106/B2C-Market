@@ -4,6 +4,7 @@
     <div class="container page">
       <nav class="tabs">
         <router-link :to="{ name: 'my-likes' }" class="active">♥ Sản phẩm yêu thích</router-link>
+        <router-link :to="{ name: 'price-watches' }">🔔 Theo dõi giá</router-link>
         <router-link :to="{ name: 'my-follows' }">Shop đang theo dõi</router-link>
       </nav>
       <div v-if="loading" class="shopee-section empty">Đang tải...</div>

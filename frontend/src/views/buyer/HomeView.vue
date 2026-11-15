@@ -52,7 +52,7 @@
       <!-- personalised for logged-in buyers (view history), newest products otherwise -->
       <section class="daily">
         <h3 class="daily-title" :style="{ top: headerHeight + 'px' }">{{ auth.isBuyer && personalised ? 'GỢI Ý HÔM NAY CHO BẠN' : 'SẢN PHẨM MỚI' }}</h3>
-        <div v-if="loading && !feed.length" class="text-muted loading">Đang tải...</div>
+        <SkeletonGrid v-if="loading && !feed.length" :count="12" />
         <div v-else-if="!feed.length" class="text-muted loading">Chưa có sản phẩm nào.</div>
         <div v-else class="grid-products">
           <ProductCard v-for="p in feed" :key="'feed-' + p.id" :product="p" />
@@ -74,6 +74,7 @@ import MallShops from '../../components/home/MallShops.vue'
 import TopSearches from '../../components/home/TopSearches.vue'
 import AppHeader from '../../components/AppHeader.vue'
 import CategoryStrip from '../../components/CategoryStrip.vue'
+import SkeletonGrid from '../../components/SkeletonGrid.vue'
 import ProductCard from '../../components/ProductCard.vue'
 import FlashSaleSection from '../../components/FlashSaleSection.vue'
 import HomeBanners from '../../components/HomeBanners.vue'

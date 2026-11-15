@@ -20,6 +20,7 @@ const routes = [
   // public shop page: profile, verified badge, policies, products
   { path: '/policies/:slug', name: 'policy', component: () => import('../views/buyer/PolicyView.vue') },
   { path: '/campaigns/:slug', name: 'campaign', component: () => import('../views/buyer/CampaignView.vue') },
+  { path: '/me', name: 'me', component: () => import('../views/buyer/MeView.vue') },
   { path: '/videos', name: 'videos', component: () => import('../views/buyer/VideosView.vue') },
   { path: '/shop/:id', name: 'shop', component: () => import('../views/buyer/ShopView.vue') },
 
@@ -33,6 +34,7 @@ const routes = [
   { path: '/account/vouchers', name: 'voucher-wallet', component: () => import('../views/buyer/VoucherWalletView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/account/wallet', name: 'my-wallet', component: () => import('../views/buyer/WalletView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/account/coins', name: 'my-coins', component: () => import('../views/buyer/CoinsView.vue'), meta: { requiresRole: 'BUYER' } },
+  { path: '/account/price-watches', name: 'price-watches', component: () => import('../views/buyer/PriceWatchesView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/account/likes', name: 'my-likes', component: () => import('../views/buyer/LikesView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/account/following', name: 'my-follows', component: () => import('../views/buyer/FollowingView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/orders', name: 'my-orders', component: () => import('../views/buyer/OrdersView.vue'), meta: { requiresRole: 'BUYER' } },
@@ -97,6 +99,7 @@ const routes = [
       { path: 'analytics/products', name: 'seller-analytics-products', component: () => import('../views/seller/analytics/ProductReportView.vue'), meta: { title: 'Sản phẩm & Tồn kho' } },
       { path: 'analytics/traffic', name: 'seller-analytics-traffic', component: () => import('../views/seller/analytics/TrafficReportView.vue'), meta: { title: 'Lượt xem & Chuyển đổi' } },
       { path: 'analytics/reviews', name: 'seller-analytics-reviews', component: () => import('../views/seller/analytics/ReviewReportView.vue'), meta: { title: 'Đánh giá khách hàng' } },
+      { path: 'inventory/forecast', name: 'seller-stock-forecast', component: () => import('../views/seller/StockForecastView.vue'), meta: { title: 'Dự báo nhập hàng (AI)' } },
       { path: 'inventory', name: 'seller-inventory', component: () => import('../views/seller/InventoryView.vue'), meta: { title: 'Tồn kho' } },
       { path: 'orders', name: 'seller-orders', component: () => import('../views/seller/SellerOrdersView.vue'), meta: { title: 'Đơn hàng' } }
     ]

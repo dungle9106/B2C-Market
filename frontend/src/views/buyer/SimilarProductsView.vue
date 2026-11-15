@@ -14,7 +14,7 @@
         </section>
         <section class="shopee-section">
           <h3 class="section-title">SẢN PHẨM TƯƠNG TỰ</h3>
-          <div v-if="loading" class="text-muted empty">Đang tải...</div>
+          <SkeletonGrid v-if="loading" :count="12" />
           <div v-else-if="!items.length" class="text-muted empty">Chưa tìm thấy sản phẩm tương tự.</div>
           <div v-else class="grid-products">
             <ProductCard v-for="p in items" :key="p.id" :product="p" />
@@ -31,6 +31,7 @@ import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppHeader from '../../components/AppHeader.vue'
 import AppFooter from '../../components/AppFooter.vue'
+import SkeletonGrid from '../../components/SkeletonGrid.vue'
 import ProductCard from '../../components/ProductCard.vue'
 import { getProduct, similarProducts } from '../../api/products'
 import { extractError } from '../../utils/apiError'

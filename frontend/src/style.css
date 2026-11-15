@@ -403,3 +403,13 @@ input:focus, select:focus, textarea:focus {
 .stepper input { width: 50px; height: 32px; margin: 0; border: none; border-left: 1px solid rgba(0, 0, 0, 0.09); border-right: 1px solid rgba(0, 0, 0, 0.09); border-radius: 0; text-align: center; padding: 0; }
 .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; }
 .old-price { color: var(--color-text-faint); text-decoration: line-through; }
+
+/* loading placeholders ("skeleton"): any element with .sk shimmers until the real content replaces it */
+.sk {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: sk-shimmer 1.2s infinite linear;
+  border-radius: 2px;
+}
+@keyframes sk-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }

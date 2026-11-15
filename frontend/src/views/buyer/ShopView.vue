@@ -73,7 +73,10 @@
       </div>
     </template>
 
-    <div v-else class="container"><div class="shopee-section empty">Đang tải...</div></div>
+    <div v-else class="container" aria-busy="true">
+      <div class="shopee-section shop-skel"><div class="sk shop-skel-logo"></div><div class="shop-skel-lines"><div class="sk"></div><div class="sk"></div></div></div>
+      <SkeletonGrid :count="10" />
+    </div>
   </div>
 </template>
 
@@ -82,6 +85,7 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppHeader from '../../components/AppHeader.vue'
 import ProductBrowser from '../../components/ProductBrowser.vue'
+import SkeletonGrid from '../../components/SkeletonGrid.vue'
 import ShopVoucherStrip from '../../components/ShopVoucherStrip.vue'
 import FollowButton from '../../components/FollowButton.vue'
 import { publicShop } from '../../api/shop'
@@ -114,6 +118,11 @@ watch(() => route.params.id, async (id) => {
 </script>
 
 <style scoped>
+.shop-skel { display: flex; align-items: center; gap: 16px; padding: 20px; }
+.shop-skel-logo { width: 80px; height: 80px; border-radius: 50%; flex-shrink: 0; }
+.shop-skel-lines { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.shop-skel-lines .sk { height: 16px; width: 50%; }
+.shop-skel-lines .sk + .sk { width: 30%; }
 .shop-head { background: white; box-shadow: var(--shadow-card); }
 .fav-badge { background: var(--color-primary); color: white; font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
 .follow-nudge { margin: 0 0 8px; padding: 10px 14px; background: #fff6f3; border: 1px dashed #f2b8a9; border-radius: 3px; color: var(--color-primary); font-size: 14px; }

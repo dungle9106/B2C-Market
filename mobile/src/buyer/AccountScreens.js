@@ -54,6 +54,7 @@ export default function AccountScreen({ navigation }) {
       <MenuItem icon="🪙" label="Shoppi Xu" hint={coins ? `${coins.balance.toLocaleString('vi-VN')} Xu` : undefined} onPress={() => navigation.navigate('Coins')} />
       <MenuItem icon="🎟" label="Kho Voucher" onPress={() => navigation.navigate('VoucherWallet')} />
       <MenuItem icon="♥" label="Đã thích" onPress={() => navigation.navigate('Likes')} />
+      <MenuItem icon="🔔" label="Theo dõi giá" hint="Báo khi giảm giá" onPress={() => navigation.navigate('PriceWatches')} />
       <MenuItem icon="🏪" label="Shop đang theo dõi" onPress={() => navigation.navigate('Following')} />
       <MenuItem icon="📍" label="Địa chỉ nhận hàng" onPress={() => navigation.navigate('Addresses')} />
       <MenuItem icon="🤖" label="Trợ lý mua sắm AI" hint="Hỏi gì cũng được" onPress={() => navigation.navigate('AIChat')} />
@@ -249,6 +250,31 @@ export function LikesScreen({ navigation }) {
     <FlatList style={styles.page} data={data.items} numColumns={2} keyExtractor={p => String(p.id)} contentContainerStyle={{ padding: 4 }}
               ListEmptyComponent={<Empty text="Bạn chưa thích sản phẩm nào. Bấm ♡ ở trang sản phẩm để lưu lại." />}
               renderItem={({ item }) => <ProductCard p={item} onPress={() => navigation.navigate('Product', { id: item.id })} />} />
+  )
+}
+
+// "Theo doi gia": products the buyer asked to hear about when the price drops
+export function PriceWatchesScreen({ navigation }) {
+  const { data, error, reload } = useLoad(() => get('/buyer/price-watches'))
+  if (!data) return error ? <Empty error={error} onRetry={reload} /> : <Loading />
+  return (
+    <FlatList style={styles.page} data={data} numColumns={2} keyExtractor={w => String(w.productId)} contentContainerStyle={{ padding: 4 }}
+              ListEmptyComponent={<Empty text="Chưa theo dõi giá sản phẩm nào. Bấm 🔔 Báo khi giảm giá ở trang sản phẩm." />}
+              renderItem={({ item: w }) => (
+                <Pressable onPress={() => navigation.navigate('Product', { id: w.productId })}
+                           style={{ flex: 1 / 2, backgroundColor: 'white', margin: 4, borderRadius: 2, overflow: 'hidden', opacity: w.onSale ? 1 : 0.6 }}>
+                  <Img uri={w.product.thumbnailUrl} style={{ width: '100%', aspectRatio: 1 }} />
+                  <View style={{ padding: 8 }}>
+                    <Text numberOfLines={2} style={{ fontSize: 13, minHeight: 34 }}>{w.product.name}</Text>
+                    <Text style={{ color: C.primary, fontSize: 15, marginVertical: 2 }}>{formatVnd(w.currentPrice)}</Text>
+                    {!w.onSale ? <Text style={styles.muted}>Tạm hết hàng</Text>
+                      : Number(w.dropPercent) >= 1 ? <Text style={{ color: C.primary, fontWeight: '600' }}>↓ {Math.round(w.dropPercent)}% từ khi theo dõi</Text>
+                      : <Text style={styles.muted}>Lúc theo dõi {formatVnd(w.watchedPrice)}</Text>}
+                    {w.targetPrice ? <Text style={styles.muted}>Báo khi ≤ {formatVnd(w.targetPrice)}</Text> : null}
+                    <Text onPress={async () => { await del(`/buyer/price-watches/${w.productId}`); reload() }} style={{ color: C.primary, marginTop: 4 }}>Bỏ theo dõi</Text>
+                  </View>
+                </Pressable>
+              )} />
   )
 }
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Dimensions, FlatList, Pressable, ScrollView, Text, View } from 'react-native'
-import { get, post, del, errorText } from '../api'
+import { get, post, put, del, errorText } from '../api'
 import { compact, formatDateTime, formatVnd } from '../format'
 import { BottomBar, Badge, Button, C, Empty, Img, Loading, ProductCard, Row, Stars, styles } from '../ui'
 
@@ -21,6 +21,7 @@ export default function ProductScreen({ route, navigation }) {
   const [p, setP] = useState(null)
   const [error, setError] = useState(null)
   const [likes, setLikes] = useState({ count: 0, liked: false })
+  const [watch, setWatch] = useState({ watching: false, targetPrice: null })
   const [reviews, setReviews] = useState(null)
   const [similar, setSimilar] = useState([])
   const [opt1, setOpt1] = useState(null)
@@ -32,6 +33,7 @@ export default function ProductScreen({ route, navigation }) {
   useEffect(() => {
     get(`/products/${id}`).then(setP).catch(e => setError(errorText(e)))
     get(`/products/${id}/likes`).then(setLikes).catch(() => {})
+    get(`/buyer/price-watches/${id}`).then(setWatch).catch(() => {})
     get(`/products/${id}/reviews`, { size: 3 }).then(setReviews).catch(() => {})
     get(`/products/${id}/similar`).then(setSimilar).catch(() => {})
   }, [id])
@@ -55,6 +57,32 @@ export default function ProductScreen({ route, navigation }) {
     } catch (e) {
       Alert.alert('Không thực hiện được', errorText(e))
     }
+  }
+
+  // "Bao khi giam gia": any drop, or only down to a price the buyer picks
+  function onWatch() {
+    const now = Number(p.price)
+    const at = (pct) => Math.round(now * (100 - pct) / 100 / 1000) * 1000
+    const save = async (target) => {
+      try {
+        const r = await put(`/buyer/price-watches/${id}`, { targetPrice: target })
+        setWatch({ watching: true, targetPrice: r.targetPrice })
+      } catch (e) {
+        Alert.alert('Không thực hiện được', errorText(e))
+      }
+    }
+    const options = [
+      { text: 'Báo mọi lần giảm giá', onPress: () => save(null) },
+      { text: `Khi còn ≤ ${formatVnd(at(10))} (-10%)`, onPress: () => save(at(10)) },
+      { text: `Khi còn ≤ ${formatVnd(at(20))} (-20%)`, onPress: () => save(at(20)) }
+    ]
+    if (watch.watching) {
+      options.push({ text: 'Bỏ theo dõi giá', style: 'destructive', onPress: async () => {
+        try { await del(`/buyer/price-watches/${id}`); setWatch({ watching: false, targetPrice: null }) } catch (e) { Alert.alert('Không thực hiện được', errorText(e)) }
+      } })
+    }
+    options.push({ text: 'Đóng', style: 'cancel' })
+    Alert.alert('Báo khi giảm giá', `Giá hiện tại ${formatVnd(now)}. Shoppi sẽ thông báo khi giá giảm (kể cả Flash Sale).`, options)
   }
 
   async function addToCart(buyNow) {
@@ -110,6 +138,11 @@ export default function ProductScreen({ route, navigation }) {
               <Text style={{ color: likes.liked ? C.primary : C.muted }}>{likes.liked ? '♥' : '♡'} {likes.count}</Text>
             </Pressable>
           </Row>
+          <Pressable onPress={onWatch} hitSlop={6} style={{ marginTop: 8, alignSelf: 'flex-start' }}>
+            <Text style={{ color: watch.watching ? C.primary : C.muted }}>
+              🔔 {watch.watching ? (watch.targetPrice ? `Báo khi ≤ ${formatVnd(watch.targetPrice)}` : 'Đang theo dõi giá') : 'Báo khi giảm giá'}
+            </Text>
+          </Pressable>
           {p.freeShipping ? <Text style={{ color: C.green, marginTop: 8 }}>🚚 Miễn phí vận chuyển</Text> : null}
           {p.returnDays ? <Text style={[styles.muted, { marginTop: 4 }]}>↩ Đổi trả trong {p.returnDays} ngày</Text> : null}
         </View>

@@ -104,9 +104,7 @@
         </span>
       </div>
 
-      <div v-if="loading && !result.items.length" class="grid-products">
-        <div v-for="i in 10" :key="i" class="skeleton"></div>
-      </div>
+      <SkeletonGrid v-if="loading && !result.items.length" :count="10" />
       <div v-else-if="!result.items.length" class="empty">
         <svg width="72" height="72" viewBox="0 0 24 24" fill="none"><path d="M21 21l-5.5-5.5M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
         <p>Không tìm thấy sản phẩm phù hợp</p>
@@ -125,6 +123,7 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import SkeletonGrid from './SkeletonGrid.vue'
 import ProductCard from './ProductCard.vue'
 import StarRating from './StarRating.vue'
 import PaginationBar from './PaginationBar.vue'
@@ -298,8 +297,6 @@ watch([filters, () => props.base], load, { immediate: true, deep: true })
 .filter-toggle { display: none; background: white; }
 
 .dim { opacity: 0.6; transition: opacity 0.15s; }
-.skeleton { aspect-ratio: 0.62; background: linear-gradient(90deg, #f2f2f2 25%, #e9e9e9 50%, #f2f2f2 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 2px; }
-@keyframes shimmer { to { background-position: -200% 0; } }
 .empty { text-align: center; padding: 60px 0; color: var(--color-text-muted); }
 .empty svg { color: #ddd; }
 
