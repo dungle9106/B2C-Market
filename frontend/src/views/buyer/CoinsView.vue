@@ -28,6 +28,10 @@
           </p>
         </section>
 
+        <router-link to="/account/lucky-spin" class="shopee-section spin-banner">
+          <span>🎡</span><div><b>Vòng quay may mắn</b><p>Mỗi ngày 1 lượt miễn phí, trúng tới 2.000 Xu</p></div><span class="go">Quay ngay ›</span>
+        </router-link>
+
         <section class="shopee-section">
           <h2>Điểm danh mỗi ngày</h2>
           <ol class="week">
@@ -109,6 +113,10 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.spin-banner { display: flex; align-items: center; gap: 12px; color: white; background: linear-gradient(90deg, #ff8a3d, #ee4d2d); }
+.spin-banner > span:first-child { font-size: 34px; }
+.spin-banner p { margin: 2px 0 0; font-size: 13px; opacity: 0.92; }
+.spin-banner .go { margin-left: auto; font-weight: 600; white-space: nowrap; }
 .page { padding-top: 20px; padding-bottom: 40px; }
 .empty { text-align: center; padding: 48px; }
 h2 { font-size: 16px; font-weight: 500; margin: 0 0 12px; }

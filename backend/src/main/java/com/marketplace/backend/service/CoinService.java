@@ -169,6 +169,13 @@ public class CoinService {
         return today.minusDays(1).equals(last) && streak < CHECK_IN_REWARDS.length ? streak + 1 : 1;
     }
 
+    /** Coins given by a platform activity (lucky spin...): credited and written in the history. */
+    public void grant(Long userId, long amount, CoinTransaction.Type type, String ref, String note) {
+        if (amount <= 0) return;
+        walletRepository.credit(userId, amount);
+        record(userId, type, amount, ref, note);
+    }
+
     private void record(Long userId, CoinTransaction.Type type, long amount, String ref, String note) {
         transactionRepository.save(CoinTransaction.builder()
                 .userId(userId).type(type).amount(amount).ref(ref).note(note).build());

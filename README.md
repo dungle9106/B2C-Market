@@ -168,6 +168,15 @@ yêu cầu được chấm, hệ thống chấm ngay lúc đó (lỗi ở bướ
 - **Shoppi Mall**: admin cấp cho shop đã xác minh giấy tờ (`POST /api/admin/shops/{id}/mall`); huy hiệu Mall trên sản phẩm
   và trang shop, bộ lọc `mall=true` khi tìm kiếm.
 
+### Vòng quay may mắn
+
+- Trang `/account/lucky-spin` (web) và màn "Vòng quay may mắn" (app): mỗi người mua **1 lượt miễn phí mỗi ngày** (giờ Việt Nam),
+  trúng 10 / 20 / 50 / 100 / 500 / 2.000 Xu, voucher Freeship 15K (lưu thẳng vào Kho Voucher) hoặc "chúc may mắn lần sau".
+- Server bốc giải bằng `SecureRandom` theo tỷ lệ công khai trên trang; trình duyệt chỉ quay bánh xe tới đúng ô được trả về.
+  Khóa duy nhất (người mua, ngày) chặn quay 2 lần kể cả khi bấm cùng lúc.
+- **Ngân sách Xu mỗi ngày** cho toàn sàn (admin chỉnh ở Cài đặt, mặc định 100.000 Xu): giải Xu lớn vượt ngân sách tự đổi sang
+  giải lớn nhất còn vừa. Trung bình một lượt tốn khoảng 37 Xu. Bảng "Người may mắn" hiện tên đã che (`Ng***h`).
+
 ### Báo khi giảm giá
 
 - Nút chuông **"Báo khi giảm giá"** trên trang sản phẩm (web và app): theo dõi mọi lần giảm, hoặc chỉ báo khi giá xuống tới mức
@@ -898,7 +907,7 @@ Frontend chạy ở `http://localhost:5173`, tự động proxy các request `/a
 
 ## Kiểm thử
 
-**Unit test (JUnit 5 + Mockito)**: `cd backend && mvn test`, không cần database. 46 ca:
+**Unit test (JUnit 5 + Mockito)**: `cd backend && mvn test`, không cần database. 51 ca:
 
 | Phần | File test | Kiểm tra |
 |---|---|---|
@@ -909,6 +918,7 @@ Frontend chạy ở `http://localhost:5173`, tự động proxy các request `/a
 | AI lạm dụng đổi trả | `ReturnRiskRulesTest` | người mua bình thường, người lạm dụng, sản phẩm lỗi bảo vệ người mua, ngưỡng mức rủi ro |
 | AI phân loại đánh giá | `ReviewTextAnalyzerTest`, `ReviewFileParserTest` | 14 đánh giá mẫu có nhãn chuẩn, cảm xúc, từ khóa nghiêm trọng, đọc file CSV/Excel |
 | Dự báo nhập hàng | `StockForecasterTest`, `InventoryForecastParamsTest` | nhu cầu đều / tăng / theo cuối tuần, tham số, lời khuyên |
+| Vòng quay may mắn | `LuckySpinRulesTest` | tỷ lệ cộng đủ 100%, bốc đúng tỷ lệ, chi phí trung bình, ngân sách hạ giải, che tên |
 
 **Kiểm thử tích hợp qua API thật**: chạy khi backend đang chạy (database bất kỳ, mỗi lần dùng tài khoản mới):
 
@@ -917,9 +927,9 @@ node scripts/test-e2e.mjs                                   # backend ở http:/
 node scripts/test-e2e.mjs --api http://localhost:3000/api   # stack docker compose
 ```
 
-44 kiểm tra: tính tiền đơn hàng và voucher, chia voucher sàn cho nhiều shop, hủy đơn trả lại kho và Xu, ví ShoppiPay
+51 kiểm tra: tính tiền đơn hàng và voucher, chia voucher sàn cho nhiều shop, hủy đơn trả lại kho và Xu, ví ShoppiPay
 (trừ tiền, hoàn tiền, không đủ số dư), **6 người cùng tranh mua 3 sản phẩm cuối** (đúng 3 người mua được, không bán âm kho,
-không lỗi hệ thống), luồng giao hàng → đánh giá → trả hàng, phân quyền giữa người mua / người bán / shop khác, báo khi giảm giá.
+không lỗi hệ thống), luồng giao hàng → đánh giá → trả hàng, phân quyền giữa người mua / người bán / shop khác, báo khi giảm giá, vòng quay (bấm 2 lần cùng lúc chỉ được 1 lượt).
 Script tạm nâng giới hạn tạo tài khoản mỗi IP trong lúc chạy và trả lại giá trị cũ khi xong.
 
 ## Tài liệu & công cụ

@@ -52,6 +52,7 @@ export default function AccountScreen({ navigation }) {
       </View>
       <MenuItem icon="💳" label="Ví ShoppiPay" hint={wallet ? formatVnd(wallet.balance) : undefined} onPress={() => navigation.navigate('Wallet')} />
       <MenuItem icon="🪙" label="Shoppi Xu" hint={coins ? `${coins.balance.toLocaleString('vi-VN')} Xu` : undefined} onPress={() => navigation.navigate('Coins')} />
+      <MenuItem icon="🎡" label="Vòng quay may mắn" hint="1 lượt/ngày" onPress={() => navigation.navigate('LuckySpin')} />
       <MenuItem icon="🎟" label="Kho Voucher" onPress={() => navigation.navigate('VoucherWallet')} />
       <MenuItem icon="♥" label="Đã thích" onPress={() => navigation.navigate('Likes')} />
       <MenuItem icon="🔔" label="Theo dõi giá" hint="Báo khi giảm giá" onPress={() => navigation.navigate('PriceWatches')} />

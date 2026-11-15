@@ -15,6 +15,7 @@ import CartScreen from './CartScreen'
 import CheckoutScreen from './CheckoutScreen'
 import OrdersScreen, { OrderDetailScreen, ReviewScreen } from './OrdersScreen'
 import AddressesScreen, { AddressFormScreen } from './AddressesScreen'
+import LuckySpinScreen from './LuckySpinScreen'
 import AccountScreen, { AIChatScreen, CoinsScreen, FollowingScreen, LikesScreen, PriceWatchesScreen, VoucherWalletScreen, WalletScreen } from './AccountScreens'
 
 const Stack = createNativeStackNavigator()
@@ -64,6 +65,7 @@ export default function BuyerApp() {
       <Stack.Screen name="AddressForm" component={AddressFormScreen} options={{ title: 'Địa chỉ mới' }} />
       <Stack.Screen name="VoucherWallet" component={VoucherWalletScreen} options={{ title: 'Kho Voucher' }} />
       <Stack.Screen name="Coins" component={CoinsScreen} options={{ title: 'Shoppi Xu' }} />
+      <Stack.Screen name="LuckySpin" component={LuckySpinScreen} options={{ title: 'Vòng quay may mắn' }} />
       <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: 'Ví ShoppiPay' }} />
       <Stack.Screen name="Likes" component={LikesScreen} options={{ title: 'Đã thích' }} />
       <Stack.Screen name="PriceWatches" component={PriceWatchesScreen} options={{ title: 'Theo dõi giá' }} />

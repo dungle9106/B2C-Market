@@ -51,6 +51,7 @@
         </section>
 
         <section class="block">
+          <router-link to="/account/lucky-spin" class="row"><span>🎡 Vòng quay may mắn</span><span class="chev">›</span></router-link>
           <router-link to="/account/likes" class="row"><span>❤️ Đã thích</span><span class="chev">›</span></router-link>
           <router-link to="/account/price-watches" class="row"><span>🔔 Theo dõi giá</span><span class="chev">›</span></router-link>
           <router-link to="/account/following" class="row"><span>🏬 Shop đang theo dõi</span><span class="chev">›</span></router-link>

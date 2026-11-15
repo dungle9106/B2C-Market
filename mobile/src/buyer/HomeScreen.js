@@ -9,6 +9,7 @@ const ICONS = ['👕', '📱', '🏠', '💄', '⚽', '🍜', '📚', '🧸', '�
 const SHORTCUTS = [
   ['🏬', 'Shoppi Mall', ['Search', { mall: true, title: 'Shoppi Mall' }]],
   ['🪙', 'Điểm danh nhận Xu', ['Coins']],
+  ['🎡', 'Vòng quay', ['LuckySpin']],
   ['🎟', 'Kho Voucher', ['VoucherWallet']]
 ]
 

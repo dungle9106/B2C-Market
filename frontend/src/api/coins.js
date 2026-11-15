@@ -10,3 +10,7 @@ export const myWallet = () => http.get('/buyer/wallet')
 export const topUpWallet = (amount) => http.post('/buyer/wallet/top-up', { amount })
 export const walletHistory = (page = 0, size = 20) => http.get('/buyer/wallet/history', { params: { page, size } })
 export const myMembership = () => http.get('/buyer/membership')
+
+// "Vong quay may man" (backend LuckySpinController): one free turn a day
+export const luckySpinStatus = () => http.get('/buyer/lucky-spin')
+export const luckySpin = () => http.post('/buyer/lucky-spin')

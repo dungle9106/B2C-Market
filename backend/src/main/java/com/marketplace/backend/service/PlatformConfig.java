@@ -106,6 +106,14 @@ public class PlatformConfig {
         return integer(COIN_MAX_SPEND_PERCENT, 50);
     }
 
+    // ==== Vong quay may man ====
+    public static final String SPIN_DAILY_BUDGET = "spin.dailyBudget";
+
+    /** Shoppi Xu the lucky spin may give away per day, all buyers together. */
+    public int spinDailyBudget() {
+        return integer(SPIN_DAILY_BUDGET, 100_000);
+    }
+
     // ==== sign-in security ====
     public static final String MAX_FAILED_LOGINS = "security.maxFailedLogins";
     public static final String LOCK_MINUTES = "security.lockMinutes";

@@ -33,6 +33,7 @@ const routes = [
   { path: '/orders/:id', name: 'order-detail', component: () => import('../views/buyer/OrderDetailView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/account/vouchers', name: 'voucher-wallet', component: () => import('../views/buyer/VoucherWalletView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/account/wallet', name: 'my-wallet', component: () => import('../views/buyer/WalletView.vue'), meta: { requiresRole: 'BUYER' } },
+  { path: '/account/lucky-spin', name: 'lucky-spin', component: () => import('../views/buyer/LuckySpinView.vue') },
   { path: '/account/coins', name: 'my-coins', component: () => import('../views/buyer/CoinsView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/account/price-watches', name: 'price-watches', component: () => import('../views/buyer/PriceWatchesView.vue'), meta: { requiresRole: 'BUYER' } },
   { path: '/account/likes', name: 'my-likes', component: () => import('../views/buyer/LikesView.vue'), meta: { requiresRole: 'BUYER' } },

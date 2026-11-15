@@ -268,6 +268,26 @@ section('8. Báo khi giảm giá')
   check('bỏ theo dõi', (await ok('GET', `/buyer/price-watches/${shirt.id}`, b.token)).watching === false)
 }
 
+// ----------------------------------------------------------------------
+section('9. Vòng quay may mắn')
+{
+  const b = await buyer('spin')
+  const s0 = await ok('GET', '/buyer/lucky-spin', b.token)
+  check('chưa quay hôm nay', s0.spunToday === false && s0.prizes.length === 8)
+  // two taps at the same moment: only one turn
+  const [r1, r2] = await Promise.all([call('POST', '/buyer/lucky-spin', b.token), call('POST', '/buyer/lucky-spin', b.token)])
+  const statuses = [r1.status, r2.status].sort()
+  check('bấm 2 lần cùng lúc chỉ được 1 lượt', statuses[0] === 200 && statuses[1] === 400, statuses.join(','))
+  const won = r1.status === 200 ? r1.data : r2.data
+  check('kết quả trỏ đúng một ô của vòng quay', won.slot >= 0 && won.slot < 8 && s0.prizes[won.slot].code === won.code, JSON.stringify(won))
+  check('Xu trúng được cộng vào ví', won.coinBalance === s0.coinBalance + won.coins, `${s0.coinBalance} + ${won.coins} = ${won.coinBalance}`)
+  const again = await call('POST', '/buyer/lucky-spin', b.token)
+  check('hôm nay không quay thêm được', again.status === 400, again.status)
+  const s1 = await ok('GET', '/buyer/lucky-spin', b.token)
+  check('trạng thái ghi nhận lượt đã quay', s1.spunToday === true && s1.todayPrize.code === won.code)
+  check('người bán không quay được (chỉ người mua)', (await call('POST', '/buyer/lucky-spin', shopA.token)).status === 403)
+}
+
 } catch (e) {
   failed++
   console.error('\n✗ Dừng giữa chừng: ' + e.message)

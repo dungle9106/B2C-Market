@@ -20,7 +20,8 @@ public class CoinTransaction {
         CHECK_IN,      // daily check-in; ref = the date
         ORDER_EARN,    // reward of a completed order; ref = order code
         ORDER_SPEND,   // used at checkout; ref = checkout code
-        ORDER_REFUND   // given back: order cancelled (ref = order code) or returned (ref = RT + request id)
+        ORDER_REFUND,  // given back: order cancelled (ref = order code) or returned (ref = RT + request id)
+        LUCKY_SPIN     // prize of "Vong quay may man"; ref = LS + spin id
     }
 
     @Id
