@@ -53,6 +53,22 @@ docker compose up --build     # http://localhost:3000  (RabbitMQ console: http:/
 Gồm PostgreSQL 16 + pgvector, Redis 7, RabbitMQ 3.13, backend (Spring Boot) và frontend (nginx, chuyển
 `/api`, `/ws`, `/uploads` sang backend). Dữ liệu và ảnh tải lên nằm trong volume `db-data`, `uploads`.
 
+### Dữ liệu demo bằng 1 lệnh
+
+Sau khi backend chạy (database mới, chưa có dữ liệu demo):
+
+```bash
+node scripts/seed-demo.mjs            # backend ở http://localhost:8081, PostgreSQL cài trên máy (cần psql)
+node scripts/seed-demo.mjs --docker   # stack docker compose (http://localhost:3000, dùng psql trong container db)
+```
+
+Tạo 4 shop (2 shop Mall), 24 sản phẩm có phân loại, 40 người mua và khoảng 3.600 đơn hàng trải đều 120 ngày (có xu hướng
+tăng/giảm, cuối tuần bán chạy hơn), hơn 2.000 đánh giá, yêu cầu trả hàng (có 1 người mua có dấu hiệu lạm dụng), Flash Sale
+đang chạy và theo dõi giá. Mọi thứ đi qua API thật, sau đó ngày tháng được lùi về quá khứ bằng SQL. Mất khoảng 1-2 phút.
+Tài khoản (mật khẩu `Demo@1234`): `buyer01@shoppi.demo` ... `buyer40@shoppi.demo`, `seller.fashion@shoppi.demo`,
+`seller.tech@shoppi.demo`, `seller.home@shoppi.demo`, `seller.beauty@shoppi.demo`. Chạy lại trên database đã có dữ liệu demo
+thì script tự dừng. Tùy chọn: `--api <url>`, `--days <30..180>`; biến `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE/PSQL`.
+
 ## Chạy backend (không dùng Docker)
 
 Yêu cầu: JDK 17+, Maven, PostgreSQL.
@@ -151,6 +167,13 @@ yêu cầu được chấm, hệ thống chấm ngay lúc đó (lỗi ở bướ
   Vàng từ 10 triệu (x1,5), Kim Cương từ 30 triệu (x2).
 - **Shoppi Mall**: admin cấp cho shop đã xác minh giấy tờ (`POST /api/admin/shops/{id}/mall`); huy hiệu Mall trên sản phẩm
   và trang shop, bộ lọc `mall=true` khi tìm kiếm.
+
+### Báo khi giảm giá
+
+- Nút chuông **"Báo khi giảm giá"** trên trang sản phẩm (web và app): theo dõi mọi lần giảm, hoặc chỉ báo khi giá xuống tới mức
+  người mua chọn. Trang `/account/price-watches` liệt kê sản phẩm đang theo dõi và đã giảm bao nhiêu % từ lúc theo dõi.
+- `PriceWatchService` quét giá mỗi 5 phút (`shoppi.price-watch.check-ms`): giảm từ 1% (người bán hạ giá hoặc Flash Sale bắt đầu)
+  thì gửi thông báo; mỗi lần giảm chỉ báo một lần, cùng sản phẩm tối đa 1 lần/12 giờ trừ khi giá giảm sâu hơn. Tối đa 100 sản phẩm/người.
 
 ### Giỏ hàng & Đặt hàng
 
@@ -283,6 +306,19 @@ với **kỳ trước cùng độ dài**. Biểu đồ vẽ bằng SVG, không d
   hồi, đánh giá có ảnh/video; phân bố số sao, đánh giá dịch vụ shop và vận chuyển, xu hướng theo thời gian, sản phẩm
   điểm thấp nhất. Shop xem mọi đánh giá (lọc theo chưa phản hồi / tiêu cực / số sao / sản phẩm) và **trả lời**
   (tối đa 255 ký tự, sửa được). Câu trả lời hiện trên trang sản phẩm; người mua nhận thông báo ở lần trả lời đầu tiên.
+
+### Người bán: Dự báo nhập hàng (AI)
+
+- Trang **Kênh Người Bán > Dự Báo Nhập Hàng (AI)** (`InventoryForecastService`, `StockForecaster`): dự báo nhu cầu từng mã hàng
+  (sản phẩm hoặc từng phân loại) từ lịch sử bán 120 ngày.
+- Mô hình: thử Holt (làm mượt hàm mũ có xu hướng giảm dần) với nhiều tham số và trung bình trượt 28/56 ngày, nhân hệ số theo ngày
+  trong tuần; chọn mô hình dự đoán đúng nhất trên các tuần đã qua (rolling origin, tầm 14 ngày) rồi kết hợp với trung bình 28 ngày.
+- Từ dự báo: số ngày còn đủ bán và ngày hết hàng, tồn kho an toàn = z × độ lệch × √(thời gian chờ hàng), điểm đặt hàng lại,
+  số lượng nên nhập để đủ bán thêm N ngày. Trạng thái: Hết hàng / Nhập gấp / Đến lúc nhập / Ổn / Tồn nhiều / Bán chậm.
+- Người bán chỉnh thời gian chờ hàng về, số ngày muốn đủ hàng, mức an toàn 90/95/99%. Biểu đồ đã bán + dự báo + mức cao từng mã.
+- Độ chính xác đo trên chính dữ liệu của shop (ẩn 14 ngày gần nhất rồi dự đoán), hiển thị cạnh cách lấy trung bình đơn giản để so sánh
+  trung thực. Với hàng bán ít, độ ngẫu nhiên của nhu cầu giới hạn độ chính xác của mọi mô hình; mô hình có lợi rõ khi có xu hướng.
+- Nút **"AI tư vấn nhập hàng"**: LLM (nếu bật) viết lời khuyên từ bảng dự báo; không có AI thì dùng lời khuyên theo quy tắc.
 
 ### Người bán: Tương tác khách hàng
 
