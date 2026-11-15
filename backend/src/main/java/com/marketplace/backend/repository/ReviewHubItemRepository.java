@@ -15,6 +15,10 @@ import java.util.Optional;
 
 public interface ReviewHubItemRepository extends JpaRepository<ReviewHubItem, Long>, JpaSpecificationExecutor<ReviewHubItem> {
 
+    /** Transaction-scoped PostgreSQL advisory lock: one writer per shop (ReviewHubService.lockShop). */
+    @Query(value = "SELECT count(*) FROM (SELECT pg_advisory_xact_lock(7501, CAST(:shopId AS integer))) l", nativeQuery = true)
+    long lockShop(@Param("shopId") Long shopId);
+
     Optional<ReviewHubItem> findByReviewId(Long reviewId);
 
     Optional<ReviewHubItem> findByShopIdAndSourceAndExternalId(Long shopId, ReviewHubItem.Source source, String externalId);

@@ -94,6 +94,7 @@ public class ReviewHubService {
     public void onReviewWritten(ReviewHubEvents.ReviewWritten e) {
         try {
             reviewRepository.findById(e.reviewId()).ifPresent(r -> {
+                lockShop(r.getProduct().getShop().getId());
                 if (repository.findByReviewId(r.getId()).isPresent()) return;
                 ReviewHubItem i = repository.save(fromReview(r));
                 refreshShop(i.getShopId());
@@ -271,7 +272,17 @@ public class ReviewHubService {
     }
 
     // the FastAPI service's reading of the new items, then priorities and anomaly signals for the whole shop
+    /**
+     * One writer per shop at a time (until the transaction ends). Each new review re-scores the shop's recent items;
+     * two reviews of one shop arriving together would otherwise update the same rows in a different order, and
+     * PostgreSQL would abort one of them (deadlock) - that review would then be missing from the hub.
+     */
+    private void lockShop(Long shopId) {
+        repository.lockShop(shopId);
+    }
+
     void refreshShop(Long shopId) {
+        lockShop(shopId);
         List<ReviewHubItem> recent = repository.since(shopId, LocalDateTime.now().minusDays(ANOMALY_WINDOW_DAYS));
         if (ai.serviceAvailable()) {
             List<ReviewHubItem> fresh = recent.stream().filter(i -> "RULE".equals(i.getAnalyzedBy()) && i.getContent() != null && !i.isIssuesManual()).toList();

@@ -216,6 +216,8 @@ public class OrderService {
 
     /** Puts quantities of the given order lines back in stock (cancellation, approved returns). */
     public void restock(Order order, Map<Long, Integer> qtyByOrderItemId, InventoryReason reason) {
+        stockService.lockProducts(order.getItems().stream()
+                .filter(i -> qtyByOrderItemId.getOrDefault(i.getId(), 0) > 0).map(i -> i.getProduct().getId()).toList());
         for (OrderItem item : order.getItems()) {
             Integer qty = qtyByOrderItemId.get(item.getId());
             if (qty == null || qty <= 0) continue;

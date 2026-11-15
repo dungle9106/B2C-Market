@@ -19,6 +19,10 @@ import java.util.List;
 
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
+    /** Row locks on these products, always taken in id order (see StockService.lockProducts). */
+    @Query(value = "SELECT id FROM products WHERE id IN (:ids) ORDER BY id FOR UPDATE", nativeQuery = true)
+    List<Long> lockInIdOrder(@Param("ids") java.util.Collection<Long> ids);
+
     List<Product> findByShopId(Long shopId);
 
     long countByShopIdAndActiveTrue(Long shopId);

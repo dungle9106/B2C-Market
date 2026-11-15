@@ -94,6 +94,9 @@ public class CheckoutService {
                 + (new Random().nextInt(900) + 100);
         User buyer = userRepository.getReferenceById(CurrentUser.id());
 
+        // every product of the checkout locked up front, in id order: concurrent checkouts cannot deadlock
+        stockService.lockProducts(p.items().stream().flatMap(List::stream).map(ci -> ci.getProduct().getId()).toList());
+
         List<OrderResponse> created = new ArrayList<>();
         for (int i = 0; i < p.quote().getShops().size(); i++) {
             ShopQuote sq = p.quote().getShops().get(i);
