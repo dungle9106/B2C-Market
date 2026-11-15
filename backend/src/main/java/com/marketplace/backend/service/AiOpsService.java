@@ -82,7 +82,8 @@ public class AiOpsService {
             Map.entry("ChatbotService", "CHATBOT"), Map.entry("SellerAIService", "PRODUCT_WRITER"), Map.entry("SellerAIController", "PRODUCT_WRITER"),
             Map.entry("ReviewInsightService", "REVIEW_INSIGHT"), Map.entry("SalesAssistantService", "SALES_ASSISTANT"),
             Map.entry("PromoAdvisorService", "PROMO_ADVISOR"), Map.entry("ReplySuggestService", "REPLY_SUGGEST"), Map.entry("AIService", "CONNECTION_TEST"),
-            Map.entry("ReturnRiskService", "RETURN_RISK"), Map.entry("ImageSearchService", "IMAGE_SEARCH"), Map.entry("ReviewAiService", "REVIEW_HUB"), Map.entry("ReviewHubService", "REVIEW_HUB"));
+            Map.entry("ReturnRiskService", "RETURN_RISK"), Map.entry("ImageSearchService", "IMAGE_SEARCH"), Map.entry("ReviewAiService", "REVIEW_HUB"), Map.entry("ReviewHubService", "REVIEW_HUB"),
+            Map.entry("InventoryForecastService", "STOCK_FORECAST"));
     static final Map<String, String> FEATURES = new LinkedHashMap<>();
 
     static {
@@ -95,6 +96,7 @@ public class AiOpsService {
         FEATURES.put("REVIEW_HUB", "Quản lý đánh giá (phân loại, soạn trả lời)");
         FEATURES.put("IMAGE_SEARCH", "Tìm kiếm bằng hình ảnh");
         FEATURES.put("RETURN_RISK", "Phát hiện lạm dụng đổi trả");
+        FEATURES.put("STOCK_FORECAST", "Dự báo nhập hàng");
         FEATURES.put("CONNECTION_TEST", "Kiểm tra kết nối");
         FEATURES.put("OTHER", "Khác");
     }

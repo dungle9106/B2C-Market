@@ -160,6 +160,7 @@ const menu = [
       { label: 'Thêm Sản Phẩm', to: { name: 'seller-product-new' } },
       { label: 'Đăng Hàng Loạt (Excel)', to: { name: 'seller-product-import' } },
       { label: 'Quản Lý Tồn Kho', to: { name: 'seller-inventory' } },
+      { label: 'Dự Báo Nhập Hàng (AI)', to: { name: 'seller-stock-forecast' } },
       { label: 'Danh Mục Của Shop', to: { name: 'seller-categories' } }
     ]
   },
@@ -184,7 +185,8 @@ const menu = [
       { label: 'Hỏi Đáp Doanh Thu', to: { name: 'seller-ai-assistant' } },
       { label: 'Phân Tích Đánh Giá', to: { name: 'seller-ai-reviews' } },
       { label: 'AI Trả Lời & Xử Lý Đánh Giá', to: { name: 'seller-review-hub', query: { tab: 'inbox' } } },
-      { label: 'Gợi Ý Thời Điểm Khuyến Mãi', to: { name: 'seller-ai-promo' } }
+      { label: 'Gợi Ý Thời Điểm Khuyến Mãi', to: { name: 'seller-ai-promo' } },
+      { label: 'Dự Báo Nhập Hàng', to: { name: 'seller-stock-forecast' } }
     ]
   },
   {
