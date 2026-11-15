@@ -17,18 +17,21 @@
           <h2 class="card-title">Kiểm tra hộp thư</h2>
           <p class="hint">Nếu <b>{{ email }}</b> có tài khoản Shoppi, bạn sẽ nhận được email hướng dẫn đặt lại mật khẩu trong vài phút. Hãy kiểm tra cả thư rác.</p>
         </div>
-        <p class="back"><router-link :to="{ name: 'login' }">‹ Quay lại đăng nhập</router-link></p>
+        <p class="back"><router-link :to="{ name: loginRoute }">‹ Quay lại đăng nhập</router-link></p>
       </section>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import AuthHeader from '../components/auth/AuthHeader.vue'
 import { forgotPassword } from '../api/auth'
 import { extractError } from '../utils/apiError'
 
+const route = useRoute()
+const loginRoute = computed(() => (route.query.from === 'seller' ? 'seller-login' : 'login'))
 const email = ref('')
 const sent = ref(false)
 const loading = ref(false)

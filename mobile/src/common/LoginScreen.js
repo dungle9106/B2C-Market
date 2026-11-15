@@ -21,6 +21,13 @@ export default function LoginScreen({ title = 'Shoppi', subtitle }) {
     setMsg('')
     try {
       if (server !== serverUrl()) { await setServer(server); setCurrent(serverUrl()) }
+      if (mode === 'forgot') {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) { setMsg('Email không hợp lệ'); return }
+        await post('/auth/forgot-password', { email: form.email.trim() })
+        // same answer whether or not the e-mail has an account
+        setMsg('✓ Nếu email này có tài khoản Shoppi, bạn sẽ nhận được link đặt lại mật khẩu (hiệu lực 30 phút). Mở email, bấm link để đặt mật khẩu mới rồi quay lại đăng nhập.')
+        return
+      }
       let res
       if (challenge) res = await post('/auth/login/2fa', { challenge, code: form.code })
       else if (mode === 'login') res = await post('/auth/login', { email: form.email, password: form.password })
@@ -56,7 +63,7 @@ export default function LoginScreen({ title = 'Shoppi', subtitle }) {
         <Text style={{ fontSize: 34, fontWeight: '700', color: C.primary, textAlign: 'center' }}>{title}</Text>
         {subtitle ? <Text style={[styles.muted, { textAlign: 'center', marginTop: 4 }]}>{subtitle}</Text> : null}
         <Text style={{ fontSize: 20, fontWeight: '500', marginTop: 32, marginBottom: 16 }}>
-          {challenge ? 'Xác minh 2 bước' : mode === 'login' ? 'Đăng nhập' : 'Đăng ký'}
+          {challenge ? 'Xác minh 2 bước' : mode === 'login' ? 'Đăng nhập' : mode === 'forgot' ? 'Quên mật khẩu' : 'Đăng ký'}
         </Text>
         {challenge ? (
           <Field label="Mã xác minh" value={form.code} onChangeText={set('code')} keyboardType="number-pad" maxLength={12} />
@@ -65,12 +72,25 @@ export default function LoginScreen({ title = 'Shoppi', subtitle }) {
             {mode === 'register' ? <Field label="Họ và tên" value={form.fullName} onChangeText={set('fullName')} /> : null}
             <Field label="Email" value={form.email} onChangeText={set('email')} autoCapitalize="none" keyboardType="email-address" />
             {mode === 'register' ? <Field label="Số điện thoại" value={form.phone} onChangeText={set('phone')} keyboardType="phone-pad" /> : null}
-            <Field label="Mật khẩu" value={form.password} onChangeText={set('password')} secureTextEntry />
+            {mode === 'forgot' ? (
+              <Text style={[styles.muted, { marginBottom: 12 }]}>Nhập email đã đăng ký, Shoppi sẽ gửi link để bạn đặt mật khẩu mới.</Text>
+            ) : (
+              <Field label="Mật khẩu" value={form.password} onChangeText={set('password')} secureTextEntry />
+            )}
+            {mode === 'login' ? (
+              <Pressable onPress={() => { setMode('forgot'); setMsg('') }} style={{ alignSelf: 'flex-end', marginTop: -6, marginBottom: 12 }}>
+                <Text style={{ color: '#2673dd', fontSize: 13 }}>Quên mật khẩu?</Text>
+              </Pressable>
+            ) : null}
           </>
         )}
         {msg ? <Text style={{ color: msg.startsWith('✓') || challenge ? C.green : C.danger, marginBottom: 12 }}>{msg}</Text> : null}
-        <Button title={busy ? 'Đang xử lý...' : challenge ? 'Xác minh' : mode === 'login' ? 'Đăng nhập' : 'Đăng ký'} onPress={submit} disabled={busy} />
-        {!challenge ? (
+        <Button title={busy ? 'Đang xử lý...' : challenge ? 'Xác minh' : mode === 'login' ? 'Đăng nhập' : mode === 'forgot' ? 'Gửi link đặt lại' : 'Đăng ký'} onPress={submit} disabled={busy} />
+        {mode === 'forgot' ? (
+          <Pressable onPress={() => { setMode('login'); setMsg('') }} style={{ marginTop: 18 }}>
+            <Text style={{ textAlign: 'center', color: C.primary }}>‹ Quay lại đăng nhập</Text>
+          </Pressable>
+        ) : !challenge ? (
           <Pressable onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setMsg('') }} style={{ marginTop: 18 }}>
             <Text style={{ textAlign: 'center', color: C.muted }}>
               {mode === 'login' ? 'Bạn mới biết đến Shoppi? ' : 'Bạn đã có tài khoản? '}

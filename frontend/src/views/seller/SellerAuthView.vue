@@ -80,6 +80,7 @@
               <form v-else novalidate @submit.prevent="onLogin">
                 <input v-model.trim="account.email" type="email" placeholder="Email" autocomplete="username" />
                 <PasswordInput v-model="account.password" />
+                <router-link :to="{ name: 'forgot-password', query: { from: 'seller' } }" class="forgot">Quên mật khẩu?</router-link>
                 <p v-if="error" class="error">{{ error }}</p>
                 <button class="btn block lg submit" type="submit" :disabled="!account.email || !account.password || loading">
                   {{ loading ? 'ĐANG XỬ LÝ...' : 'ĐĂNG NHẬP' }}
@@ -298,6 +299,7 @@ const skyline = [
 </script>
 
 <style scoped>
+.forgot { display: block; text-align: right; font-size: 13px; color: #2673dd; margin: -4px 0 8px; }
 .auth-main { position: relative; overflow: hidden; }
 .login-bg { background: var(--color-surface); }
 .register-bg { background: linear-gradient(180deg, #fff 0%, #fdf1ee 100%); }
