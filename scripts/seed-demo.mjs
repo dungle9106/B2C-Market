@@ -115,7 +115,25 @@ if ((await call('POST', '/auth/login', null, { email: `seller.${SHOPS[0].key}@${
   log('Dữ liệu demo đã có sẵn trong database này (đăng nhập được tài khoản demo). Không tạo lại.')
   process.exit(0)
 }
-const admin = (await ok('POST', '/auth/login', null, { email: ADMIN, password: ADMIN_PW })).token
+// a fresh backend answers before its first-run setup has created the admin: try for a while
+let admin
+for (let i = 0; !admin; i++) {
+  const r = await call('POST', '/auth/login', null, { email: ADMIN, password: ADMIN_PW })
+  if (r.status === 200) admin = r.data.token
+  else if (i > 30) throw new Error('Không đăng nhập được admin ' + ADMIN + ' (dùng --admin / --admin-password)')
+  else await sleep(1000)
+}
+// the platform allows only so many new accounts per address and 10 minutes (anti-spam, admin setting): raise it while
+// the demo accounts are created, and always put the admin's value back (also when the seed stops on an error)
+const settingsBefore = (await ok('GET', '/admin/settings', admin)).registerPerIp
+const restoreLimit = async () => { if (settingsBefore < 200) await call('PUT', '/admin/settings', admin, { registerPerIp: settingsBefore }) }
+if (settingsBefore < 200) await ok('PUT', '/admin/settings', admin, { registerPerIp: 1000 })
+process.on('uncaughtException', async (e) => {
+  await restoreLimit()
+  console.error(e)
+  process.exit(1)
+})
+
 const categories = (await ok('GET', '/categories')).flatMap(c => [c, ...(c.children || [])])
 const categoryId = (name) => (categories.find(c => c.name.toLowerCase().includes(name.toLowerCase())) || categories[0]).id
 
@@ -424,6 +442,7 @@ const last = [
 ]
 try { psql(last.join('\n')) } catch (e) { console.warn('   ! chỉnh ngày đánh giá/shop: ' + e.message.split('\n')[0]) }
 
+await restoreLimit()
 log(`
 Xong! Tài khoản demo (mật khẩu: ${PASSWORD})
   Người mua : ${buyers[0].email}  (đang theo dõi giá 4 sản phẩm, có Flash Sale vừa bắt đầu)

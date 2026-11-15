@@ -896,6 +896,32 @@ Frontend chạy ở `http://localhost:5173`, tự động proxy các request `/a
 4. Đăng nhập lại bằng Seller → "Đơn hàng" → xác nhận đơn vừa đặt → xem "Tổng quan" cập nhật
    thống kê
 
+## Kiểm thử
+
+**Unit test (JUnit 5 + Mockito)**: `cd backend && mvn test`, không cần database. 46 ca:
+
+| Phần | File test | Kiểm tra |
+|---|---|---|
+| Chia tiền giảm giá giữa các shop | `CheckoutSplitTest` | chia theo tỷ lệ, cộng lại đúng từng đồng, phần lẻ cho shop lớn nhất |
+| Shoppi Xu | `CoinRulesTest` | 1% tiền thực trả, hệ số hạng thành viên, làm tròn xuống |
+| Thẻ thanh toán | `PaymentRulesTest` | kiểm tra Luhn, nhận diện VISA / Mastercard / JCB |
+| Báo khi giảm giá | `PriceWatchServiceTest` | ngưỡng 1%, giá mong muốn, không báo lặp trong 12 giờ |
+| AI lạm dụng đổi trả | `ReturnRiskRulesTest` | người mua bình thường, người lạm dụng, sản phẩm lỗi bảo vệ người mua, ngưỡng mức rủi ro |
+| AI phân loại đánh giá | `ReviewTextAnalyzerTest`, `ReviewFileParserTest` | 14 đánh giá mẫu có nhãn chuẩn, cảm xúc, từ khóa nghiêm trọng, đọc file CSV/Excel |
+| Dự báo nhập hàng | `StockForecasterTest`, `InventoryForecastParamsTest` | nhu cầu đều / tăng / theo cuối tuần, tham số, lời khuyên |
+
+**Kiểm thử tích hợp qua API thật**: chạy khi backend đang chạy (database bất kỳ, mỗi lần dùng tài khoản mới):
+
+```bash
+node scripts/test-e2e.mjs                                   # backend ở http://localhost:8081
+node scripts/test-e2e.mjs --api http://localhost:3000/api   # stack docker compose
+```
+
+44 kiểm tra: tính tiền đơn hàng và voucher, chia voucher sàn cho nhiều shop, hủy đơn trả lại kho và Xu, ví ShoppiPay
+(trừ tiền, hoàn tiền, không đủ số dư), **6 người cùng tranh mua 3 sản phẩm cuối** (đúng 3 người mua được, không bán âm kho,
+không lỗi hệ thống), luồng giao hàng → đánh giá → trả hàng, phân quyền giữa người mua / người bán / shop khác, báo khi giảm giá.
+Script tạm nâng giới hạn tạo tài khoản mỗi IP trong lúc chạy và trả lại giá trị cũ khi xong.
+
 ## Tài liệu & công cụ
 
 - **ERD**: `docs/ERD.md` (Mermaid, sinh từ các entity). Đưa vào draw.io: *Arrange → Insert → Advanced → Mermaid*.
