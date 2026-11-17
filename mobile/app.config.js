@@ -34,6 +34,7 @@ module.exports = {
     },
     plugins: [
       'expo-secure-store',
+      'expo-video',
       ['expo-image-picker', { cameraPermission: 'Shoppi cần camera để chụp ảnh tìm sản phẩm và đăng ảnh sản phẩm.' }],
       // the backend runs on plain http in the demo (LAN IP or 10.0.2.2 from the emulator)
       ['expo-build-properties', { android: { usesCleartextTraffic: true } }]

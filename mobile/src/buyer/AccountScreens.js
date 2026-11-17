@@ -58,6 +58,7 @@ export default function AccountScreen({ navigation }) {
       <MenuItem icon="🔔" label="Theo dõi giá" hint="Báo khi giảm giá" onPress={() => navigation.navigate('PriceWatches')} />
       <MenuItem icon="🏪" label="Shop đang theo dõi" onPress={() => navigation.navigate('Following')} />
       <MenuItem icon="📍" label="Địa chỉ nhận hàng" onPress={() => navigation.navigate('Addresses')} />
+      <MenuItem icon="🔒" label="Đổi mật khẩu" onPress={() => navigation.navigate('ChangePassword')} />
       <MenuItem icon="🤖" label="Trợ lý mua sắm AI" hint="Hỏi gì cũng được" onPress={() => navigation.navigate('AIChat')} />
       <MenuItem icon="🛒" label="Giỏ hàng" onPress={() => navigation.navigate('Cart')} />
       <Button title="Đăng xuất" kind="ghost" style={{ margin: 16 }}

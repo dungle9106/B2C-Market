@@ -3,6 +3,7 @@ import { Alert, FlatList, Pressable, RefreshControl, ScrollView, Text, View } fr
 import { get, post, patch, errorText } from '../api'
 import { BUYER_CANCEL_REASONS, ORDER_STATUS, formatDateTime, formatVnd } from '../format'
 import { Button, C, Empty, Field, Img, Loading, Row, Select, styles, Tabs, useLoad } from '../ui'
+import { ReturnCard } from './ReturnScreens'
 
 const TABS = [
   { key: 'ALL', label: 'Tất cả' },
@@ -136,6 +137,8 @@ export function OrderDetailScreen({ route, navigation }) {
         <Text style={[styles.muted, { marginTop: 6 }]}>Mã đơn {o.code} · đặt lúc {formatDateTime(o.createdAt)}</Text>
       </View>
 
+      <ReturnCard order={o} onChanged={reload} />
+
       {cancelling ? (
         <View style={styles.card}>
           <Select label="Lý do hủy đơn" value={reason} options={BUYER_CANCEL_REASONS} onChange={setReason} />
@@ -149,6 +152,10 @@ export function OrderDetailScreen({ route, navigation }) {
       <View style={{ paddingHorizontal: 12, gap: 8 }}>
         {(o.canCancel || o.canRequestCancel) && !cancelling ? <Button title="Hủy đơn hàng" kind="ghost" onPress={() => setCancelling(true)} /> : null}
         {o.canConfirmReceived ? <Button title="Đã nhận được hàng" onPress={received} disabled={busy} /> : null}
+        {o.canReturn ? (
+          <Button title={`↩ Trả hàng/Hoàn tiền${o.returnDeadline ? ' (hạn ' + formatDateTime(o.returnDeadline) + ')' : ''}`} kind="ghost"
+                  onPress={() => navigation.navigate('ReturnRequest', { order: o })} />
+        ) : null}
         {['DELIVERED', 'CANCELLED'].includes(o.status) ? <Button title="Mua lại" kind="ghost" onPress={rebuy} disabled={busy} /> : null}
         <Button title="💬 Liên hệ Shop" kind="ghost" onPress={async () => {
           const c = await post('/buyer/chats', { shopId: o.shopId })

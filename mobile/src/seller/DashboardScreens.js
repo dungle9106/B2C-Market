@@ -79,6 +79,9 @@ export default function DashboardScreen({ navigation }) {
           ))}
         </View>
       ) : null}
+      <MenuItem icon="↩" label="Trả hàng/Hoàn tiền" onPress={() => navigation.navigate('SellerReturns')} />
+      <MenuItem icon="⭐" label="Trả lời đánh giá" hint="AI soạn sẵn" onPress={() => navigation.navigate('ReviewInbox')} />
+      <MenuItem icon="📦" label="Dự báo nhập hàng" hint="AI" onPress={() => navigation.navigate('StockForecast')} />
       <MenuItem icon="🤖" label="Trợ lý bán hàng AI" hint="Hỏi về doanh số" onPress={() => navigation.navigate('SalesAssistant')} />
       <MenuItem icon="📊" label="Hiệu quả hoạt động" onPress={() => navigation.navigate('Performance')} />
       <View style={{ height: 20 }} />
@@ -197,6 +200,10 @@ export function SellerAccountScreen({ navigation }) {
       <MenuItem icon="📊" label="Hiệu quả hoạt động" onPress={() => navigation.navigate('Performance')} />
       <MenuItem icon="🤖" label="Trợ lý bán hàng AI" onPress={() => navigation.navigate('SalesAssistant')} />
       <MenuItem icon="🔔" label="Thông báo" onPress={() => navigation.navigate('SellerNotifications')} />
+      <MenuItem icon="↩" label="Trả hàng/Hoàn tiền" onPress={() => navigation.navigate('SellerReturns')} />
+      <MenuItem icon="⭐" label="Trả lời đánh giá" onPress={() => navigation.navigate('ReviewInbox')} />
+      <MenuItem icon="📦" label="Dự báo nhập hàng (AI)" onPress={() => navigation.navigate('StockForecast')} />
+      <MenuItem icon="🔒" label="Đổi mật khẩu" onPress={() => navigation.navigate('ChangePassword')} />
       <Text style={[styles.muted, { padding: 14 }]}>Cài đặt shop, voucher, quảng cáo và báo cáo chi tiết dùng trên web Kênh Người Bán.</Text>
       <Button title="Đăng xuất" kind="ghost" style={{ margin: 16 }}
               onPress={() => Alert.alert('Đăng xuất?', '', [{ text: 'Hủy' }, { text: 'Đăng xuất', style: 'destructive', onPress: signOut }])} />

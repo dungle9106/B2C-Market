@@ -10,6 +10,8 @@ import { ChatListScreen, ChatThreadScreen } from '../common/Chat'
 import DashboardScreen, { PerformanceScreen, RegisterShopScreen, SalesAssistantScreen, SellerAccountScreen } from './DashboardScreens'
 import SellerOrdersScreen, { SellerOrderScreen } from './OrdersScreens'
 import SellerProductsScreen, { ProductFormScreen } from './ProductsScreens'
+import { ReviewInboxScreen, SellerReturnsScreen, StockForecastScreen } from './AfterSalesScreens'
+import ChangePasswordScreen from '../common/ChangePasswordScreen'
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -18,8 +20,11 @@ const Tab = createBottomTabNavigator()
 function openLink(link = '') {
   const m = /^\/seller\/orders\/(\d+)/.exec(link || '')
   if (m) return ['SellerOrder', { id: Number(m[1]) }]
-  if (link?.startsWith('/seller/orders') || link?.startsWith('/seller/returns')) return ['SellerTabs', { screen: 'SellerOrders' }]
-  if (link?.startsWith('/seller/products') || link?.startsWith('/seller/inventory')) return ['SellerTabs', { screen: 'SellerProducts' }]
+  if (link?.startsWith('/seller/returns')) return ['SellerReturns']
+  if (link?.startsWith('/seller/review-hub')) return ['ReviewInbox']
+  if (link?.startsWith('/seller/inventory')) return ['StockForecast']
+  if (link?.startsWith('/seller/orders')) return ['SellerTabs', { screen: 'SellerOrders' }]
+  if (link?.startsWith('/seller/products')) return ['SellerTabs', { screen: 'SellerProducts' }]
   if (link?.startsWith('/seller/performance')) return ['Performance']
   return null
 }
@@ -58,6 +63,10 @@ export default function SellerApp() {
       <Stack.Screen name="SellerTabs" component={SellerTabs} options={{ headerShown: false }} />
       <Stack.Screen name="SellerOrder" component={SellerOrderScreen} options={{ title: 'Chi tiết đơn hàng' }} />
       <Stack.Screen name="ProductForm" component={ProductFormScreen} options={{ title: 'Sản phẩm' }} />
+      <Stack.Screen name="SellerReturns" component={SellerReturnsScreen} options={{ title: 'Trả hàng/Hoàn tiền' }} />
+      <Stack.Screen name="StockForecast" component={StockForecastScreen} options={{ title: '✨ Dự báo nhập hàng' }} />
+      <Stack.Screen name="ReviewInbox" component={ReviewInboxScreen} options={{ title: 'Đánh giá của khách' }} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Đổi mật khẩu' }} />
       <Stack.Screen name="Performance" component={PerformanceScreen} options={{ title: 'Hiệu quả hoạt động' }} />
       <Stack.Screen name="SalesAssistant" component={SalesAssistantScreen} options={{ title: '🤖 Trợ lý bán hàng AI' }} />
       <Stack.Screen name="SellerNotifications" options={{ title: 'Thông báo' }}>

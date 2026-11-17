@@ -16,6 +16,9 @@ import CheckoutScreen from './CheckoutScreen'
 import OrdersScreen, { OrderDetailScreen, ReviewScreen } from './OrdersScreen'
 import AddressesScreen, { AddressFormScreen } from './AddressesScreen'
 import LuckySpinScreen from './LuckySpinScreen'
+import VideosScreen from './VideosScreen'
+import ReturnRequestScreen from './ReturnScreens'
+import ChangePasswordScreen from '../common/ChangePasswordScreen'
 import AccountScreen, { AIChatScreen, CoinsScreen, FollowingScreen, LikesScreen, PriceWatchesScreen, VoucherWalletScreen, WalletScreen } from './AccountScreens'
 
 const Stack = createNativeStackNavigator()
@@ -34,6 +37,7 @@ function Tabs() {
   return (
     <Tab.Navigator screenOptions={{ tabBarActiveTintColor: C.primary, headerTintColor: C.text }}>
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ', headerShown: false, tabBarIcon: icon('🏠') }} />
+      <Tab.Screen name="Videos" component={VideosScreen} options={{ title: 'Video', headerShown: false, tabBarIcon: icon('▶️') }} />
       <Tab.Screen name="Notifications" options={{ title: 'Thông báo', tabBarIcon: icon('🔔') }}>
         {(props) => <NotificationsScreen {...props} openLink={openLink} />}
       </Tab.Screen>
@@ -65,6 +69,8 @@ export default function BuyerApp() {
       <Stack.Screen name="AddressForm" component={AddressFormScreen} options={{ title: 'Địa chỉ mới' }} />
       <Stack.Screen name="VoucherWallet" component={VoucherWalletScreen} options={{ title: 'Kho Voucher' }} />
       <Stack.Screen name="Coins" component={CoinsScreen} options={{ title: 'Shoppi Xu' }} />
+      <Stack.Screen name="ReturnRequest" component={ReturnRequestScreen} options={{ title: 'Trả hàng/Hoàn tiền' }} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Đổi mật khẩu' }} />
       <Stack.Screen name="LuckySpin" component={LuckySpinScreen} options={{ title: 'Vòng quay may mắn' }} />
       <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: 'Ví ShoppiPay' }} />
       <Stack.Screen name="Likes" component={LikesScreen} options={{ title: 'Đã thích' }} />
