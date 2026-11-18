@@ -21,11 +21,20 @@
   --radius-md: 8px;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.08);
   --header-height: 108px;
+  /* whole-UI scale on wide screens (see the media queries below); viewport heights divide it back out,
+     because CSS zoom also multiplies vh units */
+  --ui-zoom: 1;
+  --vh: calc(100vh / var(--ui-zoom));
+  --dvh: calc(100dvh / var(--ui-zoom));
 }
 
 * {
   box-sizing: border-box;
 }
+
+/* everything is sized in px, so a big monitor got a small page: scale the whole UI up there */
+@media (min-width: 1400px) { :root { --ui-zoom: 1.15; zoom: 1.15; } }
+@media (min-width: 1900px) { :root { --ui-zoom: 1.3; zoom: 1.3; } }
 
 body {
   margin: 0;
@@ -308,7 +317,7 @@ input:focus, select:focus, textarea:focus {
 .row-between { display: flex; align-items: center; justify-content: space-between; }
 
 /* ===== Auth pages (buyer AuthView + SellerAuthView) ===== */
-.auth-page { min-height: 100vh; display: flex; flex-direction: column; background: var(--color-surface); }
+.auth-page { min-height: var(--vh); display: flex; flex-direction: column; background: var(--color-surface); }
 .auth-main { flex: 1; display: flex; align-items: center; padding: 40px 0; }
 .auth-main-inner { display: flex; align-items: center; justify-content: space-between; gap: 40px; width: 100%; }
 .auth-card {

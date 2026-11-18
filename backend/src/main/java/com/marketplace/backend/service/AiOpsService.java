@@ -79,7 +79,7 @@ public class AiOpsService {
 
     /** caller class -> feature key, and the labels shown on the dashboard */
     static final Map<String, String> CALLERS = Map.ofEntries(
-            Map.entry("ChatbotService", "CHATBOT"), Map.entry("SellerAIService", "PRODUCT_WRITER"), Map.entry("SellerAIController", "PRODUCT_WRITER"),
+            Map.entry("ChatbotService", "CHATBOT"), Map.entry("ShoppingAgent", "CHATBOT"), Map.entry("SellerAIService", "PRODUCT_WRITER"), Map.entry("SellerAIController", "PRODUCT_WRITER"),
             Map.entry("ReviewInsightService", "REVIEW_INSIGHT"), Map.entry("SalesAssistantService", "SALES_ASSISTANT"),
             Map.entry("PromoAdvisorService", "PROMO_ADVISOR"), Map.entry("ReplySuggestService", "REPLY_SUGGEST"), Map.entry("AIService", "CONNECTION_TEST"),
             Map.entry("ReturnRiskService", "RETURN_RISK"), Map.entry("ImageSearchService", "IMAGE_SEARCH"), Map.entry("ReviewAiService", "REVIEW_HUB"), Map.entry("ReviewHubService", "REVIEW_HUB"),

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { loadSession, setTokens, clearTokens, onSessionExpired, get, post } from './api'
+import { unregisterPush } from './push'
 
 const AuthContext = createContext(null)
 
@@ -28,6 +29,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signOut = useCallback(async () => {
+    await unregisterPush() // while still signed in: the backend only removes this account's own device
     try { await post('/auth/logout', {}) } catch (e) { /* the session ends locally anyway */ }
     await clearTokens()
     setUser(null)

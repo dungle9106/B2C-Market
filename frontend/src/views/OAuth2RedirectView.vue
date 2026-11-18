@@ -52,7 +52,7 @@ onMounted(async () => {
 
 <style scoped>
 .oauth-redirect {
-  min-height: 100vh;
+  min-height: var(--vh);
   display: flex;
   flex-direction: column;
   align-items: center;

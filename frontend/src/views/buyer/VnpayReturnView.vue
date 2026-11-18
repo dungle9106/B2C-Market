@@ -2,7 +2,7 @@
   <!-- styled with Tailwind utilities (tw- prefix) -->
   <div class="auth-page">
     <AuthHeader title="Kết quả thanh toán" />
-    <main class="tw-flex tw-justify-center tw-bg-neutral-100 tw-px-4 tw-py-12 tw-min-h-[calc(100vh-84px)]">
+    <main class="tw-flex tw-justify-center tw-bg-neutral-100 tw-px-4 tw-py-12 tw-min-h-[calc(var(--vh)-84px)]">
       <section class="auth-card tw-w-full tw-max-w-[440px] tw-text-center">
         <template v-if="state === 'loading'"><div class="tw-text-4xl">⏳</div><p>Đang xác nhận giao dịch với VNPay...</p></template>
         <template v-else-if="state === 'ok'">

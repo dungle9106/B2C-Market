@@ -63,7 +63,7 @@ class ReturnRiskModelClient {
     Map<String, Object> train(List<Map<String, Object>> items) {
         try {
             String raw = webClient.post().uri(base() + "/return-risk/train").bodyValue(Map.of("items", items)).retrieve()
-                    .onStatus(s -> s.value() == 400, r -> r.bodyToMono(String.class).map(b -> new IllegalStateException(detail(b))))
+                    .onStatus(s -> s.value() == 400, r -> r.bodyToMono(byte[].class).map(b -> new IllegalStateException(detail(new String(b, java.nio.charset.StandardCharsets.UTF_8)))))  // FastAPI sends no charset: always UTF-8
                     .bodyToMono(String.class).block(Duration.ofSeconds(120));
             return JSON.readValue(raw, Map.class);
         } catch (IllegalStateException e) {

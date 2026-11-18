@@ -35,6 +35,10 @@ import java.util.stream.Collectors;
 //   3. Generation: call the LLM (via AIService) constrained to that context
 // When no LLM is configured a rule-based answer is built from the same context,
 // so the feature still works in a demo without an API key.
+//
+// With a model that can call tools (OpenAI, Claude) the turn goes to ShoppingAgent instead: the model chooses
+// what to look up (products, the buyer's orders and vouchers, the trained recommendation model) and can act
+// (add to cart, prepare a cancellation the buyer confirms). If that fails, the RAG pipeline above answers.
 @Slf4j
 @Service
 public class ChatbotService {
@@ -49,12 +53,14 @@ public class ChatbotService {
     private final AIService aiService;
     private final TransactionTemplate readTx;
     private final com.marketplace.backend.service.search.SemanticSearchService semanticSearch;
+    private final ShoppingAgent agent;
 
     public ChatbotService(ProductRepository productRepository, OrderRepository orderRepository,
                           ChatHistoryRepository chatHistoryRepository, UserRepository userRepository,
                           AIService aiService, PlatformTransactionManager txManager,
-                          com.marketplace.backend.service.search.SemanticSearchService semanticSearch) {
+                          com.marketplace.backend.service.search.SemanticSearchService semanticSearch, ShoppingAgent agent) {
         this.semanticSearch = semanticSearch;
+        this.agent = agent;
         this.productRepository = productRepository;
         this.orderRepository = orderRepository;
         this.chatHistoryRepository = chatHistoryRepository;
@@ -73,27 +79,62 @@ public class ChatbotService {
     public ChatbotResponse chat(String userMessage) {
         Long userId = CurrentUser.id();
         String message = userMessage.trim();
+
+        if (agent.available()) {
+            List<ChatHistory> history = readTx.execute(s -> {
+                List<ChatHistory> h = new ArrayList<>(chatHistoryRepository.findTop10ByUserIdOrderByCreatedAtDesc(userId));
+                Collections.reverse(h);
+                return h;
+            });
+            ShoppingAgent.Result r = agent.run(userId, message, history, this::searchForAgent);
+            if (r != null) {
+                ChatHistory saved = save(userId, message, r.reply());
+                return new ChatbotResponse(r.reply(), r.products(), r.orders(), r.suggestSupport(),
+                        saved != null ? saved.getCreatedAt() : null, r.actions(), r.steps());
+            }
+        }
+
         Context ctx = readTx.execute(s -> retrieve(userId, message));
 
         String reply = aiService.isConfigured()
                 ? aiService.complete(buildSystemPrompt(ctx), message)
                 : ruleBasedReply(ctx);
 
-        // best-effort logging of the conversation turn (also feeds the next turn's context)
-        ChatHistory saved = null;
+        ChatHistory saved = save(userId, message, reply);
+        boolean couldNotHelp = ctx.products().isEmpty() && ctx.orders().isEmpty() && ctx.topic() == null;
+        return new ChatbotResponse(reply, ctx.productCards(), ctx.orderRefs(),
+                ctx.wantsHuman() || couldNotHelp, saved != null ? saved.getCreatedAt() : null, List.of(), List.of());
+    }
+
+    // best-effort logging of the conversation turn (also feeds the next turn's context)
+    private ChatHistory save(Long userId, String message, String reply) {
         try {
-            saved = chatHistoryRepository.save(ChatHistory.builder()
+            return chatHistoryRepository.save(ChatHistory.builder()
                     .user(userRepository.getReferenceById(userId))
                     .message(NotificationService.cut(message, 2000))
                     .response(NotificationService.cut(reply, 4000))
                     .build());
         } catch (Exception e) {
             log.warn("Could not save chatbot history: {}", e.getMessage());
+            return null;
         }
+    }
 
-        boolean couldNotHelp = ctx.products().isEmpty() && ctx.orders().isEmpty() && ctx.topic() == null;
-        return new ChatbotResponse(reply, ctx.productCards(), ctx.orderRefs(),
-                ctx.wantsHuman() || couldNotHelp, saved != null ? saved.getCreatedAt() : null);
+    /** The agent's search_products tool: the same keyword + meaning search as below, with an explicit price range. */
+    private List<Product> searchForAgent(String query, BigDecimal min, BigDecimal max, int limit) {
+        String norm = TextNormalizer.normalize(query);
+        PriceRange price = min == null && max == null ? parsePrice(norm) : new PriceRange(min, max);
+        List<Product> products = findProducts(stripPrice(norm), price, null, limit);
+        if (products.size() < limit) {
+            Map<Long, Product> merged = new LinkedHashMap<>();
+            products.forEach(p -> merged.put(p.getId(), p));
+            for (Product p : semanticSearch.nearestProducts(query, limit * 2)) {
+                if (merged.size() >= limit) break;
+                if (p.isActive() && p.getShop().isActive() && (price == null || price.contains(p.getEffectivePrice()))) merged.putIfAbsent(p.getId(), p);
+            }
+            products = List.copyOf(merged.values());
+        }
+        return products;
     }
 
     /** Previous turns, oldest first, to restore the chat window. */
@@ -121,7 +162,7 @@ public class ChatbotService {
         Topic topic = Topic.detect(norm);
 
         // topic phrases are not product words: "don hang dang o dau" must not match "dau goi"
-        List<Product> products = findProducts(Topic.strip(stripPrice(norm)), price, topic);
+        List<Product> products = findProducts(Topic.strip(stripPrice(norm)), price, topic, MAX_CONTEXT_PRODUCTS);
         // RAG, step 2: too few keyword matches ("quà cho mẹ", "đồ đi biển"): add the products closest in meaning
         // (embeddings + pgvector), still within the price range
         if (products.size() < MAX_CONTEXT_PRODUCTS && topic == null) {
@@ -164,7 +205,7 @@ public class ChatbotService {
             "tr", "vnd", "dong", "d", "con", "khac", "them", "nua", "lam", "ai", "o", "nen", "hon", "ma", "thich",
             "phu", "ok", "oke", "uh", "roi", "chua", "gium", "dum", "lay", "chay", "moi", "don");
 
-    private List<Product> findProducts(String norm, PriceRange price, Topic topic) {
+    private List<Product> findProducts(String norm, PriceRange price, Topic topic, int limit) {
         List<String> words = Arrays.stream(norm.split("[^a-z0-9]+"))
                 .filter(w -> !w.isBlank() && !STOPWORDS.contains(w) && !w.matches("\\d+"))
                 .distinct().limit(6).toList();
@@ -175,7 +216,7 @@ public class ChatbotService {
             if (!browsing || topic != null) return List.of();
             return productRepository.findTop10ByActiveTrueOrderBySoldCountDesc().stream()
                     .filter(p -> p.getShop().isActive() && (price == null || price.contains(p.getEffectivePrice())))
-                    .limit(MAX_CONTEXT_PRODUCTS).toList();
+                    .limit(limit).toList();
         }
 
         // candidates: every product containing at least one keyword as a whole word
@@ -202,7 +243,7 @@ public class ChatbotService {
                 .filter(s -> s.score() > 0)
                 .sorted(Comparator.comparingInt(Scored::score).reversed()
                         .thenComparing(s -> s.p().getSoldCount(), Comparator.reverseOrder()))
-                .limit(MAX_CONTEXT_PRODUCTS)
+                .limit(limit)
                 .map(Scored::p)
                 .toList();
     }
@@ -292,7 +333,7 @@ public class ChatbotService {
     }
 
     // Shoppi's rules, given to the LLM as ground truth (and used for the rule-based answers)
-    private static final Map<Topic, String> POLICY = new EnumMap<>(Map.of(
+    static final Map<Topic, String> POLICY = new EnumMap<>(Map.of(
             Topic.SHIPPING, "Vận chuyển: Shoppi hợp tác với GHN, GHTK, J&T Express, Viettel Post. Có 3 gói: Tiết kiệm, Nhanh, "
                     + "Hỏa tốc (Hỏa tốc chỉ khi shop và người nhận cùng tỉnh). Phí ship tính theo cùng tỉnh/khác tỉnh. "
                     + "Sản phẩm có nhãn Freeship được miễn phí vận chuyển tối đa bằng phí gói Tiết kiệm; ngoài ra có voucher giảm phí ship.",
@@ -421,7 +462,7 @@ public class ChatbotService {
 
     // ==================== helpers ====================
 
-    private static String statusName(OrderStatus s) {
+    static String statusName(OrderStatus s) {
         return switch (s) {
             case AWAITING_PAYMENT -> "Chờ thanh toán";
             case PENDING -> "Chờ xác nhận";

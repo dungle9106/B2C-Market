@@ -4,6 +4,7 @@ import Constants from 'expo-constants'
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { AuthProvider } from './src/auth'
+import { navigationRef } from './src/push'
 import { C } from './src/ui'
 import BuyerApp from './src/buyer/BuyerApp'
 import SellerApp from './src/seller/SellerApp'
@@ -16,7 +17,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <NavigationContainer theme={theme}>
+        <NavigationContainer ref={navigationRef} theme={theme}>
           {isSeller ? <SellerApp /> : <BuyerApp />}
         </NavigationContainer>
       </AuthProvider>

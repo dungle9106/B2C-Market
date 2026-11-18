@@ -10,6 +10,7 @@
         <span>Thông báo mới nhận</span>
         <button v-if="store.total > 0" type="button" class="link" @click="onReadAll">Đánh dấu đã đọc tất cả</button>
       </div>
+      <PushToggle compact />
       <div v-if="loading" class="empty">Đang tải...</div>
       <div v-else-if="!items.length" class="empty">Chưa có thông báo nào</div>
       <ul v-else>
@@ -35,6 +36,8 @@ import { useAuthStore } from '../stores/auth'
 import { useNotificationStore } from '../stores/notifications'
 import { myNotifications, markNotificationRead, markAllNotificationsRead } from '../api/notifications'
 import { notificationIcon, timeAgo } from '../utils/notifications'
+import { resumePush } from '../utils/webPush'
+import PushToggle from './PushToggle.vue'
 
 // tone: 'light' = white icon on the orange buyer header, 'dark' = grey icon on the white seller header
 defineProps({ tone: { type: String, default: 'light' } })
@@ -81,6 +84,7 @@ function onClickOutside(e) {
 }
 onMounted(() => {
   store.start()
+  resumePush() // this browser already allows notifications: deliver this account's to it
   document.addEventListener('click', onClickOutside)
 })
 onBeforeUnmount(() => document.removeEventListener('click', onClickOutside))

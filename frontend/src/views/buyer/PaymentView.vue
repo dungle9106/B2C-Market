@@ -208,7 +208,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.pay-page { min-height: 100vh; background: #f0f2f5; padding: 0 16px 40px; }
+.pay-page { min-height: var(--vh); background: #f0f2f5; padding: 0 16px 40px; }
 .sandbox { background: #fff4e5; color: #b45309; text-align: center; font-size: 12px; font-weight: 600; padding: 8px; margin: 0 -16px 32px; letter-spacing: 0.3px; }
 .sandbox.vn { background: #e8f1fb; color: #005baa; }
 .vnpay p { line-height: 1.6; margin: 0 0 14px; }

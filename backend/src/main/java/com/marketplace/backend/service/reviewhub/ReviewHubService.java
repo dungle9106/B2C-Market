@@ -810,10 +810,12 @@ public class ReviewHubService {
         return m;
     }
 
-    /** Trains the FastAPI service's classifier on the reviews labelled by sellers and by the LLM. */
+    /**
+     * Trains the FastAPI service's classifier on the reviews labelled by sellers and by the LLM, on top of the
+     * service's own base set of labelled reviews (review-ai-service/app/review_data.py): it works from zero corrections.
+     */
     public Map<String, Object> train() {
         List<ReviewHubItem> labelled = repository.labeled();
-        if (labelled.size() < 20) throw bad("Cần ít nhất 20 đánh giá đã gán nhãn (do AI hoặc người bán sửa), hiện có " + labelled.size());
         try {
             Map<String, Object> r = ai.train(labelled);
             auditService.log("TRAIN_REVIEW_MODEL", "SETTING", null, "Mô hình phân loại đánh giá", "Huấn luyện trên " + labelled.size() + " đánh giá");

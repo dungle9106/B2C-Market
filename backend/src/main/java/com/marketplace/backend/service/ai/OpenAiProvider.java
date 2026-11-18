@@ -71,6 +71,69 @@ public class OpenAiProvider implements AIProvider {
         }
     }
 
+    // Chat Completions with "tools": the model answers with message.tool_calls[{id, function: {name, arguments}}]
+    // (arguments is a JSON string); each result goes back as a {role: "tool", tool_call_id} message
+    @Override
+    public Agent.Reply converse(AiSettings s, String systemPrompt, List<Agent.Msg> messages, List<Agent.Tool> tools) {
+        if (s.openaiKey() == null || s.openaiKey().isBlank()) return Agent.Reply.failed("Chưa cấu hình API key");
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        out.add(Map.of("role", "system", "content", systemPrompt));
+        for (Agent.Msg m : messages) {
+            if (m instanceof Agent.User u) {
+                out.add(Map.of("role", "user", "content", u.text()));
+            } else if (m instanceof Agent.Assistant a) {
+                Map<String, Object> msg = new java.util.HashMap<>();
+                msg.put("role", "assistant");
+                msg.put("content", a.text() == null ? "" : a.text());
+                if (!a.calls().isEmpty()) {
+                    msg.put("tool_calls", a.calls().stream().map(c -> Map.of("id", c.id(), "type", "function",
+                            "function", Map.of("name", c.name(), "arguments", json(c.args())))).toList());
+                }
+                out.add(msg);
+            } else if (m instanceof Agent.ToolResult r) {
+                out.add(Map.of("role", "tool", "tool_call_id", r.callId(), "content", r.content()));
+            }
+        }
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("model", s.openaiModel());
+        body.put("messages", out);
+        body.put("temperature", 0.3);
+        if (!tools.isEmpty()) {
+            body.put("tools", tools.stream().map(t -> Map.of("type", "function",
+                    "function", Map.of("name", t.name(), "description", t.description(), "parameters", t.schema()))).toList());
+        }
+        try {
+            String raw = webClient.post().uri(s.openaiUrl())
+                    .header("Authorization", "Bearer " + s.openaiKey())
+                    .header("Content-Type", "application/json")
+                    .bodyValue(body).retrieve().bodyToMono(String.class).block(Duration.ofSeconds(60));
+            JsonNode root = objectMapper.readTree(raw);
+            JsonNode msg = root.path("choices").path(0).path("message");
+            List<Agent.Call> calls = new java.util.ArrayList<>();
+            for (JsonNode c : msg.path("tool_calls")) {
+                String args = c.path("function").path("arguments").asText("{}");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> parsed = args.isBlank() ? Map.of() : objectMapper.readValue(args, Map.class);
+                calls.add(new Agent.Call(c.path("id").asText(), c.path("function").path("name").asText(), parsed));
+            }
+            JsonNode usage = root.path("usage");
+            return new Agent.Reply(msg.path("content").isTextual() ? msg.path("content").asText() : null, calls,
+                    usage.path("prompt_tokens").asInt(), usage.path("completion_tokens").asInt(), null);
+        } catch (WebClientResponseException e) {
+            return Agent.Reply.failed("HTTP " + e.getStatusCode().value() + " " + cut(e.getResponseBodyAsString()));
+        } catch (Exception e) {
+            return Agent.Reply.failed(e.getClass().getSimpleName() + ": " + cut(e.getMessage()));
+        }
+    }
+
+    private String json(Object o) {
+        try {
+            return objectMapper.writeValueAsString(o);
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
     /** Vectors of the texts, in order. */
     public record Embeddings(List<float[]> vectors, int tokens, String error) {
     }

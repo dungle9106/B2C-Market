@@ -128,6 +128,92 @@ Lưu ý: ổ đĩa của Render gói miễn phí không bền, ảnh tải lên 
 - **Upload ảnh/video**: `POST /api/uploads`, lưu ở thư mục `app.upload.dir` (mặc định `uploads/` trong thư mục
   chạy backend, đổi bằng biến `UPLOAD_DIR`). Chỉ nhận JPG/PNG/WEBP/GIF ≤ 5MB và MP4/WEBM ≤ 30MB.
 
+### Trợ lý mua sắm AI biết hành động (LLM + tool calling)
+
+Trang `/chatbot` (web) và màn Trợ lý AI (app). Khi provider ở trang **AI & chi phí LLM** là OpenAI hoặc Claude và đã có API key,
+mô hình **tự chọn công cụ cần dùng** thay vì chỉ đọc một khối context cố định (`ShoppingAgent.java`, tối đa 6 vòng gọi công cụ mỗi câu):
+
+| Công cụ | Làm gì |
+|---|---|
+| `search_products` | tìm theo từ khóa không dấu + theo ý nghĩa (pgvector), lọc khoảng giá, sắp xếp |
+| `get_product` | mô tả, phân loại (màu/size) với giá và tồn kho riêng, thời hạn đổi trả |
+| `recommend_for_me` | gợi ý từ **mô hình gợi ý tự huấn luyện** (mục dưới), kèm lý do "vì bạn đã xem ..." |
+| `similar_products` | sản phẩm được cùng nhóm người quan tâm / cùng loại |
+| `my_orders`, `my_vouchers` | đơn hàng (trạng thái, vận đơn, có hủy được không) và Kho Voucher của chính người hỏi |
+| `add_to_cart` | thêm vào giỏ thật (dễ hoàn tác), chỉ khi người mua yêu cầu rõ; sản phẩm có phân loại thì phải hỏi lại |
+| `propose_cancel_order` | **không tự hủy**: hiện nút "Xác nhận hủy đơn" để người mua tự bấm |
+| `handoff_to_human` | hiện nút Chat với Shop / Gửi yêu cầu hỗ trợ |
+
+Mỗi công cụ chỉ đọc/ghi dữ liệu của người đang đăng nhập và đi qua đúng service của ứng dụng (cùng luật tồn kho, hủy đơn...).
+Dưới câu trả lời hiện dòng "🔧 Đã tra cứu: ..." cho biết trợ lý đã dùng công cụ nào. Chưa có API key, provider là Hugging Face,
+hoặc gọi API lỗi thì tự quay về chatbot RAG/luật như cũ. Kiểm thử vòng lặp agent bằng mô hình giả: `ShoppingAgentTest`.
+
+### Mô hình gợi ý sản phẩm (tự huấn luyện)
+
+"Gợi ý cho bạn" ở trang chủ, "Sản phẩm tương tự" và công cụ `recommend_for_me` của trợ lý dùng mô hình **học từ hành vi mua sắm**
+(`review-ai-service/app/recommender.py`, cần `REVIEW_AI_URL`), không còn chỉ là luật "cùng danh mục":
+
+1. Trọng số hành vi: xem 1, thích 2, thêm giỏ 3, mua 5, đánh giá 4-5 sao +2, đánh giá 1-2 sao −3 (`RecommendationService`).
+2. **Item-based collaborative filtering**: độ tương đồng cosine giữa các sản phẩm trên ma trận người mua × sản phẩm (log trọng số,
+   hệ số co cho cặp ít người chung, giữ 50 láng giềng), cộng một phần "cùng danh mục" (β) và "độ phổ biến" (γ) cho sản phẩm mới.
+3. **Đánh giá leave-last-out**: giấu sản phẩm cuối cùng của mỗi người mua; β, γ chọn trên tập validation, điểm báo cáo trên tập test.
+   So sánh với 2 luật cũ bằng HitRate@10, NDCG@10 và độ phủ danh mục. Trang admin **Mô hình gợi ý sản phẩm** (`/admin/reco`)
+   hiện các số này cho dữ liệu thật và có nút huấn luyện; tự huấn luyện lại 3:40 mỗi đêm. Cần ít nhất 10 người mua và 50 lượt tương tác.
+4. Chưa huấn luyện hoặc dịch vụ tắt thì quay về luật cũ (cùng danh mục đã xem, rồi bán chạy).
+
+Benchmark trên **dữ liệu mô phỏng** (1000 người mua, 400 sản phẩm, 20 danh mục; dùng khi DB thật còn ít dữ liệu), chạy `cd review-ai-service && python -m app.benchmark`:
+
+| Cách gợi ý | HitRate@10 | NDCG@10 | Độ phủ |
+|---|---|---|---|
+| Bán chạy nhất (luật cũ) | 0.127 | 0.067 | 4.3% |
+| Cùng danh mục đã xem (luật cũ) | 0.180 | 0.101 | 38.5% |
+| **Mô hình học từ hành vi** | **0.214** | **0.127** | **96.8%** |
+
+### AI phát hiện gian lận đơn hàng (tự huấn luyện)
+
+Mỗi đơn mới được chấm điểm rủi ro 0-100 trong vòng 2 phút sau khi đặt (`service/risk/FraudService.java`). Trang admin
+**AI phát hiện gian lận đơn** (`/admin/fraud`, quyền ORDERS) liệt kê đơn bị gắn cờ, lý do và nút kết luận **An toàn / Gian lận**.
+
+1. **15 đặc trưng** chỉ tính từ dữ liệu có trước lúc đặt đơn: giá trị đơn và tỉ lệ so với thói quen của người mua, tuổi tài khoản,
+   số đơn trong 1 giờ / 24 giờ, COD, tỉ lệ bom hàng trước đó, số tài khoản khác dùng cùng SĐT nhận hàng, tỉ lệ giảm giá, số lượng,
+   đăng nhập từ thiết bị mới, số lần nhập sai mật khẩu, đặt lúc 0h-5h.
+2. **Luật thủ công** (`FraudRules.java`) là đường cơ sở và quyết định khi chưa có mô hình.
+3. **Isolation Forest** (không cần nhãn): đơn "khác thường" so với mọi đơn đã thấy được đẩy điểm lên.
+4. **Mô hình có giám sát**: hồi quy logistic và Gradient Boosting thi với nhau, chọn cái tốt hơn trên tập validation. Nhãn lấy
+   từ lịch sử: đơn bị từ chối nhận / hủy sau khi đã gửi (bom hàng) hoặc admin kết luận gian lận = 1; đơn giao thành công
+   hoặc admin kết luận an toàn = 0. Đánh giá theo thời gian: 60% đơn cũ nhất để học, 20% để chọn mô hình, 20% mới nhất để chấm.
+5. Điểm ≥ 60 thì báo cho admin. Không đơn nào bị hủy tự động; kết luận của admin thành dữ liệu huấn luyện. Tự huấn luyện lại 4:10 mỗi đêm.
+
+### AI dự đoán khách hàng rời bỏ & giữ chân (tự huấn luyện)
+
+Trang admin **AI dự đoán rời bỏ** (`/admin/churn`, quyền VOUCHERS) chấm mọi người mua đã từng đặt đơn
+(`service/risk/ChurnService.java`):
+
+1. **Tua lại lịch sử**: tại 12 mốc thời gian trong quá khứ (mỗi tháng), lấy hành vi của từng người mua tính đến mốc đó
+   (số ngày chưa mua, nhịp mua thường ngày, số đơn, tổng chi, lượt xem / thêm giỏ / thích / đăng nhập 30 ngày, tỉ lệ hủy,
+   trả hàng, đánh giá xấu, thâm niên). Nhãn = **không đặt đơn nào trong 60 ngày sau mốc**.
+2. Hồi quy logistic / Gradient Boosting học quy luật, so với luật "càng lâu chưa mua càng dễ rời bỏ". Tự huấn luyện lại mỗi thứ Hai.
+3. Danh sách người mua xếp theo nguy cơ hoặc theo **doanh thu có nguy cơ mất** (xác suất × tổng chi), kèm lý do.
+4. **Voucher giữ chân**: chọn người mua, đặt mức giảm, hệ thống tạo một mã ẩn (`GIUCHAN…`), bỏ thẳng vào ví voucher của từng
+   người và gửi thông báo đẩy. Mỗi người nhận tối đa 1 lần trong 14 ngày.
+5. **Nhắc giỏ hàng bị bỏ quên** (tự động mỗi giờ): sản phẩm nằm trong giỏ từ 1 đến 7 ngày mà chưa đặt được nhắc, tối đa 3 ngày một lần.
+   Tắt bằng `app.retention.cart-reminder=false`.
+6. Mọi hành động được lưu (`retention_actions`) để trang admin đo **tỉ lệ người mua quay lại trong 30 ngày** sau khi được nhắc / tặng voucher.
+
+Benchmark trên **dữ liệu mô phỏng** (DB thật còn quá ít đơn để huấn luyện), chạy `cd review-ai-service && python -m app.benchmark_risk`.
+Chấm trên 20% trường hợp mới nhất mà mô hình chưa thấy:
+
+| Bài toán | Cách chấm | ROC-AUC | PR-AUC | Độ chính xác top 10% | Bắt được trong top 10% |
+|---|---|---|---|---|---|
+| Rời bỏ (3000 người mua) | Luật: số ngày chưa mua | 0.694 | 0.477 | 56.7% | 19.8% |
+| | **Mô hình (hồi quy logistic)** | **0.842** | **0.733** | **88.3%** | **30.8%** |
+| Gian lận (6000 đơn, 8% gian lận) | Luật thủ công | 0.880 | 0.711 | 66.7% | 77.7% |
+| | Chỉ Isolation Forest | 0.902 | 0.632 | 53.3% | 62.1% |
+| | **Mô hình (Gradient Boosting)** | **0.995** | **0.976** | **83.3%** | **97.1%** |
+
+Lưu ý khi viết báo cáo: dữ liệu mô phỏng có quy luật rõ hơn dữ liệu thật, nên con số thật sẽ thấp hơn; điều cần chứng minh là
+quy trình (đặc trưng không rò rỉ tương lai, chia tập theo thời gian, so với luật) và mô hình hơn luật trên cùng một tập test.
+
 ### AI phát hiện lạm dụng đổi trả
 
 Trang `/admin/return-risk` (quyền Đơn hàng), và bảng phân tích ngay trong màn hình Tranh chấp. Chỉ admin thấy; **AI không tự từ chối yêu cầu**.
@@ -681,6 +767,27 @@ Quyền **"Cấu hình & vận hành hệ thống"** (`PERM_SETTINGS`, trước 
 - Dùng Gmail: `smtp.gmail.com`, cổng 587, STARTTLS. Mật khẩu là **Mật khẩu ứng dụng** của Google (cần bật xác minh
   2 bước), không phải mật khẩu Gmail.
 
+### Thông báo đẩy (Web Push + app điện thoại)
+
+- Mọi thông báo trong app (đơn hàng, tin nhắn, khuyến mãi, hỗ trợ, thông báo toàn sàn) đồng thời được **đẩy tới
+  trình duyệt và điện thoại** của người dùng, kể cả khi họ không mở Shoppi. Bấm vào thông báo sẽ mở đúng trang
+  (chi tiết đơn, khung chat...).
+- **Web:** bật ở chuông thông báo hoặc trang *Thông báo* (nút *Bật*, *Gửi thử*, *Tắt*). Backend tự viết chuẩn Web
+  Push bằng JDK, không dùng thư viện ngoài: mã hóa nội dung `aes128gcm` (RFC 8291, có unit test đối chiếu ví dụ
+  mẫu của RFC) và ký VAPID ES256 (RFC 8292). Khóa VAPID được tạo tự động lần đầu và lưu mã hóa trong
+  `platform_settings`, nên **không cần cấu hình gì**. Trình duyệt cần `https` hoặc `localhost`.
+- **App điện thoại** (`expo-notifications`): backend gửi qua dịch vụ push của Expo. Thông báo của người bán
+  (link `/seller/...`) chỉ tới app Người Bán, còn lại tới app Shoppi. Muốn app nhận được push thì phải build có
+  Firebase:
+  1. Tạo project trên [Firebase](https://console.firebase.google.com), thêm 2 app Android `vn.shoppi.buyer` và
+     `vn.shoppi.seller`, tải `google-services.json` đặt vào `mobile/`.
+  2. Trong `mobile/` chạy `npx eas init` để lấy *project id*, rồi tải khóa FCM V1 (Firebase → Project settings →
+     Service accounts → Generate new private key) lên Expo bằng `npx eas credentials`.
+  3. Build APK với biến `EAS_PROJECT_ID=<project id>`.
+  Thiếu các bước này (hoặc chạy trong Expo Go) thì app vẫn chạy bình thường, chỉ là không có push.
+- Thiết bị được lưu ở bảng `push_subscriptions`. Đăng xuất thì thiết bị đó ngừng nhận thông báo của tài khoản;
+  thiết bị đã gỡ app / chặn thông báo được tự xóa khi dịch vụ push báo không còn tồn tại.
+
 ### Thanh toán VNPay (cổng thật, API 2.1.0)
 
 - **Luồng**: người mua chọn *VNPay* ở bước thanh toán → backend tạo URL có chữ ký **HMAC-SHA512** → người mua thanh toán
@@ -954,7 +1061,7 @@ Backend đã hỗ trợ chuyển đổi giữa 2 nguồn AI chỉ bằng 1 dòng
 
 ## Kiến trúc AI (để viết vào báo cáo)
 
-- **Không tự train model.** Gọi thẳng OpenAI Chat Completions API qua `AIService.java`
+- **Phần ngôn ngữ không tự train mô hình lớn.** Gọi thẳng OpenAI Chat Completions API (hoặc Claude) qua `AIService.java`
   (dùng `WebClient`), đúng cách tiếp cận phổ biến trong công nghiệp hiện nay.
 - **Chatbot buyer = RAG thủ công 3 bước** (`ChatbotService.java`):
   1. *Retrieval*: chuẩn hóa câu hỏi về dạng không dấu, tách khoảng giá và chủ đề (đơn hàng, đổi trả...),
@@ -966,5 +1073,22 @@ Backend đã hỗ trợ chuyển đổi giữa 2 nguồn AI chỉ bằng 1 dòng
   3. *Generation*: gọi LLM, ràng buộc chỉ trả lời trong phạm vi context được cung cấp
 - **Gợi ý mô tả (seller)**: prompt engineering đơn giản, không cần retrieval
   (`SellerAIController.java`)
-- **Recommendation**: rule-based trên `ViewHistory` + cùng category
-  (`RecommendationController.java`, `ProductService.recommendSimilar`)
+- **Trợ lý biết hành động** (`ShoppingAgent.java`): LLM + function calling. `AIProvider.converse` chuyển một hội thoại
+  có công cụ (`service/ai/Agent.java`) sang định dạng của OpenAI (`tools` / `tool_calls`) hoặc Claude (`tool_use` / `tool_result`);
+  vòng lặp: gọi mô hình → chạy công cụ mô hình yêu cầu → gửi kết quả → lặp đến khi có câu trả lời. Hành động khó hoàn tác
+  (hủy đơn) chỉ được đề xuất, người mua bấm xác nhận.
+- **Recommendation (tự train)**: item-based collaborative filtering trên hành vi thật (`review-ai-service/app/recommender.py`,
+  `service/reco/RecommendationService.java`), đánh giá HitRate@10 / NDCG@10 so với luật cũ; luật cũ là phương án dự phòng.
+- **Gian lận đơn & rời bỏ (tự train)**: mô hình dạng bảng (`review-ai-service/app/tabular.py`): hồi quy logistic và
+  Gradient Boosting thi với nhau, Isolation Forest cho phát hiện bất thường không cần nhãn; chia tập theo thời gian, so với luật
+  thủ công bằng ROC-AUC, PR-AUC, precision / recall trong top 10% (`service/risk/`).
+- **Thị giác máy tính (tự train, transfer learning)**: MobileNetV2 (ONNX, chạy bằng `onnxruntime` trên CPU) trích 1.280 đặc trưng
+  của ảnh sản phẩm, hồi quy logistic học trên ảnh của sàn để đoán danh mục (`review-ai-service/app/vision.py`). Người bán tải ảnh bìa
+  lên là form đăng sản phẩm gợi ý danh mục (`VisionCategoryService`). Kiểm định theo sản phẩm (5 phần): đúng ngành hàng 79%
+  (top-3: 94%), cách so màu cũ 25%.
+- **Tự train trên máy bằng Python**: `cd review-ai-service && pip install -r requirements-train.txt && python train_from_db.py`
+  đọc dữ liệu thật từ PostgreSQL, train 5 mô hình (gợi ý, rời bỏ, gian lận, phân loại đánh giá, thị giác máy tính), so với luật cũ,
+  ghi biểu đồ + bảng vào `review-ai-service/reports/` và nạp mô hình mới vào dịch vụ đang chạy.
+- **Hai loại AI trong dự án**: (1) gọi API mô hình lớn có sẵn + RAG + tool calling cho phần cần hiểu và sinh ngôn ngữ;
+  (2) tự huấn luyện mô hình học máy nhỏ trên dữ liệu của sàn (gợi ý sản phẩm, phân loại đánh giá, phát hiện lạm dụng đổi trả,
+  phát hiện gian lận đơn, dự đoán rời bỏ, dự báo nhập hàng) cho phần cần con số đo được, chạy nhanh trên CPU, không tốn phí API.

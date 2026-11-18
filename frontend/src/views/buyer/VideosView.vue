@@ -6,7 +6,7 @@
       <router-link v-if="filtered" :to="{ name: 'videos' }" class="clear">✕ Xem tất cả video</router-link>
     </div>
 
-    <div ref="feedEl" class="feed" :style="feedTop ? { height: `calc(100dvh - ${feedTop}px)` } : null">
+    <div ref="feedEl" class="feed" :style="feedTop ? { height: `calc(var(--dvh) - ${feedTop}px)` } : null">
       <div v-if="!items.length" class="empty">{{ loading ? 'Đang tải...' : error || 'Chưa có video nào.' }}</div>
 
       <section v-for="(v, i) in items" :key="v.id" class="slide" :data-index="i">
@@ -153,7 +153,11 @@ async function toggleLike(v) {
 watch(() => [route.query.product, route.query.shop], () => reload())
 
 onMounted(async () => {
-  feedTop.value = Math.round(feedEl.value.getBoundingClientRect().top + window.scrollY)
+  const el = feedEl.value
+  const r = el.getBoundingClientRect()
+  // the page may be scaled with CSS zoom on wide screens: turn the measured (screen) px back into CSS px
+  const z = el.offsetHeight ? r.height / el.offsetHeight : 1
+  feedTop.value = Math.round((r.top + window.scrollY) / (z || 1))
   observer = new IntersectionObserver(onVisible, { root: feedEl.value, threshold: 0.6 })
   await load(true)
   await nextTick()
@@ -164,12 +168,12 @@ onBeforeUnmount(() => observer?.disconnect())
 </script>
 
 <style scoped>
-.videos-page { background: #111; min-height: 100vh; }
+.videos-page { background: #111; min-height: var(--vh); }
 .bar { display: flex; justify-content: center; gap: 20px; padding: 8px; background: #111; }
 .bar button { background: none; border: none; color: #aaa; font-size: 15px; cursor: pointer; padding: 4px 2px; border-bottom: 2px solid transparent; }
 .bar button.active { color: white; border-bottom-color: var(--color-primary); }
 .clear { color: #ffb199; font-size: 13px; align-self: center; }
-.feed { height: calc(100dvh - 170px); overflow-y: auto; scroll-snap-type: y mandatory; }
+.feed { height: calc(var(--dvh) - 170px); overflow-y: auto; scroll-snap-type: y mandatory; }
 .empty { color: #bbb; text-align: center; padding: 48px 16px; }
 .slide { height: 100%; scroll-snap-align: start; display: flex; justify-content: center; padding: 8px 0; box-sizing: border-box; }
 .frame { position: relative; height: 100%; aspect-ratio: 9 / 16; max-width: 100%; background: black; border-radius: 8px; overflow: hidden; }
@@ -193,7 +197,7 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; cursor: po
 .product b { color: var(--color-primary); font-size: 13px; }
 .buy { grid-column: 2; justify-self: end; margin-top: -18px; background: var(--color-primary); color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 @media (max-width: 560px) {
-  .feed { height: calc(100dvh - 150px); }
+  .feed { height: calc(var(--dvh) - 150px); }
   .slide { padding: 0; }
   .frame { border-radius: 0; width: 100%; aspect-ratio: auto; }
 }

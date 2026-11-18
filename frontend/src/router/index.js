@@ -124,6 +124,8 @@ const routes = [
       { path: 'verifications', name: 'admin-verifications', component: () => import('../views/admin/AdminVerificationsView.vue'), meta: { perm: 'SHOPS' } },
       { path: 'orders', name: 'admin-orders', component: () => import('../views/admin/AdminOrdersView.vue'), meta: { perm: 'ORDERS' } },
       { path: 'return-risk', name: 'admin-return-risk', component: () => import('../views/admin/AdminReturnRiskView.vue'), meta: { perm: 'ORDERS' } },
+      { path: 'fraud', name: 'admin-fraud', component: () => import('../views/admin/AdminFraudView.vue'), meta: { perm: 'ORDERS' } },
+      { path: 'churn', name: 'admin-churn', component: () => import('../views/admin/AdminChurnView.vue'), meta: { perm: 'VOUCHERS' } },
       { path: 'disputes', name: 'admin-disputes', component: () => import('../views/admin/AdminDisputesView.vue'), meta: { perm: 'ORDERS' } },
       // the old complaints page became the dispute centre
       { path: 'complaints', redirect: { name: 'admin-disputes' } },
@@ -144,6 +146,7 @@ const routes = [
       { path: 'settings', name: 'admin-settings', component: () => import('../views/admin/AdminSettingsView.vue'), meta: { perm: 'SETTINGS' } },
       { path: 'policies', name: 'admin-policies', component: () => import('../views/admin/AdminPoliciesView.vue'), meta: { perm: 'SETTINGS' } },
       { path: 'ai', name: 'admin-ai', component: () => import('../views/admin/AdminAiView.vue'), meta: { perm: 'SETTINGS' } },
+      { path: 'reco', name: 'admin-reco', component: () => import('../views/admin/AdminRecoView.vue'), meta: { perm: 'SETTINGS' } },
       { path: 'security', name: 'admin-security', component: () => import('../views/AccountSecurityPage.vue') },
       { path: 'gateways', name: 'admin-gateways', component: () => import('../views/admin/AdminGatewaysView.vue'), meta: { perm: 'SETTINGS' } },
       { path: 'email', name: 'admin-email', component: () => import('../views/admin/AdminEmailView.vue'), meta: { perm: 'SETTINGS' } },

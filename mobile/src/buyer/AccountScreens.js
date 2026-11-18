@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Alert, FlatList, KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
-import { get, post, del, errorText } from '../api'
+import { get, post, del, patch, errorText } from '../api'
 import { useAuth } from '../auth'
 import { formatDateTime, formatVnd } from '../format'
 import { BottomBar, Button, C, Empty, Img, Loading, ProductCard, Row, styles, Tabs, useLoad } from '../ui'
@@ -299,7 +299,48 @@ export function FollowingScreen({ navigation }) {
   )
 }
 
-// RAG chatbot: answers from the catalogue, the buyer's orders and the shop policies
+// what the assistant did (added to cart) or proposes (cancel an order: the buyer confirms here)
+function AgentAction({ a, navigation }) {
+  const [state, setState] = useState(null)   // null | busy | done | kept
+  const [err, setErr] = useState('')
+  if (a.type === 'CART_ADDED') {
+    return (
+      <Text onPress={() => navigation.navigate('Cart')} style={{ marginTop: 8, color: '#1a8a7a' }}>
+        🛒 Đã thêm {a.name}{a.variant ? ` (${a.variant})` : ''} × {a.quantity} vào giỏ · <Text style={{ color: '#2673dd' }}>Xem giỏ ›</Text>
+      </Text>
+    )
+  }
+  if (a.type !== 'CANCEL_ORDER') return null
+  const cancel = async () => {
+    setState('busy')
+    setErr('')
+    try {
+      await patch(`/orders/${a.orderId}/cancel`, { reason: a.reason })
+      setState('done')
+    } catch (e) {
+      setState(null)
+      setErr(errorText(e))
+    }
+  }
+  return (
+    <View style={{ marginTop: 8, padding: 8, borderRadius: 6, backgroundColor: '#fff8f6', borderWidth: 1, borderColor: '#ffd6cc' }}>
+      <Text>{a.mode === 'CANCEL' ? 'Hủy đơn' : 'Gửi yêu cầu hủy đơn'} <Text style={{ fontWeight: '600' }}>{a.code}</Text>?</Text>
+      <Text style={{ color: C.faint, fontSize: 12 }}>Lý do: {a.reason}</Text>
+      {state === 'done' ? <Text style={{ color: '#1a8a7a', marginTop: 4 }}>✓ {a.mode === 'CANCEL' ? 'Đã hủy đơn' : 'Đã gửi yêu cầu hủy'}</Text>
+        : state === 'kept' ? <Text style={{ color: C.faint, marginTop: 4 }}>Đã giữ lại đơn hàng</Text>
+        : (
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+            <Button title={a.mode === 'CANCEL' ? 'Xác nhận hủy' : 'Gửi yêu cầu'} small onPress={cancel} disabled={state === 'busy'} />
+            <Button title="Không hủy" kind="ghost" small onPress={() => setState('kept')} disabled={state === 'busy'} />
+          </View>
+        )}
+      {!!err && <Text style={{ color: '#d0011b', fontSize: 12, marginTop: 4 }}>{err}</Text>}
+    </View>
+  )
+}
+
+// Shopping assistant: answers from the catalogue, the buyer's orders and the shop policies; with an AI model that
+// can call tools it also acts (adds to cart, recommends with the trained model, prepares cancellations)
 export function AIChatScreen({ navigation }) {
   const { data: history, setData: setHistory, error } = useLoad(() => get('/ai/history'))
   const [text, setText] = useState('')
@@ -324,7 +365,7 @@ export function AIChatScreen({ navigation }) {
   }
 
   if (!history) return error ? <Empty error={error} /> : <Loading />
-  const SAMPLES = ['Tìm áo thun dưới 200k', 'Đơn hàng của tôi đang ở đâu?', 'Chính sách đổi trả thế nào?']
+  const SAMPLES = ['Gợi ý sản phẩm hợp với tôi', 'Tìm áo thun dưới 200k', 'Đơn hàng của tôi đang ở đâu?', 'Tôi có voucher nào dùng được?']
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.page} keyboardVerticalOffset={90}>
       <FlatList data={history.map((h, i) => ({ ...h, i })).reverse()} inverted keyExtractor={h => String(h.i)} contentContainerStyle={{ padding: 12 }}
@@ -339,8 +380,10 @@ export function AIChatScreen({ navigation }) {
                     <View style={{ alignSelf: 'flex-end', backgroundColor: C.primary, borderRadius: 8, padding: 10, maxWidth: '80%', marginVertical: 4 }}>
                       <Text style={{ color: 'white' }}>{h.message}</Text>
                     </View>
+                    {!!extras[h.i]?.steps?.length && <Text style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>🔧 Đã tra cứu: {extras[h.i].steps.join(' · ')}</Text>}
                     <View style={{ alignSelf: 'flex-start', backgroundColor: 'white', borderRadius: 8, padding: 10, maxWidth: '85%', marginVertical: 4 }}>
                       <Text>{h.reply ?? 'Đang trả lời...'}</Text>
+                      {(extras[h.i]?.actions || []).map((a, k) => <AgentAction key={k} a={a} navigation={navigation} />)}
                       {(extras[h.i]?.products || []).slice(0, 4).map(p => (
                         <Pressable key={p.id} onPress={() => navigation.navigate('Product', { id: p.id })} style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                           <Img uri={p.thumbnailUrl} style={{ width: 44, height: 44 }} />

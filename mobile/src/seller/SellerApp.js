@@ -6,6 +6,7 @@ import { useAuth } from '../auth'
 import { Button, C, Empty, Loading } from '../ui'
 import LoginScreen from '../common/LoginScreen'
 import NotificationsScreen from '../common/NotificationsScreen'
+import { usePushNotifications } from '../push'
 import { ChatListScreen, ChatThreadScreen } from '../common/Chat'
 import DashboardScreen, { PerformanceScreen, RegisterShopScreen, SalesAssistantScreen, SellerAccountScreen } from './DashboardScreens'
 import SellerOrdersScreen, { SellerOrderScreen } from './OrdersScreens'
@@ -29,6 +30,8 @@ function openLink(link = '') {
   return null
 }
 
+const PUSH_FALLBACK = ['SellerNotifications']
+
 const icon = (glyph) => ({ color }) => <Text style={{ fontSize: 20, color }}>{glyph}</Text>
 
 function SellerTabs() {
@@ -47,6 +50,7 @@ function SellerTabs() {
 
 export default function SellerApp() {
   const { ready, user, signOut } = useAuth()
+  usePushNotifications(user?.role === 'SELLER', openLink, PUSH_FALLBACK)
   if (!ready) return <Loading />
   if (!user) return <LoginScreen title="Shoppi" subtitle="Kênh Người Bán" />
   if (user.role === 'BUYER') return <RegisterShopScreen />

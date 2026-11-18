@@ -75,6 +75,18 @@ export const returnRiskDetail = (returnId) => http.get(`/admin/return-risk/${ret
 export const reanalyzeReturnRisk = (returnId) => http.post(`/admin/return-risk/${returnId}/reanalyze`)
 export const reviewReturnRisk = (returnId, label, note) => http.post(`/admin/return-risk/${returnId}/review`, { label, note })
 export const trainReturnRisk = () => http.post('/admin/return-risk/train')
+// recommendation model (review-ai-service/app/recommender.py): status + held-out metrics, and training
+export const recoStatus = () => http.get('/admin/reco/status')
+export const trainReco = () => http.post('/admin/reco/train', null, { timeout: 600000 })
+// order fraud model + flagged orders (FraudService) and churn model + win-back vouchers (ChurnService)
+export const fraudStatus = () => http.get('/admin/fraud/status')
+export const trainFraud = () => http.post('/admin/fraud/train', null, { timeout: 600000 })
+export const fraudOrders = ({ level = '', verdict = '', page = 0, size = 20 } = {}) => http.get('/admin/fraud/orders', { params: { level: level || undefined, verdict: verdict || undefined, page, size } })
+export const setFraudVerdict = (id, verdict) => http.patch(`/admin/fraud/${id}/verdict`, { verdict })
+export const churnStatus = () => http.get('/admin/churn/status')
+export const trainChurn = () => http.post('/admin/churn/train', null, { timeout: 600000 })
+export const churnBuyers = ({ level = '', sort = 'risk', limit = 100 } = {}) => http.get('/admin/churn/buyers', { params: { level: level || undefined, sort, limit }, timeout: 120000 })
+export const sendWinback = (body) => http.post('/admin/churn/winback', body)
 export const releaseReturnHold = (returnId) => http.post(`/admin/return-risk/${returnId}/release`)
 
 // ---- buyer / seller disputes ----

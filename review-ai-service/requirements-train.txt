@@ -1,0 +1,5 @@
+# Extra libraries for train_from_db.py (training from the database on your own computer).
+# Not needed by the AI service itself (Docker image): pip install -r requirements-train.txt
+-r requirements.txt
+psycopg[binary]>=3.1
+matplotlib>=3.8

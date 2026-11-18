@@ -130,6 +130,7 @@ const menu = [
       { label: 'Tất cả đơn hàng', to: { name: 'admin-orders' }, perm: 'ORDERS' },
       { label: 'Đơn hàng bị trễ', to: { name: 'admin-orders', query: { status: 'LATE' } }, perm: 'ORDERS' },
       { label: 'Tranh chấp', to: { name: 'admin-disputes' }, perm: 'ORDERS', badge: () => stats.value.openDisputes },
+      { label: 'AI phát hiện gian lận đơn', to: { name: 'admin-fraud' }, perm: 'ORDERS' },
       { label: 'AI chống gian lận đổi trả', to: { name: 'admin-return-risk' }, perm: 'ORDERS' },
       { label: 'Hoàn tiền', to: { name: 'admin-refunds' }, perm: 'FINANCE', badge: () => stats.value.pendingRefunds },
       { label: 'Đối soát người bán', to: { name: 'admin-settlements' }, perm: 'FINANCE' },
@@ -142,7 +143,8 @@ const menu = [
       { label: 'Chương trình khuyến mãi', to: { name: 'admin-campaigns' } },
       { label: 'Shoppi Voucher', to: { name: 'admin-vouchers' } },
       { label: 'Flash Sale toàn sàn', to: { name: 'admin-flash-sales' }, badge: () => stats.value.pendingFlashItems },
-      { label: 'Banner trang chủ', to: { name: 'admin-banners' } }
+      { label: 'Banner trang chủ', to: { name: 'admin-banners' } },
+      { label: 'AI dự đoán rời bỏ', to: { name: 'admin-churn' } }
     ]
   },
   {
@@ -160,6 +162,7 @@ const menu = [
       { label: 'Cấu hình sàn', to: { name: 'admin-settings' }, perm: 'SETTINGS' },
       { label: 'Chính sách chung', to: { name: 'admin-policies' }, perm: 'SETTINGS' },
       { label: 'AI & chi phí LLM', to: { name: 'admin-ai' }, perm: 'SETTINGS' },
+      { label: 'Mô hình gợi ý sản phẩm', to: { name: 'admin-reco' }, perm: 'SETTINGS' },
       { label: 'Thanh toán & vận chuyển', to: { name: 'admin-gateways' }, perm: 'SETTINGS' },
       { label: 'Email', to: { name: 'admin-email' }, perm: 'SETTINGS' },
       { label: 'Giám sát hệ thống', to: { name: 'admin-monitoring' }, perm: 'SETTINGS' }
@@ -216,7 +219,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.ad { min-height: 100vh; background: #f6f6f6; }
+.ad { min-height: var(--vh); background: #f6f6f6; }
 .ad-header {
   position: sticky; top: 0; z-index: 50; height: 64px;
   display: flex; align-items: center; gap: 12px; padding: 0 24px;
@@ -243,7 +246,7 @@ onBeforeUnmount(() => {
 .account-menu a:hover { background: #f7f7f7; color: var(--color-primary); }
 
 .ad-body { display: flex; align-items: flex-start; }
-.sidebar { position: sticky; top: 64px; width: 232px; flex-shrink: 0; height: calc(100vh - 64px); overflow-y: auto; background: white; padding: 12px 0 24px; box-shadow: 1px 0 3px rgba(0, 0, 0, 0.04); display: flex; flex-direction: column; }
+.sidebar { position: sticky; top: 64px; width: 232px; flex-shrink: 0; height: calc(var(--vh) - 64px); overflow-y: auto; background: white; padding: 12px 0 24px; box-shadow: 1px 0 3px rgba(0, 0, 0, 0.04); display: flex; flex-direction: column; }
 .nav-group { margin-bottom: 8px; }
 .group-title { padding: 10px 20px 6px; font-size: 13px; font-weight: 600; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.3px; }
 .nav-group ul { list-style: none; margin: 0; padding: 0; }

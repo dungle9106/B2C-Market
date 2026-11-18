@@ -53,7 +53,7 @@ async function submit() {
 </script>
 
 <style scoped>
-.simple { display: flex; justify-content: center; padding: 48px 16px; background: #f5f5f5; min-height: calc(100vh - 84px); }
+.simple { display: flex; justify-content: center; padding: 48px 16px; background: #f5f5f5; min-height: calc(var(--vh) - 84px); }
 .auth-card { max-width: 420px; width: 100%; }
 .hint { font-size: 14px; color: var(--color-text-muted); line-height: 1.6; }
 .done { text-align: center; }

@@ -519,7 +519,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .chat {
   display: grid; grid-template-columns: 320px 1fr;
-  height: min(680px, calc(100vh - 200px)); min-height: 460px;
+  height: min(680px, calc(var(--vh) - 200px)); min-height: 460px;
   background: white; border-radius: 4px; box-shadow: var(--shadow-card); overflow: hidden;
 }
 
@@ -613,7 +613,7 @@ onBeforeUnmount(() => {
 
 /* one pane at a time on narrow screens */
 @media (max-width: 760px) {
-  .chat { grid-template-columns: 1fr; height: calc(100vh - 170px); }
+  .chat { grid-template-columns: 1fr; height: calc(var(--vh) - 170px); }
   .chat.has-active .conv-pane { display: none; }
   .chat:not(.has-active) .thread-pane { display: none; }
   .back { display: block; }

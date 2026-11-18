@@ -11,6 +11,8 @@ export const clearChatbotHistory = () => http.delete('/ai/history')
 export const generateDescription = (data) => http.post('/seller/ai/generate-description', data)
 // { name, categoryId, cost } -> { count, p25, median, p75, suggested, notes, histogram, comparables } or { count, message }
 export const suggestPrice = (data) => http.post('/seller/ai/price-suggestion', data)
+// computer vision: the categories a product photo looks like -> { available, items: [{ categoryId, name, path, probability }] }
+export const categoryFromImage = (imageUrl) => http.post('/seller/ai/category-from-image', { imageUrl }, { timeout: 30000 })
 // praise / complaint themes of the shop's reviews
 export const reviewInsights = ({ productId, days } = {}) =>
   http.get('/seller/ai/review-insights', { params: { productId: productId || undefined, days } })

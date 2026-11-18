@@ -33,6 +33,8 @@ const empty = () => ({ token: null, refreshToken: null, userId: null, fullName: 
 
 // calls made with a refresh token only: never with this tab's access token attached
 const forkSession = (refreshToken) => axios.post(`${base()}/auth/session/fork`, { refreshToken }).then(r => r.data)
+// this browser stops receiving the signed-out account's push notifications (loaded lazily: no import cycle with api/http)
+const stopPush = (token) => { if (token) import('../utils/webPush').then(m => m.disablePush(token)).catch(() => {}) }
 const dropSession = (refreshToken) => axios.post(`${base()}/auth/logout`, { refreshToken }).catch(() => {})
 
 export const useAuthStore = defineStore('auth', {
@@ -184,6 +186,7 @@ export const useAuthStore = defineStore('auth', {
 
     /** Signs out only this tab, to sign in with another account here: other tabs and newly opened ones are untouched. */
     async signOutTab() {
+      stopPush(this.token)
       if (this.token) await apiLogout(null).catch(() => {})
       useNotificationStore().stop()
       this.clearTab()
@@ -204,6 +207,7 @@ export const useAuthStore = defineStore('auth', {
       if (callServer && this.token) apiLogout(sameAccount ? seed.refreshToken : null).catch(() => {})
       else if (sameAccount && callServer) dropSession(seed.refreshToken)
       if (sameAccount && callServer) write(localStorage, SEED_KEY, null)
+      if (callServer) stopPush(this.token)
       useNotificationStore().stop()
       this.clearTab()
     }

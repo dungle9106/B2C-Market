@@ -106,7 +106,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.print-page { background: #e9e9e9; min-height: 100vh; padding: 70px 0 30px; }
+.print-page { background: #e9e9e9; min-height: var(--vh); padding: 70px 0 30px; }
 .toolbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 14px; padding: 12px 24px; background: white; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1); }
 .spacer { flex: 1; }
 .msg { max-width: 600px; margin: 0 auto 12px; padding: 10px 14px; background: white; border-radius: 4px; font-size: 14px; }

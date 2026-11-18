@@ -277,7 +277,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.sc { min-height: 100vh; background: #f6f6f6; }
+.sc { min-height: var(--vh); background: #f6f6f6; }
 
 /* ---- header ---- */
 .sc-header {
@@ -344,7 +344,7 @@ onBeforeUnmount(() => {
 .sidebar {
   position: sticky; top: 64px;
   width: 232px; flex-shrink: 0;
-  height: calc(100vh - 64px);
+  height: calc(var(--vh) - 64px);
   overflow-y: auto;
   background: var(--color-surface);
   padding: 12px 0 24px;

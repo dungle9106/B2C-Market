@@ -6,6 +6,7 @@ import { useAuth } from '../auth'
 import { C, Loading } from '../ui'
 import LoginScreen from '../common/LoginScreen'
 import NotificationsScreen from '../common/NotificationsScreen'
+import { usePushNotifications } from '../push'
 import { ChatListScreen, ChatThreadScreen } from '../common/Chat'
 import HomeScreen from './HomeScreen'
 import SearchScreen, { ImageSearchScreen } from './SearchScreen'
@@ -31,6 +32,9 @@ function openLink(link) {
   return [{ orders: 'OrderDetail', products: 'Product', shops: 'Shop' }[m[1]], { id: Number(m[2]) }]
 }
 
+// a tapped push notification without its own screen opens the notifications tab
+const PUSH_FALLBACK = ['Tabs', { screen: 'Notifications' }]
+
 const icon = (glyph) => ({ color }) => <Text style={{ fontSize: 20, color }}>{glyph}</Text>
 
 function Tabs() {
@@ -51,6 +55,7 @@ function Tabs() {
 
 export default function BuyerApp() {
   const { ready, user } = useAuth()
+  usePushNotifications(!!user, openLink, PUSH_FALLBACK)
   if (!ready) return <Loading />
   if (!user) return <LoginScreen title="Shoppi" subtitle="Mua sắm online – Sàn TMĐT tích hợp AI" />
   return (

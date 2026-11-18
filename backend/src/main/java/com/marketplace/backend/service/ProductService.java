@@ -48,6 +48,7 @@ public class ProductService {
     private final ProductModerationService moderationService;
     private final ProductReportRepository reportRepository;
     private final ShippingService shippingService;
+    private final com.marketplace.backend.service.reco.RecommendationService recommendationService;
 
     // ==== Buyer-facing browsing ====
 
@@ -131,14 +132,13 @@ public class ProductService {
         return r;
     }
 
-    // rule-based recommendation: same category products, best sellers first
+    // "San pham tuong tu": the recommendation model, then same category products (RecommendationService)
     @Transactional(readOnly = true)
     public List<ProductResponse> recommendSimilar(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ApiException("Sản phẩm không tồn tại", HttpStatus.NOT_FOUND));
-        if (product.getCategory() == null) return List.of();
-        return productRepository.findSimilarByCategory(product.getCategory().getId(), productId)
-                .stream().limit(12).map(ProductResponse::from).collect(Collectors.toList());
+        // learned from what buyers look at / buy together, then the same category
+        return recommendationService.similar(product);
     }
 
     @Transactional(readOnly = true)

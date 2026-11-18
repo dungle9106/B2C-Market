@@ -6,6 +6,9 @@ const VARIANTS = {
 }
 const variant = process.env.APP_VARIANT === 'seller' ? 'seller' : 'buyer'
 const v = VARIANTS[variant]
+const fs = require('fs')
+// push notifications on Android need Firebase: put google-services.json (with both packages) next to this file
+const googleServicesFile = process.env.GOOGLE_SERVICES_JSON || (fs.existsSync('./google-services.json') ? './google-services.json' : undefined)
 
 module.exports = {
   expo: {
@@ -30,17 +33,21 @@ module.exports = {
       package: v.package,
       adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: v.color },
       edgeToEdgeEnabled: true,
-      permissions: ['CAMERA']
+      permissions: ['CAMERA'],
+      ...(googleServicesFile ? { googleServicesFile } : {})
     },
     plugins: [
       'expo-secure-store',
       'expo-video',
+      ['expo-notifications', { color: v.color }],
       ['expo-image-picker', { cameraPermission: 'Shoppi cần camera để chụp ảnh tìm sản phẩm và đăng ảnh sản phẩm.' }],
       // the backend runs on plain http in the demo (LAN IP or 10.0.2.2 from the emulator)
       ['expo-build-properties', { android: { usesCleartextTraffic: true } }]
     ],
     extra: {
       variant,
+      // Expo project id (from `eas init`), needed to get a push token; without it push stays off
+      ...(process.env.EAS_PROJECT_ID ? { eas: { projectId: process.env.EAS_PROJECT_ID } } : {}),
       // default server: the PC's backend seen from the Android emulator; changeable on the login screen
       apiUrl: process.env.API_URL || 'http://10.0.2.2:8081'
     }

@@ -48,7 +48,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.simple { display: flex; justify-content: center; padding: 48px 16px; background: #f5f5f5; min-height: calc(100vh - 84px); }
+.simple { display: flex; justify-content: center; padding: 48px 16px; background: #f5f5f5; min-height: calc(var(--vh) - 84px); }
 .auth-card { max-width: 420px; width: 100%; }
 .center { text-align: center; }
 .icon { font-size: 40px; }

@@ -4,6 +4,7 @@
     <div class="container page">
       <section class="shopee-section">
         <h1 class="title">Thông Báo</h1>
+        <PushToggle />
         <NotificationList />
       </section>
     </div>
@@ -13,6 +14,7 @@
 <script setup>
 import AppHeader from '../components/AppHeader.vue'
 import NotificationList from '../components/NotificationList.vue'
+import PushToggle from '../components/PushToggle.vue'
 </script>
 
 <style scoped>

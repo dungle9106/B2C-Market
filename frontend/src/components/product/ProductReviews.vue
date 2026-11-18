@@ -140,7 +140,7 @@ watch(() => props.productId, loadAll, { immediate: true })
 .empty svg { color: #ddd; }
 
 .lightbox { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.85); display: flex; align-items: center; justify-content: center; }
-.lightbox img { max-width: 90vw; max-height: 85vh; object-fit: contain; }
+.lightbox img { max-width: 90vw; max-height: calc(var(--vh) * 0.85); object-fit: contain; }
 .lb-close { position: absolute; top: 16px; right: 20px; background: none; border: none; color: white; font-size: 26px; cursor: pointer; }
 .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255, 255, 255, 0.15); border: none; color: white; font-size: 36px; width: 48px; height: 64px; cursor: pointer; }
 .lb-nav.prev { left: 16px; }
