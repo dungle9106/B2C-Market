@@ -100,6 +100,49 @@
       </template>
     </section>
 
+    <!-- ===== social sign-in ===== -->
+    <section class="sc-card">
+      <div class="sc-card-head tw-items-center">
+        <h2 class="sc-card-title">Đăng Nhập Bằng Mạng Xã Hội (OAuth2)</h2>
+        <span class="tw-text-[13px] tw-font-semibold" :class="readyCount ? 'tw-text-green-600' : 'tw-text-amber-700'">
+          {{ !so ? '' : readyCount ? `● Đang bật ${readyCount}/${so.providers.length}` : '● Chưa cấu hình' }}
+        </span>
+      </div>
+      <div v-if="!so" class="sc-empty">Đang tải...</div>
+      <template v-else>
+        <label class="tw-mb-3 tw-flex tw-flex-col tw-gap-1 tw-text-[13px] tw-text-neutral-500">Địa chỉ backend công khai (tên miền hoặc ngrok, để trống khi chỉ chạy web trên máy này)
+          <input v-model.trim="s.publicUrl" placeholder="https://abc-123.ngrok-free.app" /></label>
+        <div v-for="p in s.providers" :key="p.id" class="tw-mb-3 tw-rounded tw-border tw-border-neutral-200 tw-p-3">
+          <div class="tw-mb-2 tw-flex tw-items-center tw-gap-2">
+            <SocialIcon :provider="p.id" />
+            <b>{{ p.name }}</b>
+            <span class="tw-text-xs" :class="info(p.id).ready ? 'tw-text-green-600' : 'tw-text-neutral-400'">{{ info(p.id).ready ? '● Đang hoạt động' : '● Chưa hoạt động' }}</span>
+            <span class="tw-flex-1"></span>
+            <label class="tw-flex tw-items-center tw-gap-1.5 tw-text-[13px]"><input v-model="p.enabled" type="checkbox" class="!tw-w-auto" /> Cho phép</label>
+          </div>
+          <div class="tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-2">
+            <label class="tw-flex tw-flex-col tw-gap-1 tw-text-[13px] tw-text-neutral-500">{{ p.id === 'facebook' ? 'App ID' : 'Client ID' }}<input v-model.trim="p.clientId" autocomplete="off" /></label>
+            <label class="tw-flex tw-flex-col tw-gap-1 tw-text-[13px] tw-text-neutral-500">{{ p.id === 'facebook' ? 'App Secret' : 'Client Secret' }}<input v-model="p.clientSecret" type="password" autocomplete="new-password"
+                   :placeholder="info(p.id).secretSet ? '•••••••• (đã lưu, nhập để thay)' : 'Secret'" /></label>
+          </div>
+          <p class="tw-mb-0 tw-mt-2 tw-break-all tw-text-xs tw-text-neutral-500">
+            Callback URL cần khai báo: <code class="tw-rounded tw-bg-neutral-100 tw-px-1.5 tw-py-px">{{ info(p.id).callbackUrl }}</code>
+            · <a :href="info(p.id).consoleUrl" target="_blank" rel="noopener" class="tw-text-blue-600">Tạo khóa</a>
+            · Nguồn: {{ SOURCE[info(p.id).source] }}
+          </p>
+        </div>
+        <ul class="tw-mb-3 tw-mt-1.5 tw-pl-[18px] tw-text-xs tw-leading-relaxed tw-text-neutral-400">
+          <li>Nút "Tiếp tục với ..." chỉ hiện trên trang đăng nhập (web và app) khi nhà cung cấp đó đã đủ khóa và được cho phép.</li>
+          <li>App điện thoại cần địa chỉ công khai https: Google và Facebook không chấp nhận callback về IP nội bộ (10.0.2.2, 192.168...).</li>
+          <li>Để mọi người dùng được: Google → OAuth consent screen → "Publish app" (chế độ Testing chỉ cho 100 người thử); Facebook → chuyển ứng dụng sang chế độ Live (cần URL chính sách quyền riêng tư: /policies/privacy).</li>
+        </ul>
+        <div class="tw-flex tw-flex-wrap tw-items-center tw-justify-end tw-gap-2.5">
+          <span v-if="sMsg" :class="sOk ? 'tw-text-green-600' : 'tw-text-red-600'" class="tw-text-[13px]">{{ sMsg }}</span>
+          <button type="button" class="btn sm" :disabled="busy" @click="saveSo">Lưu cấu hình đăng nhập</button>
+        </div>
+      </template>
+    </section>
+
     <!-- ===== all carriers ===== -->
     <section class="sc-card">
       <div class="sc-card-head"><h2 class="sc-card-title">Tất Cả Đơn Vị Vận Chuyển</h2>
@@ -126,8 +169,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { vnpayConfig, saveVnpayConfig, ghnConfig, saveGhnConfig, testGhn, carrierConfig, saveCarrierConfig, testCarrier, shippingCarriers } from '../../api/admin'
+import { ref, computed, onMounted } from 'vue'
+import SocialIcon from '../../components/auth/SocialIcon.vue'
+import { socialLoginConfig, saveSocialLoginConfig, vnpayConfig, saveVnpayConfig, ghnConfig, saveGhnConfig, testGhn, carrierConfig, saveCarrierConfig, testCarrier, shippingCarriers } from '../../api/admin'
 import { extractError } from '../../utils/apiError'
 
 const SOURCE = { ADMIN: 'Trang quản trị', ENV: 'Biến môi trường', NONE: 'Chưa cấu hình' }
@@ -146,6 +190,33 @@ const t = ref({})
 const tMsg = ref('')
 const tOk = ref(true)
 const carriers = ref([])
+const so = ref(null)
+const s = ref({ publicUrl: '', providers: [] })
+const sMsg = ref('')
+const sOk = ref(true)
+const readyCount = computed(() => so.value?.providers.filter((p) => p.ready).length || 0)
+const info = (id) => so.value?.providers.find((p) => p.id === id) || {}
+
+function fillSo(c) {
+  so.value = c
+  s.value = { publicUrl: c.publicUrl || '', providers: c.providers.map((p) => ({ id: p.id, name: p.name, enabled: p.enabled, clientId: p.clientId || '', clientSecret: '' })) }
+}
+
+async function saveSo() {
+  busy.value = true
+  sMsg.value = ''
+  try {
+    const body = { publicUrl: s.value.publicUrl || null, providers: s.value.providers.map(({ name, clientSecret, ...p }) => (clientSecret ? { ...p, clientSecret } : p)) }
+    fillSo((await saveSocialLoginConfig(body)).data)
+    sOk.value = true
+    sMsg.value = 'Đã lưu cấu hình đăng nhập mạng xã hội'
+  } catch (e) {
+    sOk.value = false
+    sMsg.value = extractError(e)
+  } finally {
+    busy.value = false
+  }
+}
 
 function fillVn(c) {
   vn.value = c
@@ -244,7 +315,8 @@ async function testGh() {
 }
 
 onMounted(async () => {
-  const [a, b, c] = await Promise.allSettled([vnpayConfig(), ghnConfig(), carrierConfig('ghtk')])
+  const [a, b, c, d] = await Promise.allSettled([vnpayConfig(), ghnConfig(), carrierConfig('ghtk'), socialLoginConfig()])
+  if (d.status === 'fulfilled') fillSo(d.value.data)
   if (a.status === 'fulfilled') fillVn(a.value.data)
   if (b.status === 'fulfilled') fillGh(b.value.data)
   if (c.status === 'fulfilled') fillTk(c.value.data)

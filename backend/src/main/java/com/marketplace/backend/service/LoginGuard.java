@@ -41,6 +41,10 @@ public class LoginGuard {
         hit("register:" + ip, config.registerPerIp(), 10, "Đã tạo quá nhiều tài khoản từ địa chỉ của bạn. Vui lòng thử lại sau.");
     }
 
+    public void checkResetCode(String ip) {
+        hit("code:" + ip, 20, 15, "Bạn đã nhập mã quá nhiều lần. Vui lòng thử lại sau 15 phút.");
+    }
+
     public void checkPasswordReset(String ip) {
         hit("reset:" + ip, RESET_PER_IP, 15, "Bạn đã yêu cầu đặt lại mật khẩu quá nhiều lần. Vui lòng thử lại sau 15 phút.");
     }

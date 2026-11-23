@@ -42,7 +42,8 @@ public class EmailEventListener {
             User u = userRepository.findById(e.userId()).orElse(null);
             if (u == null || u.getDeletedAt() != null) return;
             if ("REGISTERED".equals(e.type())) {
-                accountMail.sendVerification(u);
+                // a social sign-up already has an address the provider verified
+                if (!u.isEmailVerified()) accountMail.sendVerification(u);
                 return;
             }
             Object device = e.details().get("device"), ip = e.details().get("ip");

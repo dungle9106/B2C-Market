@@ -759,8 +759,8 @@ Quyền **"Cấu hình & vận hành hệ thống"** (`PERM_SETTINGS`, trước 
 
 - Email được đưa vào hàng đợi (bảng `email_messages`) và gửi nền mỗi 5 giây. Nếu lỗi, hệ thống gửi lại sau 1, 5 rồi
   30 phút.
-- Các loại email: xác thực email khi đăng ký, quên/đặt lại mật khẩu (link dùng 1 lần, hết hạn), cảnh báo bảo mật (đăng
-  nhập thiết bị mới, đổi mật khẩu, bật/tắt 2FA), các bước của đơn hàng.
+- Các loại email: xác thực email khi đăng ký, quên/đặt lại mật khẩu (mã 6 số và link dùng 1 lần, hết hạn), cảnh báo bảo
+  mật (đăng nhập thiết bị mới, đổi mật khẩu, bật/tắt 2FA, liên kết / gỡ tài khoản mạng xã hội), các bước của đơn hàng.
 - Cấu hình SMTP ở **`/admin/email`** (mật khẩu được mã hóa), dự phòng bằng biến `MAIL_HOST`, `MAIL_PORT`,
   `MAIL_USERNAME`, `MAIL_PASSWORD`. Trang này cũng cho gửi thử và xem *Hộp thư đi* (xem trước nội dung, gửi lại).
   **Chưa cấu hình SMTP thì email chỉ được lưu lại, không gửi đi.**
@@ -802,6 +802,7 @@ Quyền **"Cấu hình & vận hành hệ thống"** (`PERM_SETTINGS`, trước 
 - **Cấu hình** ở `/admin/gateways` (hash secret được mã hóa), dự phòng bằng `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`.
   Đăng ký sandbox tại <https://sandbox.vnpayment.vn/devreg/> để nhận TMN code và hash secret.
   Thẻ test của sandbox: NCB `9704198526191432198`, chủ thẻ `NGUYEN VAN A`, ngày phát hành `07/15`, OTP `123456`.
+  Các bước đăng ký chi tiết: [docs/HUONG-DAN-KET-NOI-THAT.md](docs/HUONG-DAN-KET-NOI-THAT.md).
 - **Lưu ý**: VNPay không gọi được IPN vào `localhost`. Khi chạy local, kết quả được ghi nhận qua return URL (có kiểm tra
   chữ ký). Khi triển khai thật, hãy khai báo IPN URL công khai (hoặc dùng ngrok) trong trang merchant VNPay.
 - Các ví MoMo/ZaloPay, thẻ và chuyển khoản vẫn là cổng **mô phỏng** như trước.
@@ -964,26 +965,30 @@ Giá theo token của model Claude nhập ở bảng giá trên cùng trang đ�
   Có pgvector: cột `vector(256)` + chỉ mục HNSW, CSDL tự tìm láng giềng gần nhất (`<=>`); chưa có: lưu `real[]`
   và tính cosine trong Java. Trạng thái chỉ mục xem ở *AI & chi phí LLM*.
 
-### Đăng nhập bằng Google (OAuth2 + Spring Security)
+### Đăng nhập bằng Google, Facebook, GitHub (OAuth2 + Spring Security)
 
-Có 2 cách đăng nhập:
-1. **Email/mật khẩu** đăng ký trực tiếp trong app: `POST /api/auth/register`, `POST /api/auth/login`
-   (mật khẩu băm BCrypt, xác thực qua `AuthenticationManager`), trả về JWT.
-2. **Google OAuth2** (Authorization Code flow, `spring-boot-starter-oauth2-client` + `oauth2Login()`):
-   nút "Đăng nhập với Google" → `GET /oauth2/authorization/google` → Google → callback
-   `/login/oauth2/code/google` → `OAuth2LoginSuccessHandler` tạo/tìm user, cấp JWT và redirect về
-   `http://localhost:5173/oauth2/redirect#token=...&refresh=...` (hoặc `#challenge=...` nếu tài khoản bật 2FA) → frontend gọi `GET /api/auth/me`.
-   Email Google chưa có trong DB sẽ được tự tạo tài khoản BUYER.
+- **Cách đăng nhập**: email/mật khẩu (`POST /api/auth/register`, `/api/auth/login`, mật khẩu băm BCrypt) hoặc nút
+  **Tiếp tục với Google / Facebook / GitHub** trên web và cả 3 app (Authorization Code flow, `oauth2Login()`).
+- **Luồng**: `GET /oauth2/authorization/{google|facebook|github}` → trang của nhà cung cấp → callback
+  `/login/oauth2/code/{provider}` → `OAuth2LoginSuccessHandler` tìm/tạo tài khoản, cấp JWT và chuyển về
+  `/oauth2/redirect#token=...&refresh=...` (web) hoặc `shoppi://oauth2/redirect#token=...` (app, mở bằng trình duyệt hệ thống),
+  `#challenge=...` nếu tài khoản bật 2FA. Token nằm sau dấu `#` nên không bị ghi vào log máy chủ.
+- **Nhiều tài khoản liên kết** (bảng `user_oauth_accounts`): một tài khoản Shoppi gắn được cả Google, Facebook, GitHub, nhận
+  diện theo mã người dùng của nhà cung cấp (đổi email bên đó vẫn đăng nhập được). Lần đầu: email đã xác minh trùng tài khoản có sẵn
+  thì gắn vào tài khoản đó, chưa có thì tạo tài khoản Người mua. Email *chưa xác minh* không được dùng để nhận tài khoản. Trang
+  *Bảo mật tài khoản* có mục **Tài khoản liên kết** (liên kết thêm / gỡ; không gỡ được cách đăng nhập cuối cùng khi chưa có mật khẩu).
+- **Facebook / GitHub**: `SocialOAuth2UserService` chuẩn hóa hồ sơ; GitHub lấy email *primary, verified* từ `/user/emails`.
+- **Khóa cấu hình ngay trên trang quản trị** `/admin/gateways` (secret được mã hóa, không cần khởi động lại):
+  `SocialLoginSettings` vừa lưu khóa vừa là `ClientRegistrationRepository` của Spring Security. Dự phòng bằng biến
+  `GOOGLE_CLIENT_ID/SECRET`, `FACEBOOK_CLIENT_ID/SECRET`, `GITHUB_CLIENT_ID/SECRET`. Nhà cung cấp chưa có khóa thì nút không hiện.
+- **Địa chỉ công khai** (`OAUTH2_PUBLIC_URL` hoặc trang admin, ví dụ ngrok): Google/Facebook không nhận callback về IP nội bộ,
+  nên app điện thoại cần địa chỉ `https` công khai. Cùng địa chỉ này hiện sẵn IPN URL của VNPay.
+- **Quên mật khẩu**: email chứa **mã 6 số** (30 phút, băm BCrypt, sai 5 lần phải xin mã mới) và liên kết đặt lại.
+  `POST /api/auth/forgot-password` → `POST /api/auth/reset-password/verify-code` (trả token 10 phút) →
+  `POST /api/auth/reset-password`. Tài khoản tạo bằng mạng xã hội dùng cách này hoặc *Tạo mật khẩu* để có thêm mật khẩu.
 
-Cấu hình một lần:
-1. Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID (loại **Web application**)
-2. Thêm **Authorized redirect URI**: `http://localhost:8081/login/oauth2/code/google`
-3. Đặt biến môi trường trước khi chạy backend:
-   ```bash
-   export GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
-   export GOOGLE_CLIENT_SECRET=GOCSPX-xxxx
-   ```
-   (Trong IntelliJ: Run Configuration → Environment variables.)
+Hướng dẫn đăng ký khóa từng nhà cung cấp (và Gmail, VNPay, GHN, ngrok):
+**[docs/HUONG-DAN-KET-NOI-THAT.md](docs/HUONG-DAN-KET-NOI-THAT.md)**.
 
 **Lưu ý:** nếu chưa đặt `OPENAI_API_KEY`, các endpoint AI vẫn hoạt động (không lỗi) nhưng trả
 về thông báo "AI chưa được cấu hình" thay vì câu trả lời thật.

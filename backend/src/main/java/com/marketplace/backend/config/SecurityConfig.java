@@ -59,7 +59,8 @@ public class SecurityConfig {
                                                    OAuth2LoginSuccessHandler oAuth2SuccessHandler,
                                                    OAuth2LoginFailureHandler oAuth2FailureHandler,
                                                    OAuth2FrontendRedirect frontendRedirect,
-                                                   ClientRegistrationRepository clientRegistrationRepository) throws Exception {
+                                                   ClientRegistrationRepository clientRegistrationRepository,
+                                                   com.marketplace.backend.security.SocialOAuth2UserService socialUserService) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             // the API only returns JSON / files: forbid framing, sniffing and leaking the referrer
@@ -77,13 +78,15 @@ public class SecurityConfig {
             // without this, an anonymous API call would get a 302 to Google's
             // login page (oauth2Login's default entry point) instead of a 401
             .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-            // "Dang nhap voi Google": browser goes to /oauth2/authorization/google,
-            // Google redirects back to /login/oauth2/code/google, Spring Security
+            // "Tiep tuc voi Google/Facebook/GitHub": browser goes to /oauth2/authorization/{provider},
+            // the provider redirects back to /login/oauth2/code/{provider}, Spring Security
             // exchanges the code + loads the profile, then our success handler
             // issues a JWT and redirects to the frontend.
             .oauth2Login(oauth2 -> oauth2
                 .authorizationEndpoint(ep -> ep.authorizationRequestResolver(
                     authorizationRequestResolver(clientRegistrationRepository, frontendRedirect)))
+                // Facebook / GitHub profiles (Google is OpenID Connect and needs nothing extra)
+                .userInfoEndpoint(ui -> ui.userService(socialUserService))
                 .successHandler(oAuth2SuccessHandler)
                 .failureHandler(oAuth2FailureHandler)
             )
@@ -144,14 +147,24 @@ public class SecurityConfig {
                 new DefaultOAuth2AuthorizationRequestResolver(clientRegistrationRepository, "/oauth2/authorization");
 
         return new OAuth2AuthorizationRequestResolver() {
+            // a provider that is not set up (or switched off) has no registration: Spring's resolver throws,
+            // we let the request through to SocialLoginUnavailableController, which sends the user back with a message
             @Override
             public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
-                return remember(request, defaultResolver.resolve(request));
+                try {
+                    return remember(request, defaultResolver.resolve(request));
+                } catch (IllegalArgumentException e) {
+                    return null;
+                }
             }
 
             @Override
             public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
-                return remember(request, defaultResolver.resolve(request, clientRegistrationId));
+                try {
+                    return remember(request, defaultResolver.resolve(request, clientRegistrationId));
+                } catch (IllegalArgumentException e) {
+                    return null;
+                }
             }
 
             private OAuth2AuthorizationRequest remember(HttpServletRequest request, OAuth2AuthorizationRequest authRequest) {

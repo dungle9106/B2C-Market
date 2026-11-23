@@ -27,11 +27,15 @@ final class EmailTemplates {
                 "Xác thực email", link) + note("Nếu bạn không đăng ký tài khoản Shoppi, hãy bỏ qua email này."));
     }
 
-    static Mail resetPassword(String name, String link, String ip) {
-        return new Mail("[Shoppi] Đặt lại mật khẩu", page("Đặt lại mật khẩu",
+    static Mail resetPassword(String name, String code, String link, String ip) {
+        String box = "<p style=\"margin:18px 0;text-align:center\"><span style=\"display:inline-block;padding:12px 22px;background:#fff5f2;"
+                + "border:1px dashed #ee4d2d;border-radius:6px;font-size:30px;letter-spacing:8px;font-weight:bold;color:#ee4d2d\">" + esc(code) + "</span></p>";
+        return new Mail("[Shoppi] Mã đặt lại mật khẩu: " + code, page("Đặt lại mật khẩu",
                 p("Chào " + esc(name) + ",") + p("Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn (từ địa chỉ " + esc(ip)
-                        + "). Liên kết có hiệu lực trong 30 phút và chỉ dùng được một lần."), "Đặt mật khẩu mới", link)
-                + note("Nếu bạn không yêu cầu, hãy bỏ qua email này: mật khẩu của bạn không thay đổi."));
+                        + "). Nhập mã dưới đây trên web hoặc app Shoppi:") + box
+                        + p("Mã và liên kết có hiệu lực trong 30 phút, chỉ dùng được một lần. Hoặc bấm nút để đặt mật khẩu mới trên trình duyệt:"),
+                "Đặt mật khẩu mới", link)
+                + note("Không chia sẻ mã này với bất kỳ ai. Nếu bạn không yêu cầu, hãy bỏ qua email này: mật khẩu của bạn không thay đổi."));
     }
 
     static Mail security(String type, String name, String device, String ip, Object minutes) {
@@ -54,6 +58,13 @@ final class EmailTemplates {
             case "TWO_FACTOR_DISABLED" -> new Mail("[Shoppi] Đã tắt xác thực 2 lớp", page("Xác thực 2 lớp đã tắt",
                     p("Chào " + esc(name) + ", xác thực 2 lớp vừa được tắt lúc " + now + (device != null ? " từ " + esc(device) : "")
                             + ". Nếu không phải bạn, hãy đổi mật khẩu ngay."), "Bảo mật tài khoản", "/account/security"));
+            // "device" carries the provider name (Google / Facebook / GitHub) for these two
+            case "SOCIAL_LINKED", "SOCIAL_UNLINKED" -> new Mail("[Shoppi] " + ("SOCIAL_LINKED".equals(type) ? "Đã liên kết" : "Đã gỡ liên kết")
+                    + " tài khoản " + esc(device), page("SOCIAL_LINKED".equals(type) ? "Liên kết tài khoản mới" : "Đã gỡ liên kết tài khoản",
+                    p("Chào " + esc(name) + ", tài khoản " + esc(device) + " vừa được " + ("SOCIAL_LINKED".equals(type)
+                            ? "liên kết với tài khoản Shoppi của bạn. Từ giờ bạn có thể đăng nhập bằng " + esc(device) + "."
+                            : "gỡ khỏi tài khoản Shoppi của bạn.") + " Thời gian: " + now + ".")
+                            + p("Nếu không phải bạn, hãy đổi mật khẩu và kiểm tra các tài khoản liên kết ngay."), "Bảo mật tài khoản", "/account/security"));
             default -> null;
         };
     }

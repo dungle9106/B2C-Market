@@ -3,12 +3,14 @@
 import React, { useState } from 'react'
 import { Alert, Linking, RefreshControl, ScrollView, Share, Text, View } from 'react-native'
 import { get, post, del, errorText } from '../api'
+import { socialSignIn, PROVIDER_STYLE } from './social'
 import { formatDateTime } from '../format'
 import { Button, C, Empty, Field, Loading, Row, styles, useLoad } from '../ui'
 
 const RESULT = { SUCCESS: 'Thành công', BAD_PASSWORD: 'Sai mật khẩu', UNKNOWN_EMAIL: 'Sai email', LOCKED: 'Tài khoản bị khóa', TEMP_LOCKED: 'Đang khóa tạm',
   RATE_LIMITED: 'Bị chặn (quá nhiều lần)', TWO_FACTOR_FAILED: 'Sai mã 2 lớp', TWO_FACTOR_REQUIRED: 'Chờ mã 2 lớp' }
-const METHOD = { PASSWORD: 'Mật khẩu', GOOGLE: 'Google', TOTP: 'Mã ứng dụng', BACKUP_CODE: 'Mã dự phòng', TWO_FACTOR: 'Mã 2 lớp' }
+const PROVIDER = { GOOGLE: 'Google', FACEBOOK: 'Facebook', GITHUB: 'GitHub' }
+const METHOD = { PASSWORD: 'Mật khẩu', GOOGLE: 'Google', FACEBOOK: 'Facebook', GITHUB: 'GitHub', TOTP: 'Mã ứng dụng', BACKUP_CODE: 'Mã dự phòng', TWO_FACTOR: 'Mã 2 lớp' }
 
 export default function SecurityScreen({ navigation }) {
   const { data: d, error, reload, refreshing, refresh } = useLoad(() => get('/account/security'))
@@ -43,6 +45,19 @@ export default function SecurityScreen({ navigation }) {
     setTf(x => ({ ...x, codes: r.backupCodes, code: '' }))
     reload()
   })
+  // the provider's page opens in the browser; the backend attaches the result to this account (?link=)
+  const link = (a) => act(async () => {
+    const t = await post('/account/oauth/link-token')
+    const r = await socialSignIn(a.id, { startBase: t.startBase, link: t.token })
+    if (!r) return
+    if (r.error) throw new Error(r.error)
+    Alert.alert('Đã liên kết', `Từ giờ bạn có thể đăng nhập bằng ${a.name}.`)
+    reload()
+  })
+  const unlink = (a) => Alert.alert(`Gỡ liên kết ${a.name}?`, `Bạn sẽ không đăng nhập bằng ${a.name} được nữa.`, [{ text: 'Không' }, {
+    text: 'Gỡ', style: 'destructive', onPress: () => act(async () => { await del(`/account/oauth/${a.id}`); reload() })
+  }])
+
   const disable = () => Alert.alert('Tắt xác thực 2 lớp?', 'Tài khoản sẽ kém an toàn hơn.', [{ text: 'Không' }, {
     text: 'Tắt', style: 'destructive', onPress: () => act(async () => {
       await post('/account/2fa/disable', { password: tf.password, code: tf.code.trim() })
@@ -56,7 +71,7 @@ export default function SecurityScreen({ navigation }) {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
       <View style={styles.card}>
         <Text style={styles.h2}>📧 Email</Text>
-        <Text>{d.email}{d.provider === 'GOOGLE' ? ' (Google)' : ''}</Text>
+        <Text>{d.email}{PROVIDER[d.provider] ? ` (đăng ký bằng ${PROVIDER[d.provider]})` : ''}</Text>
         {d.emailVerified ? <Text style={{ color: C.green, marginTop: 4 }}>✓ Đã xác minh</Text> : (
           <Row style={{ justifyContent: 'space-between', marginTop: 6 }}>
             <Text style={{ color: '#f69113' }}>Chưa xác minh</Text>
@@ -68,9 +83,34 @@ export default function SecurityScreen({ navigation }) {
 
       <View style={styles.card}>
         <Text style={styles.h2}>🔑 Mật khẩu</Text>
-        <Text style={styles.muted}>{d.passwordChangedAt ? `Đổi lần cuối ${formatDateTime(d.passwordChangedAt)}` : 'Chưa đổi lần nào'}</Text>
-        <Button small kind="ghost" title="Đổi mật khẩu" style={{ alignSelf: 'flex-start', marginTop: 8 }} onPress={() => navigation.navigate('ChangePassword')} />
+        <Text style={styles.muted}>{!d.hasPassword ? 'Chưa có mật khẩu Shoppi: tạo mật khẩu để đăng nhập được bằng email'
+          : d.passwordChangedAt ? `Đổi lần cuối ${formatDateTime(d.passwordChangedAt)}` : 'Chưa đổi lần nào'}</Text>
+        <Button small kind="ghost" title={d.hasPassword ? 'Đổi mật khẩu' : 'Tạo mật khẩu'} style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                onPress={() => navigation.navigate('ChangePassword', { first: !d.hasPassword })} />
       </View>
+
+      {d.linkedAccounts?.length ? (
+        <View style={styles.card}>
+          <Text style={styles.h2}>🔗 Tài khoản liên kết</Text>
+          <Text style={[styles.muted, { marginBottom: 6 }]}>Đăng nhập nhanh bằng tài khoản mạng xã hội. Shoppi không đăng gì lên tài khoản của bạn.</Text>
+          {d.linkedAccounts.map(a => {
+            const st = PROVIDER_STYLE[a.id] || {}
+            return (
+              <Row key={a.id} style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: C.border }}>
+                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: st.bg === 'white' ? C.bg : st.bg, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                  <Text style={{ color: st.bg === 'white' ? st.color : 'white', fontWeight: '700' }}>{st.icon}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text>{a.name}{a.linked ? <Text style={{ color: C.green }}>  · đã liên kết</Text> : null}</Text>
+                  <Text style={[styles.muted, { fontSize: 12 }]}>{a.linked ? (a.email || a.displayName || '') : 'Chưa liên kết'}</Text>
+                </View>
+                {a.linked ? <Button small kind="ghost" title="Gỡ" disabled={busy} onPress={() => unlink(a)} />
+                  : a.available ? <Button small title="Liên kết" disabled={busy} onPress={() => link(a)} /> : null}
+              </Row>
+            )
+          })}
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.h2}>🛡 Xác thực 2 lớp</Text>
@@ -89,8 +129,8 @@ export default function SecurityScreen({ navigation }) {
             <Text style={{ color: C.green }}>✓ Đang bật · còn {d.backupCodesLeft} mã dự phòng</Text>
             <Field label="Mã 6 số từ ứng dụng xác thực" value={tf.code} onChangeText={setT('code')} keyboardType="number-pad" maxLength={8} style={{ marginTop: 10 }} />
             <Button small kind="ghost" title="Tạo lại mã dự phòng" disabled={busy || tf.code.length < 6} onPress={regenerate} style={{ marginBottom: 12 }} />
-            <Field label="Mật khẩu (để tắt)" value={tf.password} onChangeText={setT('password')} secureTextEntry />
-            <Button small kind="danger" title="Tắt xác thực 2 lớp" disabled={busy || tf.code.length < 6 || !tf.password} onPress={disable} />
+            {d.hasPassword ? <Field label="Mật khẩu (để tắt)" value={tf.password} onChangeText={setT('password')} secureTextEntry /> : null}
+            <Button small kind="danger" title="Tắt xác thực 2 lớp" disabled={busy || tf.code.length < 6 || (d.hasPassword && !tf.password)} onPress={disable} />
           </>
         ) : tf.secret ? (
           <>

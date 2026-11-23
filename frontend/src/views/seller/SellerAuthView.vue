@@ -86,9 +86,8 @@
                   {{ loading ? 'ĐANG XỬ LÝ...' : 'ĐĂNG NHẬP' }}
                 </button>
               </form>
-              <div class="or-divider"><span>HOẶC</span></div>
               <!-- a BUYER landing on /seller is sent on to the shop step by the router guard -->
-              <GoogleLoginButton label="Đăng nhập với Google" :redirect="route.query.redirect || '/seller'" />
+              <SocialLoginButtons :redirect="route.query.redirect || '/seller'" />
               <p class="terms">
                 Bằng việc đăng nhập, bạn đồng ý với
                 <span class="text-primary">Điều khoản dịch vụ</span> &amp;
@@ -115,8 +114,7 @@
                   {{ loading ? 'ĐANG XỬ LÝ...' : 'TIẾP THEO' }}
                 </button>
               </form>
-              <div class="or-divider"><span>HOẶC</span></div>
-              <GoogleLoginButton label="Đăng ký với Google" redirect="/seller/register" />
+              <SocialLoginButtons verb="Đăng ký" redirect="/seller/register" />
               <p class="terms">
                 Bằng việc đăng ký, bạn đã đồng ý với Shoppi về
                 <span class="text-primary">Điều khoản dịch vụ</span> &amp;
@@ -179,7 +177,7 @@ import { useAuthStore } from '../../stores/auth'
 import { becomeSeller } from '../../api/shop'
 import AuthHeader from '../../components/auth/AuthHeader.vue'
 import PasswordInput from '../../components/auth/PasswordInput.vue'
-import GoogleLoginButton from '../../components/auth/GoogleLoginButton.vue'
+import SocialLoginButtons from '../../components/auth/SocialLoginButtons.vue'
 import TwoFactorStep from '../../components/auth/TwoFactorStep.vue'
 import { validateLogin, validateRegister, extractError } from '../../utils/authForm'
 import { PROVINCES } from '../../utils/provinces'

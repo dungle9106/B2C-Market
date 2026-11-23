@@ -184,6 +184,8 @@ export const securityLogins = ({ failedOnly = true, page = 0, size = 30 } = {}) 
 export const unlockLogin = (userId) => http.post(`/admin/system/security/unlock/${userId}`)
 
 // ---- payment & shipping gateways ----
+export const socialLoginConfig = () => http.get('/admin/system/social-login')
+export const saveSocialLoginConfig = (body) => http.put('/admin/system/social-login', body)
 export const vnpayConfig = () => http.get('/admin/system/payment/vnpay')
 export const saveVnpayConfig = (body) => http.put('/admin/system/payment/vnpay', body) // { enabled, tmnCode, hashSecret?, payUrl?, apiUrl? }
 export const ghnConfig = () => http.get('/admin/system/shipping/ghn')

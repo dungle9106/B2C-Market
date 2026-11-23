@@ -6,6 +6,7 @@
     "start": "expo start",
     "build:buyer": "node scripts/build-apk.js buyer",
     "build:seller": "node scripts/build-apk.js seller",
+    "build:admin": "node scripts/build-apk.js admin",
     "android": "expo run:android",
     "ios": "expo run:ios"
   },
@@ -17,16 +18,21 @@
     "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.14",
     "expo-device": "~8.0.10",
+    "expo-document-picker": "~14.0.8",
+    "expo-file-system": "~19.0.24",
     "expo-image-picker": "~17.0.11",
+    "expo-linking": "~8.0.12",
     "expo-notifications": "~0.32.17",
+    "expo-print": "~15.0.8",
     "expo-secure-store": "~15.0.8",
+    "expo-sharing": "~14.0.8",
     "expo-status-bar": "~3.0.9",
     "expo-video": "~3.0.16",
+    "expo-web-browser": "~15.0.11",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0",
-    "undefined": "D:/shoppi-tmp/npm-cache"
+    "react-native-screens": "~4.16.0"
   },
   "private": true
 }

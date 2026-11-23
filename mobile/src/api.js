@@ -122,4 +122,36 @@ export function upload(path, image, params) {
   return request('POST', path, { form, params })
 }
 
+// a file the API sends back (an Excel export...) saved to the cache folder: resolves to its local uri
+export async function download(path, fileName, retried = false) {
+  const FileSystem = require('expo-file-system/legacy')
+  const target = FileSystem.cacheDirectory + fileName
+  let res
+  try {
+    res = await FileSystem.downloadAsync(`${session.server}/api${path}`, target, { headers: session.token ? { Authorization: `Bearer ${session.token}` } : {} })
+  } catch (e) {
+    throw new ApiError(0, `Không kết nối được máy chủ ${session.server}`)
+  }
+  if (res.status === 401 && !retried && session.refreshToken) {
+    try {
+      refreshing = refreshing || refresh().finally(() => { refreshing = null })
+      await refreshing
+    } catch (e) {
+      await clearTokens()
+      session.onLogout?.()
+      throw new ApiError(401, 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại')
+    }
+    return download(path, fileName, true)
+  }
+  if (res.status >= 400) throw new ApiError(res.status, `Không tải được tệp (lỗi ${res.status})`)
+  return res.uri
+}
+
+// a picked document ({ uri, mimeType, name } from expo-document-picker) as a multipart "file" field
+export function uploadFile(path, file, params) {
+  const form = new FormData()
+  form.append('file', { uri: file.uri, type: file.mimeType || 'application/octet-stream', name: file.name || 'file' })
+  return request('POST', path, { form, params })
+}
+
 export const errorText = (e) => e?.message || 'Đã có lỗi xảy ra'

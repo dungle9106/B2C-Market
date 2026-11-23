@@ -8,9 +8,11 @@ import { navigationRef } from './src/push'
 import { C } from './src/ui'
 import BuyerApp from './src/buyer/BuyerApp'
 import SellerApp from './src/seller/SellerApp'
+import AdminApp from './src/admin/AdminApp'
 
 // APP_VARIANT at build time decides which app this is (app.config.js)
-const isSeller = Constants.expoConfig?.extra?.variant === 'seller'
+const variant = Constants.expoConfig?.extra?.variant
+const VariantApp = variant === 'seller' ? SellerApp : variant === 'admin' ? AdminApp : BuyerApp
 const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, primary: C.primary, background: C.bg } }
 
 export default function App() {
@@ -18,7 +20,7 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <NavigationContainer ref={navigationRef} theme={theme}>
-          {isSeller ? <SellerApp /> : <BuyerApp />}
+          <VariantApp />
         </NavigationContainer>
       </AuthProvider>
       <StatusBar style="auto" />

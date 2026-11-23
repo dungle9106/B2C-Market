@@ -1,6 +1,5 @@
 package com.marketplace.backend.service;
 
-import com.marketplace.backend.entity.AuthProvider;
 import com.marketplace.backend.entity.EmailToken;
 import com.marketplace.backend.entity.User;
 import com.marketplace.backend.exception.ApiException;
@@ -23,7 +22,7 @@ import java.util.Base64;
 import java.util.Map;
 
 /**
- * E-mail links: "xac thuc email" (24 hours) and "quen mat khau" (30 minutes, one use). The token in the link
+ * E-mail links: "xac thuc email" (24 hours) and "quen mat khau" (30 minutes, one use, plus a 6-digit code). The token in the link
  * is random; only its SHA-256 is stored. A reset signs every device out and lifts a temporary sign-in lock.
  */
 @Service
@@ -65,17 +64,48 @@ public class EmailAccountService {
         return AdminUserService.map("email", u.getEmail(), "verified", true);
     }
 
-    /** Always answers the same way, so it can't be used to find out which e-mails have an account. */
+    /**
+     * Always answers the same way, so it can't be used to find out which e-mails have an account.
+     * The e-mail carries both a 6-digit code (typed in the web page or the app) and a link.
+     * Accounts created by a Google / Facebook / GitHub sign-in use this to create their first password.
+     */
     public void forgotPassword(String address) {
         RequestInfo info = RequestInfo.current();
         guard.checkPasswordReset(info.ip());
         if (address == null) return;
-        userRepository.findByEmail(address.trim().toLowerCase()).filter(u -> u.getAuthProvider() == AuthProvider.LOCAL && u.getDeletedAt() == null)
+        userRepository.findByEmail(address.trim().toLowerCase()).filter(u -> u.getDeletedAt() == null && u.isEnabled())
                 .ifPresent(u -> {
                     String token = issue(u.getId(), EmailToken.Purpose.RESET_PASSWORD, 30);
-                    EmailTemplates.Mail m = EmailTemplates.resetPassword(u.getFullName(), frontendUrl + "/reset-password?token=" + token, info.ip());
+                    String code = String.format("%06d", random.nextInt(1_000_000));
+                    tokens.expireAll(u.getId(), EmailToken.Purpose.RESET_CODE, LocalDateTime.now());
+                    // BCrypt (salted) rather than SHA-256: a 6-digit code is too small a space for a plain hash
+                    tokens.save(EmailToken.builder().userId(u.getId()).purpose(EmailToken.Purpose.RESET_CODE)
+                            .tokenHash(passwordEncoder.encode(code)).attempts(0)
+                            .expiresAt(LocalDateTime.now().plusMinutes(30)).createdAt(LocalDateTime.now()).build());
+                    EmailTemplates.Mail m = EmailTemplates.resetPassword(u.getFullName(), code, frontendUrl + "/reset-password?token=" + token, info.ip());
                     email.queue(u.getEmail(), u.getId(), "RESET_PASSWORD", m.subject(), m.html());
                 });
+    }
+
+    /** The 6-digit code from the e-mail: answers a short-lived reset token for resetPassword(). 5 tries per code. */
+    public Map<String, Object> verifyResetCode(String address, String code) {
+        guard.checkResetCode(RequestInfo.current().ip());
+        String c = code == null ? "" : code.replaceAll("\\s", "");
+        if (!c.matches("\\d{6}")) throw bad("Mã xác minh gồm 6 chữ số");
+        User u = address == null ? null : userRepository.findByEmail(address.trim().toLowerCase()).orElse(null);
+        EmailToken t = u == null ? null : tokens.findFirstByUserIdAndPurposeAndUsedAtIsNullOrderByIdDesc(u.getId(), EmailToken.Purpose.RESET_CODE).orElse(null);
+        if (t == null || t.getExpiresAt().isBefore(LocalDateTime.now())) throw bad("Mã xác minh không đúng hoặc đã hết hạn, vui lòng yêu cầu mã mới");
+        if (!passwordEncoder.matches(c, t.getTokenHash())) {
+            int tries = (t.getAttempts() == null ? 0 : t.getAttempts()) + 1;
+            t.setAttempts(tries);
+            if (tries >= 5) {
+                t.setUsedAt(LocalDateTime.now());
+                throw bad("Bạn đã nhập sai 5 lần, vui lòng yêu cầu mã mới");
+            }
+            throw bad("Mã xác minh không đúng, bạn còn " + (5 - tries) + " lần thử");
+        }
+        t.setUsedAt(LocalDateTime.now());
+        return AdminUserService.map("resetToken", issue(u.getId(), EmailToken.Purpose.RESET_PASSWORD, 10));
     }
 
     public void resetPassword(String token, String newPassword) {
@@ -83,7 +113,9 @@ public class EmailAccountService {
         User u = userRepository.findById(t.getUserId()).orElseThrow();
         PasswordPolicy.check(newPassword, u.getEmail());
         t.setUsedAt(LocalDateTime.now());
+        tokens.expireAll(u.getId(), EmailToken.Purpose.RESET_CODE, LocalDateTime.now());
         u.setPassword(passwordEncoder.encode(newPassword));
+        u.setPasswordSet(true);
         u.setPasswordChangedAt(LocalDateTime.now());
         u.setFailedLoginCount(0);
         u.setLoginLockedUntil(null);
@@ -116,5 +148,9 @@ public class EmailAccountService {
         EmailToken t = find(token, purpose);
         t.setUsedAt(LocalDateTime.now());
         return t;
+    }
+
+    private static ApiException bad(String m) {
+        return new ApiException(m, HttpStatus.BAD_REQUEST);
     }
 }

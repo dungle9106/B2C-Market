@@ -1,12 +1,12 @@
 <template>
   <div class="oauth-redirect">
     <div class="spinner"></div>
-    <p>Đang hoàn tất đăng nhập Google...</p>
+    <p>Đang hoàn tất đăng nhập...</p>
   </div>
 </template>
 
 <script setup>
-// Landing page for the backend's redirect after Google OAuth2 login:
+// Landing page for the backend's redirect after a Google / Facebook / GitHub sign-in:
 //   /oauth2/redirect#token=<our JWT>   or   /oauth2/redirect#error=<message>
 // The token travels in the fragment (never sent to a server), and we clear
 // it from the address bar right away with router.replace.
@@ -24,6 +24,15 @@ onMounted(async () => {
   const refresh = params.get('refresh')
   const challenge = params.get('challenge')
   const error = params.get('error')
+  const linked = params.get('linked')
+
+  // "Lien ket tai khoan" from the security page: back there with the result
+  const linkReturn = sessionStorage.getItem('oauth2_link_return')
+  if (linkReturn) {
+    sessionStorage.removeItem('oauth2_link_return')
+    router.replace({ path: linkReturn, query: linked ? { linked } : { linkError: error || 'Liên kết tài khoản thất bại' } })
+    return
+  }
   // the account uses two-step verification: finish on the login page
   if (challenge) {
     router.replace({ name: 'login', query: { challenge } })
@@ -36,7 +45,7 @@ onMounted(async () => {
   sessionStorage.removeItem('oauth2_redirect')
 
   if (!token) {
-    router.replace({ name: 'login', query: { error: error || 'Đăng nhập Google thất bại, vui lòng thử lại' } })
+    router.replace({ name: 'login', query: { error: error || 'Đăng nhập thất bại, vui lòng thử lại' } })
     return
   }
 

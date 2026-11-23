@@ -30,6 +30,9 @@ public class SchemaPatcher implements CommandLineRunner {
         exec("ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check");
         exec("ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_method_check");
         exec("ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_status_check");
+        // new enum values: RESET_CODE (6-digit reset code), FACEBOOK / GITHUB sign-in
+        exec("ALTER TABLE email_tokens DROP CONSTRAINT IF EXISTS email_tokens_purpose_check");
+        exec("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_auth_provider_check");
 
         // vouchers.discount_percent was replaced by type + discount_value
         if (columnExists("vouchers", "discount_percent")) {

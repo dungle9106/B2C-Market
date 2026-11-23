@@ -1,18 +1,39 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, FlatList, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
-import { get, post, put, patch, del, upload, errorText } from '../api'
+import * as DocumentPicker from 'expo-document-picker'
+import * as Sharing from 'expo-sharing'
+import { get, post, put, patch, del, upload, download, uploadFile, errorText } from '../api'
 import { formatVnd } from '../format'
-import { Badge, Button, C, Empty, Field, Img, Loading, Row, Select, styles, Tabs, useLoad } from '../ui'
+import { Badge, BottomBar, Button, C, Empty, Field, Img, Loading, Row, Select, styles, Tabs, useLoad } from '../ui'
 import { PriceSuggestion } from './ReportScreens'
 
 const TABS = [{ key: 'ALL', label: 'Tất cả' }, { key: 'ACTIVE', label: 'Đang bán' }, { key: 'OUT', label: 'Hết hàng' }, { key: 'HIDDEN', label: 'Đã ẩn' }]
 const MODERATION = { PENDING: 'Chờ duyệt', REJECTED: 'Bị từ chối', REMOVED: 'Vi phạm' }
 
+const BULK = [
+  { action: 'HIDE', label: 'Ẩn' },
+  { action: 'SHOW', label: 'Hiện' },
+  { action: 'SOLD_OUT', label: 'Hết hàng' },
+  { action: 'DELETE', label: 'Xóa', danger: true }
+]
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+// "Nhap / xuat Excel": the same files as the web (ProductExcelService). Export and the template are saved, then
+// handed to the share sheet (Drive, Zalo, e-mail...); import checks the file first (dryRun) and asks before creating.
+async function shareDownload(path, name) {
+  const uri = await download(path, name)
+  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: XLSX, dialogTitle: name, UTI: 'org.openxmlformats.spreadsheetml.sheet' })
+  else Alert.alert('Đã lưu tệp', uri)
+}
+
 export default function SellerProductsScreen({ navigation }) {
   const { data, error, refreshing, refresh, reload } = useLoad(() => get('/seller/products'))
   const [tab, setTab] = useState('ALL')
   const [q, setQ] = useState('')
+  const [picking, setPicking] = useState(false)
+  const [picked, setPicked] = useState([])
+  const [busy, setBusy] = useState(false)
 
   async function run(fn) {
     try { await fn(); reload() } catch (e) { Alert.alert('Không thực hiện được', errorText(e)) }
@@ -22,20 +43,70 @@ export default function SellerProductsScreen({ navigation }) {
   const list = (data || []).filter(p => (!q || p.name.toLowerCase().includes(q.toLowerCase())) && ({
     ACTIVE: p.active && p.stock > 0, OUT: p.stock <= 0, HIDDEN: !p.active
   }[tab] ?? true))
+  const toggle = (id) => setPicked(x => (x.includes(id) ? x.filter(i => i !== id) : [...x, id]))
+  const stopPicking = () => { setPicking(false); setPicked([]) }
+
+  async function busyRun(fn) {
+    setBusy(true)
+    try { await fn() } catch (e) { Alert.alert('Không thực hiện được', errorText(e)) } finally { setBusy(false) }
+  }
+
+  const bulk = (b) => Alert.alert(`${b.label} ${picked.length} sản phẩm?`, b.action === 'DELETE' ? 'Sản phẩm đã có đơn hàng chỉ có thể ẩn.' : '', [{ text: 'Hủy' }, {
+    text: b.label, style: b.danger ? 'destructive' : 'default', onPress: () => busyRun(async () => {
+      const r = await post('/seller/products/bulk', { ids: picked, action: b.action })
+      Alert.alert(`Đã cập nhật ${r.updated} sản phẩm`, r.skipped?.length ? 'Bỏ qua: ' + r.skipped.map(x => `${x.name} (${x.reason})`).join('; ') : '')
+      stopPicking()
+      reload()
+    })
+  }])
+
+  const importExcel = () => busyRun(async () => {
+    const pick = await DocumentPicker.getDocumentAsync({ type: [XLSX, 'application/vnd.ms-excel', '*/*'], copyToCacheDirectory: true })
+    if (pick.canceled || !pick.assets?.length) return
+    const file = pick.assets[0]
+    const check = await uploadFile('/seller/products/import', file, { dryRun: true })
+    const errs = check.errors || []
+    const ok = check.products?.length || 0
+    const errText = errs.slice(0, 8).map(e => `• Dòng ${e.row}: ${e.message}`).join('\n') + (errs.length > 8 ? `\n... và ${errs.length - 8} lỗi khác` : '')
+    if (!ok) return Alert.alert('File chưa hợp lệ', errText || 'Không tìm thấy sản phẩm nào trong file')
+    Alert.alert(`Đăng ${ok} sản phẩm?`, `${check.rows} dòng · ${ok} sản phẩm hợp lệ${errs.length ? ` · ${errs.length} lỗi (bị bỏ qua):\n${errText}` : ''}\nSản phẩm mới sẽ được gửi duyệt nếu sàn yêu cầu.`, [{ text: 'Hủy' }, {
+      text: 'Đăng sản phẩm', onPress: () => busyRun(async () => {
+        const r = await uploadFile('/seller/products/import', file, { dryRun: false })
+        Alert.alert('Đã đăng sản phẩm', `Đã tạo ${r.created} sản phẩm từ Excel.`)
+        reload()
+      })
+    }])
+  })
+
+  const excelMenu = () => Alert.alert('Excel', 'Đăng hàng loạt hoặc xuất danh sách sản phẩm', [
+    { text: 'Nhập từ Excel', onPress: importExcel },
+    { text: 'Tải file mẫu', onPress: () => busyRun(() => shareDownload('/seller/products/import/template', 'Shoppi_mau_dang_san_pham.xlsx')) },
+    { text: 'Xuất danh sách', onPress: () => busyRun(() => shareDownload('/seller/products/export', `Shoppi_san_pham_${new Date().toISOString().slice(0, 10)}.xlsx`)) }
+  ], { cancelable: true })
 
   return (
     <View style={styles.page}>
-      <View style={{ backgroundColor: 'white', padding: 8 }}>
-        <TextInput value={q} onChangeText={setQ} placeholder="🔍 Tìm sản phẩm của shop" placeholderTextColor={C.faint} style={styles.input} />
-      </View>
-      <Tabs items={TABS} value={tab} onChange={setTab} />
+      <Row style={{ backgroundColor: 'white', padding: 8, gap: 8 }}>
+        <TextInput value={q} onChangeText={setQ} placeholder="🔍 Tìm sản phẩm của shop" placeholderTextColor={C.faint} style={[styles.input, { flex: 1 }]} />
+        <Button small kind="ghost" title="Excel" disabled={busy} onPress={excelMenu} />
+        <Button small kind={picking ? 'primary' : 'ghost'} title={picking ? 'Xong' : 'Chọn'} onPress={() => (picking ? stopPicking() : setPicking(true))} />
+      </Row>
+      <Tabs items={TABS} value={tab} onChange={(t) => { setTab(t); setPicked([]) }} />
+      {picking ? (
+        <Row style={{ backgroundColor: 'white', paddingHorizontal: 12, paddingVertical: 8, justifyContent: 'space-between' }}>
+          <Text style={styles.muted}>Đã chọn {picked.length} sản phẩm</Text>
+          <Text style={{ color: C.primary }} onPress={() => setPicked(picked.length === list.length ? [] : list.map(p => p.id))}>{picked.length === list.length ? 'Bỏ chọn' : 'Chọn tất cả'}</Text>
+        </Row>
+      ) : null}
       {!data ? (error ? <Empty error={error} onRetry={reload} /> : <Loading />) : (
         <FlatList data={list} keyExtractor={p => String(p.id)} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
-                  ListEmptyComponent={<Empty text="Chưa có sản phẩm. Bấm + để đăng sản phẩm đầu tiên." />}
+                  ListEmptyComponent={<Empty text="Chưa có sản phẩm. Bấm + để đăng sản phẩm đầu tiên, hoặc Excel để đăng hàng loạt." />}
                   contentContainerStyle={{ paddingBottom: 80 }}
                   renderItem={({ item: p }) => (
-                    <View style={[styles.card, { marginBottom: 1 }]}>
-                      <Pressable onPress={() => navigation.navigate('ProductForm', { id: p.id })} style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={[styles.card, { marginBottom: 1 }, picked.includes(p.id) && { backgroundColor: C.primarySoft }]}>
+                      <Pressable onPress={() => (picking ? toggle(p.id) : navigation.navigate('ProductForm', { id: p.id }))}
+                                 onLongPress={() => { setPicking(true); toggle(p.id) }} style={{ flexDirection: 'row', gap: 10 }}>
+                        {picking ? <Text style={{ fontSize: 20, alignSelf: 'center', color: picked.includes(p.id) ? C.primary : C.faint }}>{picked.includes(p.id) ? '☑' : '☐'}</Text> : null}
                         <Img uri={p.thumbnailUrl} style={{ width: 70, height: 70 }} />
                         <View style={{ flex: 1 }}>
                           <Text numberOfLines={2}>{p.name}</Text>
@@ -48,22 +119,30 @@ export default function SellerProductsScreen({ navigation }) {
                           <Text style={styles.muted}>Kho {p.stock} · Đã bán {p.soldCount}</Text>
                         </View>
                       </Pressable>
-                      <Row style={{ gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-                        <Button small kind="ghost" title="Nhân bản" onPress={() => run(async () => {
-                          const copy = await post(`/seller/products/${p.id}/duplicate`)
-                          if (copy?.id) navigation.navigate('ProductForm', { id: copy.id })
-                        })} />
-                        <Button small kind="ghost" title="Kho hàng" onPress={() => navigation.navigate('ProductForm', { id: p.id })} />
-                        <Button small kind="ghost" title={p.active ? 'Ẩn' : 'Hiện'} onPress={() => run(() => patch(`/seller/products/${p.id}/toggle-active`))} />
-                        <Button small kind="danger" title="Xóa" onPress={() => remove(p)} />
-                      </Row>
+                      {!picking ? (
+                        <Row style={{ gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                          <Button small kind="ghost" title="Nhân bản" onPress={() => run(async () => {
+                            const copy = await post(`/seller/products/${p.id}/duplicate`)
+                            if (copy?.id) navigation.navigate('ProductForm', { id: copy.id })
+                          })} />
+                          <Button small kind="ghost" title="Kho hàng" onPress={() => navigation.navigate('ProductForm', { id: p.id })} />
+                          <Button small kind="ghost" title={p.active ? 'Ẩn' : 'Hiện'} onPress={() => run(() => patch(`/seller/products/${p.id}/toggle-active`))} />
+                          <Button small kind="danger" title="Xóa" onPress={() => remove(p)} />
+                        </Row>
+                      ) : null}
                     </View>
                   )} />
       )}
-      <Pressable onPress={() => navigation.navigate('ProductForm', {})}
-                 style={{ position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 4 }}>
-        <Text style={{ color: 'white', fontSize: 30, marginTop: -2 }}>+</Text>
-      </Pressable>
+      {picking ? (
+        <BottomBar>
+          {BULK.map(b => <Button key={b.action} small style={{ flex: 1 }} kind={b.danger ? 'danger' : 'ghost'} title={b.label} disabled={busy || !picked.length} onPress={() => bulk(b)} />)}
+        </BottomBar>
+      ) : (
+        <Pressable onPress={() => navigation.navigate('ProductForm', {})}
+                   style={{ position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 4 }}>
+          <Text style={{ color: 'white', fontSize: 30, marginTop: -2 }}>+</Text>
+        </Pressable>
+      )}
     </View>
   )
 }

@@ -27,6 +27,7 @@ public class AdminSystemController {
     private final EmailService email;
     private final AdminSecurityService security;
     private final VnpayService vnpay;
+    private final com.marketplace.backend.security.SocialLoginSettings socialLogin;
     private final com.marketplace.backend.service.shipping.CarrierGateways carrierGateways;
     private final com.marketplace.backend.service.search.ImageSearchService imageSearch;
     private final com.marketplace.backend.service.search.SemanticSearchService semanticSearch;
@@ -199,6 +200,19 @@ public class AdminSystemController {
     @PutMapping("/api/admin/system/payment/vnpay")
     public ResponseEntity<Map<String, Object>> updateVnpay(@RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(vnpay.update(body));
+    }
+
+    // ==================== social sign-in (Google, Facebook, GitHub) ====================
+
+    @GetMapping("/api/admin/system/social-login")
+    public ResponseEntity<Map<String, Object>> socialLogin() {
+        return ResponseEntity.ok(socialLogin.config());
+    }
+
+    // body: { publicUrl?, providers: [{ id, enabled, clientId, clientSecret? }] }
+    @PutMapping("/api/admin/system/social-login")
+    public ResponseEntity<Map<String, Object>> updateSocialLogin(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(socialLogin.update(body));
     }
 
     // ==================== "tim bang hinh anh": the product image index ====================

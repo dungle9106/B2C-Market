@@ -12,7 +12,7 @@
             <span v-if="u.superAdmin" class="role super">Cấp cao</span>
             <span class="status" :class="u.status">{{ STATUS[u.status] }}</span>
           </h2>
-          <div class="faint">{{ u.email }}<template v-if="u.phone"> · {{ u.phone }}</template> · {{ u.authProvider === 'GOOGLE' ? 'Đăng nhập Google' : 'Email & mật khẩu' }}</div>
+          <div class="faint">{{ u.email }}<template v-if="u.phone"> · {{ u.phone }}</template> · {{ ({ GOOGLE: 'Đăng ký bằng Google', FACEBOOK: 'Đăng ký bằng Facebook', GITHUB: 'Đăng ký bằng GitHub' })[u.authProvider] || 'Email & mật khẩu' }}</div>
           <div class="faint">Tham gia {{ formatDateTime(u.createdAt) }} · Đăng nhập gần nhất: {{ u.lastLoginAt ? formatDateTime(u.lastLoginAt) : 'chưa ghi nhận' }}</div>
         </div>
         <div v-if="canAct" class="head-actions">

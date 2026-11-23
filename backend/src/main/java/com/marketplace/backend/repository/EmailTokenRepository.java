@@ -13,6 +13,8 @@ public interface EmailTokenRepository extends JpaRepository<EmailToken, Long> {
 
     Optional<EmailToken> findByTokenHash(String tokenHash);
 
+    Optional<EmailToken> findFirstByUserIdAndPurposeAndUsedAtIsNullOrderByIdDesc(Long userId, EmailToken.Purpose purpose);
+
     // a new link makes the older ones of the same purpose useless
     @Modifying
     @Query("UPDATE EmailToken t SET t.usedAt = :now WHERE t.userId = :userId AND t.purpose = :purpose AND t.usedAt IS NULL")

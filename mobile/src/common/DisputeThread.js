@@ -1,5 +1,5 @@
 // A return dispute (web: components/orders/DisputeThread.vue): buyer, seller and Shoppi write to each other and add
-// photo evidence while Shoppi decides. side: 'buyer' | 'seller'.
+// photo evidence while Shoppi decides. side: 'buyer' | 'seller' | 'admin' (Shoppi Admin app).
 import React, { useCallback, useEffect, useState } from 'react'
 import { Alert, Text, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
@@ -14,7 +14,8 @@ export default function DisputeThread({ returnId, side, open = true }) {
   const [text, setText] = useState('')
   const [files, setFiles] = useState([])
   const [busy, setBusy] = useState(false)
-  const load = useCallback(() => get(`/${side}/returns/${returnId}/messages`).then(setMessages).catch(() => setMessages([])), [returnId, side])
+  const base = side === 'admin' ? `/admin/disputes/${returnId}` : `/${side}/returns/${returnId}`
+  const load = useCallback(() => get(`${base}/messages`).then(setMessages).catch(() => setMessages([])), [returnId, side])
   useEffect(() => { load() }, [load])
   const me = side.toUpperCase()
 
@@ -34,7 +35,7 @@ export default function DisputeThread({ returnId, side, open = true }) {
   async function send() {
     setBusy(true)
     try {
-      await post(`/${side}/returns/${returnId}/messages`, { content: text.trim(), attachments: files })
+      await post(`${base}/messages`, { content: text.trim(), attachments: files })
       setText('')
       setFiles([])
       load()
