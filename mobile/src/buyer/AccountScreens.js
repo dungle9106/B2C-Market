@@ -58,7 +58,10 @@ export default function AccountScreen({ navigation }) {
       <MenuItem icon="🔔" label="Theo dõi giá" hint="Báo khi giảm giá" onPress={() => navigation.navigate('PriceWatches')} />
       <MenuItem icon="🏪" label="Shop đang theo dõi" onPress={() => navigation.navigate('Following')} />
       <MenuItem icon="📍" label="Địa chỉ nhận hàng" onPress={() => navigation.navigate('Addresses')} />
-      <MenuItem icon="🔒" label="Đổi mật khẩu" onPress={() => navigation.navigate('ChangePassword')} />
+      <MenuItem icon="🔒" label="Bảo mật tài khoản" hint="Mật khẩu, xác thực 2 lớp, thiết bị" onPress={() => navigation.navigate('Security')} />
+      <MenuItem icon="⚡" label="Shoppi Flash Sale" onPress={() => navigation.navigate('FlashSale')} />
+      <MenuItem icon="🛟" label="Trung tâm hỗ trợ" hint="Câu hỏi thường gặp, gửi yêu cầu" onPress={() => navigation.navigate('HelpCenter')} />
+      <MenuItem icon="📜" label="Chính sách Shoppi" onPress={() => navigation.navigate('Policies')} />
       <MenuItem icon="🤖" label="Trợ lý mua sắm AI" hint="Hỏi gì cũng được" onPress={() => navigation.navigate('AIChat')} />
       <MenuItem icon="🛒" label="Giỏ hàng" onPress={() => navigation.navigate('Cart')} />
       <Button title="Đăng xuất" kind="ghost" style={{ margin: 16 }}
@@ -194,7 +197,7 @@ export function WalletScreen() {
 const WALLET_TABS = [{ key: 'ALL', label: 'Tất cả' }, { key: 'PLATFORM', label: 'Shoppi' }, { key: 'SHOP', label: 'Của Shop' }, { key: 'EXPIRED', label: 'Hết hiệu lực' }]
 const STATE = { UPCOMING: 'Chưa đến thời gian sử dụng', UNAVAILABLE: 'Chưa dùng được', EXPIRED: 'Đã hết hạn' }
 
-function Ticket({ v, children, off }) {
+export function Ticket({ v, children, off }) {
   return (
     <View style={{ flexDirection: 'row', backgroundColor: 'white', marginHorizontal: 10, marginTop: 8, opacity: off ? 0.55 : 1, minHeight: 90 }}>
       <View style={{ width: 90, backgroundColor: v.scope === 'PLATFORM' ? C.primary : C.green, alignItems: 'center', justifyContent: 'center', padding: 6 }}>

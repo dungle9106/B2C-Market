@@ -74,7 +74,7 @@ def _prepare(img: Image.Image) -> np.ndarray:
     return ((x - MEAN) / STD).transpose(2, 0, 1)
 
 
-def embed(images: list[bytes], batch: int = 32) -> np.ndarray:
+def embed(images: list[bytes], batch: int = 8) -> np.ndarray:
     """1280 numbers per photo, scaled to length 1 (so cosine similarity is a dot product)."""
     session = _backbone()
     out = []
@@ -135,12 +135,12 @@ def info() -> dict:
     return {"trained": True, **{k: m.get(k) for k in ("images", "products", "categories", "industries", "metrics", "trainedAt")}}
 
 
-def predict(data: bytes, k: int = 3) -> dict:
+def predict(data: bytes, k: int = 3, x: np.ndarray | None = None) -> dict:
     """The k most likely categories (ids) and industries of one photo."""
     m = load()
     if not m:
         return {"trained": False, "categories": [], "industries": []}
-    x = embed([data])
+    x = embed([data]) if x is None else x.reshape(1, -1)
 
     def top(clf):
         p = clf.predict_proba(x)[0]

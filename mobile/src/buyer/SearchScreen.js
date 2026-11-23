@@ -110,7 +110,7 @@ export function ImageSearchScreen({ navigation }) {
     <ScrollView style={styles.page} contentContainerStyle={{ paddingBottom: 24 }}>
       <View style={[styles.card, { alignItems: 'center' }]}>
         {photo ? <Image source={{ uri: photo.uri }} style={{ width: 160, height: 160, borderRadius: 4 }} />
-          : <Text style={[styles.muted, { textAlign: 'center', marginVertical: 20 }]}>Chụp hoặc chọn ảnh sản phẩm bạn muốn tìm. Shoppi sẽ tìm các sản phẩm có màu sắc, hình dáng giống nhất.</Text>}
+          : <Text style={[styles.muted, { textAlign: 'center', marginVertical: 20 }]}>Chụp hoặc chọn ảnh sản phẩm bạn muốn tìm. AI thị giác máy tính của Shoppi sẽ tìm các sản phẩm giống nhất.</Text>}
         <Row style={{ gap: 10, marginTop: 12 }}>
           <Button title="📷 Chụp ảnh" onPress={() => pick(true)} disabled={busy} />
           <Button title="🖼 Chọn từ thư viện" kind="ghost" onPress={() => pick(false)} disabled={busy} />
@@ -121,14 +121,21 @@ export function ImageSearchScreen({ navigation }) {
       {result ? (
         <>
           {result.description ? <Text style={[styles.card, styles.muted]}>AI nhận diện: {result.description}</Text> : null}
+          {/* same engines as the web: MobileNetV2 when the AI service runs, colour and shape otherwise */}
+          <Text style={[styles.muted, { paddingHorizontal: 12, fontSize: 12 }]}>
+            {result.engine?.includes('MOBILENET') ? 'AI thị giác máy tính (MobileNetV2)' : 'So sánh màu sắc và hình dáng'} với {result.indexed} ảnh sản phẩm
+          </Text>
           <Text style={[styles.h2, { paddingHorizontal: 12 }]}>{items.length} sản phẩm tương tự</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 4 }}>
             {items.map(({ product, similarity }) => (
               <View key={product.id} style={{ width: '50%' }}>
                 <ProductCard p={product} onPress={() => navigation.navigate('Product', { id: product.id })} />
-                <Text style={{ position: 'absolute', left: 8, top: 8, backgroundColor: 'rgba(0,0,0,.55)', color: 'white', fontSize: 11, paddingHorizontal: 4 }}>
-                  Giống {Math.round((similarity || 0) * 100)}%
-                </Text>
+                {/* the API sends a percentage already (0-100); shown, like the web, from 50% */}
+                {similarity >= 50 ? (
+                  <Text style={{ position: 'absolute', left: 8, top: 8, backgroundColor: 'rgba(0,0,0,.55)', color: 'white', fontSize: 11, paddingHorizontal: 4 }}>
+                    Giống {similarity}%
+                  </Text>
+                ) : null}
               </View>
             ))}
           </View>

@@ -1086,9 +1086,23 @@ Backend đã hỗ trợ chuyển đổi giữa 2 nguồn AI chỉ bằng 1 dòng
   của ảnh sản phẩm, hồi quy logistic học trên ảnh của sàn để đoán danh mục (`review-ai-service/app/vision.py`). Người bán tải ảnh bìa
   lên là form đăng sản phẩm gợi ý danh mục (`VisionCategoryService`). Kiểm định theo sản phẩm (5 phần): đúng ngành hàng 79%
   (top-3: 94%), cách so màu cũ 25%.
+- **Tìm kiếm bằng ảnh bằng MobileNetV2**: mỗi ảnh bìa được lưu vector 1.280 số (`product_image_index.embedding`, tự lập chỉ mục
+  mỗi 2 phút); ảnh người mua tải lên được so cosine với các vector đó, cộng điểm cho danh mục mà mô hình thị giác đoán được
+  (`ImageSearchService`, endpoint `/vision/embed`). Thử trên 256 ảnh phụ của sản phẩm tìm trong 206 ảnh bìa: đúng sản phẩm ở vị trí
+  đầu 79% (top-5: 94%), so màu cũ 38% (60%). MobileNet đọc được cả ảnh WEBP mà chỉ mục so màu của Java bỏ qua. Dịch vụ AI tắt thì
+  tự quay về so màu sắc và hình dáng.
 - **Tự train trên máy bằng Python**: `cd review-ai-service && pip install -r requirements-train.txt && python train_from_db.py`
   đọc dữ liệu thật từ PostgreSQL, train 5 mô hình (gợi ý, rời bỏ, gian lận, phân loại đánh giá, thị giác máy tính), so với luật cũ,
   ghi biểu đồ + bảng vào `review-ai-service/reports/` và nạp mô hình mới vào dịch vụ đang chạy.
+- **Kiểm thử chatbot tự động**: `node scripts/chatbot-eval.mjs` gửi 70 hội thoại (`scripts/demo-data/chatbot-cases.mjs`) qua API thật,
+  viết như khách thật gõ: không dấu, viết tắt / teen code ("đt", "kcn", "mk", "ko"), sai chính tả ("samsug", "ao khaoc"), đổi ý
+  giữa chừng ("à thôi, đổi sang loa"), câu nối tiếp chỉ hiểu được nhờ câu trước ("dưới 5 triệu thôi"), chính sách, đơn hàng, cần
+  người thật, hỏi thứ sàn không bán. Mỗi câu được chấm tự động (đúng loại hàng, đúng khoảng giá, nhắc đúng chính sách, có đơn hàng,
+  có chuyển hỗ trợ, không đưa hàng không liên quan); ca sai được ghi lại để sửa tiếp (`review-ai-service/reports/chatbot-eval.md`).
+  Chạy được cả khi chưa có API key (RAG theo luật) lẫn khi có (agent, chấm thêm thêm vào giỏ / gợi ý). Kết quả với RAG theo luật:
+  75% trước khi sửa, sau khi thêm `ChatQuery` (viết tắt, sửa chính tả theo từ điển của chính danh mục hàng, bỏ từ đệm khi đổi ý,
+  nhớ chủ đề cho câu nối tiếp, cần khớp ít nhất nửa số từ) đạt 100% bộ đã dùng để sửa và **87% bộ giữ lại** (câu mới viết sau,
+  không dùng để sửa: con số trung thực về câu khách thật hỏi).
 - **Hai loại AI trong dự án**: (1) gọi API mô hình lớn có sẵn + RAG + tool calling cho phần cần hiểu và sinh ngôn ngữ;
   (2) tự huấn luyện mô hình học máy nhỏ trên dữ liệu của sàn (gợi ý sản phẩm, phân loại đánh giá, phát hiện lạm dụng đổi trả,
   phát hiện gian lận đơn, dự đoán rời bỏ, dự báo nhập hàng) cho phần cần con số đo được, chạy nhanh trên CPU, không tốn phí API.

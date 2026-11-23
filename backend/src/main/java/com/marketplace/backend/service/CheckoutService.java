@@ -481,6 +481,9 @@ public class CheckoutService {
 
     private List<CartItem> loadItems(List<Long> ids, Long buyerId) {
         List<CartItem> items = new ArrayList<>();
+        if (ids == null || ids.isEmpty() || ids.contains(null)) {
+            throw bad("Vui lòng chọn sản phẩm trong giỏ hàng để đặt");
+        }
         for (Long id : new LinkedHashSet<>(ids)) {
             CartItem item = cartItemRepository.findById(id)
                     .filter(i -> i.getUser().getId().equals(buyerId))

@@ -197,14 +197,38 @@ export function SellerAccountScreen({ navigation }) {
           <Text>↩ Đổi trả {shop.defaultReturnDays} ngày · chuẩn bị hàng {shop.handlingDays} ngày</Text>
         </View>
       ) : null}
-      <MenuItem icon="📊" label="Hiệu quả hoạt động" onPress={() => navigation.navigate('Performance')} />
-      <MenuItem icon="🤖" label="Trợ lý bán hàng AI" onPress={() => navigation.navigate('SalesAssistant')} />
-      <MenuItem icon="🔔" label="Thông báo" onPress={() => navigation.navigate('SellerNotifications')} />
+      <Section title="Đơn hàng & Chăm sóc khách hàng" />
       <MenuItem icon="↩" label="Trả hàng/Hoàn tiền" onPress={() => navigation.navigate('SellerReturns')} />
       <MenuItem icon="⭐" label="Trả lời đánh giá" onPress={() => navigation.navigate('ReviewInbox')} />
-      <MenuItem icon="📦" label="Dự báo nhập hàng (AI)" onPress={() => navigation.navigate('StockForecast')} />
-      <MenuItem icon="🔒" label="Đổi mật khẩu" onPress={() => navigation.navigate('ChangePassword')} />
-      <Text style={[styles.muted, { padding: 14 }]}>Cài đặt shop, voucher, quảng cáo và báo cáo chi tiết dùng trên web Kênh Người Bán.</Text>
+      <MenuItem icon="❓" label="Hỏi đáp sản phẩm" onPress={() => navigation.navigate('SellerQuestions')} />
+      <MenuItem icon="💬" label="Tin nhắn tự động & mẫu trả lời" onPress={() => navigation.navigate('CareSettings')} />
+      <MenuItem icon="🔔" label="Thông báo" onPress={() => navigation.navigate('SellerNotifications')} />
+      <Section title="Kênh Marketing" />
+      <MenuItem icon="🎟" label="Mã giảm giá của Shop" onPress={() => navigation.navigate('SellerVouchers')} />
+      <MenuItem icon="⚡" label="Flash Sale của Shop" onPress={() => navigation.navigate('SellerFlashSale')} />
+      <MenuItem icon="🏬" label="Đăng ký Shoppi Flash Sale" onPress={() => navigation.navigate('SellerFlashEvents')} />
+      <MenuItem icon="🎁" label="Combo khuyến mãi" onPress={() => navigation.navigate('SellerCombos')} />
+      <MenuItem icon="🔥" label="Mua kèm deal sốc / Quà tặng" onPress={() => navigation.navigate('SellerAddOnDeals')} />
+      <MenuItem icon="📣" label="Quảng cáo Shoppi" onPress={() => navigation.navigate('SellerAds')} />
+      <MenuItem icon="🎬" label="Shoppi Video" onPress={() => navigation.navigate('SellerVideos')} />
+      <Section title="Báo cáo & AI" />
+      <MenuItem icon="📈" label="Phân tích bán hàng" hint="Doanh thu, sản phẩm, lượt xem, đánh giá" onPress={() => navigation.navigate('Analytics')} />
+      <MenuItem icon="💰" label="Doanh thu & Đối soát" onPress={() => navigation.navigate('Finance')} />
+      <MenuItem icon="📊" label="Hiệu quả hoạt động" onPress={() => navigation.navigate('Performance')} />
+      <MenuItem icon="🤖" label="Trợ lý bán hàng AI" onPress={() => navigation.navigate('SalesAssistant')} />
+      <MenuItem icon="✨" label="AI phân tích đánh giá" onPress={() => navigation.navigate('AIReviews')} />
+      <MenuItem icon="🗓" label="AI gợi ý thời điểm khuyến mãi" onPress={() => navigation.navigate('PromoTiming')} />
+      <MenuItem icon="📦" label="Tồn kho" onPress={() => navigation.navigate('Inventory')} />
+      <MenuItem icon="🔮" label="Dự báo nhập hàng (AI)" onPress={() => navigation.navigate('StockForecast')} />
+      <Section title="Quản lý Shop" />
+      <MenuItem icon="🏪" label="Hồ sơ Shop" onPress={() => navigation.navigate('ShopSettings')} />
+      <MenuItem icon="🗂" label="Danh mục của Shop" onPress={() => navigation.navigate('ShopCategories')} />
+      <MenuItem icon="📜" label="Chính sách Shop (đổi trả, vận chuyển)" onPress={() => navigation.navigate('ShopPolicies')} />
+      <MenuItem icon="✅" label="Xác minh Shop" onPress={() => navigation.navigate('ShopVerification')} />
+      <Section title="Tài khoản & Hỗ trợ" />
+      <MenuItem icon="🔒" label="Bảo mật tài khoản" hint="Mật khẩu, xác thực 2 lớp, thiết bị" onPress={() => navigation.navigate('Security')} />
+      <MenuItem icon="🛟" label="Hỗ trợ từ Shoppi" onPress={() => navigation.navigate('HelpCenter')} />
+      <MenuItem icon="📄" label="Chính sách Shoppi" onPress={() => navigation.navigate('Policies')} />
       <Button title="Đăng xuất" kind="ghost" style={{ margin: 16 }}
               onPress={() => Alert.alert('Đăng xuất?', '', [{ text: 'Hủy' }, { text: 'Đăng xuất', style: 'destructive', onPress: signOut }])} />
     </ScrollView>
@@ -241,3 +265,5 @@ export function RegisterShopScreen() {
     </ScrollView>
   )
 }
+
+const Section = ({ title }) => <Text style={{ color: C.muted, fontSize: 12, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 4 }}>{title.toUpperCase()}</Text>

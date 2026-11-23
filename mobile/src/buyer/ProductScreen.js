@@ -3,6 +3,7 @@ import { Alert, Dimensions, FlatList, Pressable, ScrollView, Text, View } from '
 import { get, post, put, del, errorText } from '../api'
 import { compact, formatDateTime, formatVnd } from '../format'
 import { BottomBar, Badge, Button, C, Empty, Img, Loading, ProductCard, Row, Stars, styles } from '../ui'
+import { ProductExtras, ReportProductLink } from './MoreScreens'
 
 const W = Dimensions.get('window').width
 
@@ -180,6 +181,8 @@ export default function ProductScreen({ route, navigation }) {
           <Text style={{ color: C.primary, borderWidth: 1, borderColor: C.primary, paddingHorizontal: 8, paddingVertical: 4 }}>Xem Shop</Text>
         </Pressable>
 
+        <ProductExtras p={p} navigation={navigation} />
+
         <View style={styles.card}>
           <Text style={styles.h2}>Mô tả sản phẩm</Text>
           <Text style={{ lineHeight: 21 }}>{p.description || 'Chưa có mô tả'}</Text>
@@ -201,6 +204,8 @@ export default function ProductScreen({ route, navigation }) {
           ))}
           {!reviews?.items?.length ? <Text style={styles.muted}>Chưa có đánh giá</Text> : null}
         </View>
+
+        <ReportProductLink p={p} />
 
         {similar.length ? (
           <View style={{ marginBottom: 8 }}>

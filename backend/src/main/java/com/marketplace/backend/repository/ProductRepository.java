@@ -93,6 +93,10 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     List<Product> findTop10ByActiveTrueOrderBySoldCountDesc();
 
+    // the words of the catalogue, for the chatbot's typo correction
+    @Query("SELECT p.searchText FROM Product p WHERE p.active = true AND p.searchText IS NOT NULL")
+    List<String> activeSearchTexts();
+
     // flash sales running right now, ending soonest first
     @Query("SELECT p FROM Product p JOIN p.shop s WHERE p.active = true AND s.active = true " +
            "AND p.flashSalePrice IS NOT NULL AND p.flashSaleStart <= :now AND p.flashSaleEnd > :now " +

@@ -12,7 +12,8 @@ What it does, for each model:
 
 The recommendation model is also scored per industry (top-level category: Điện tử, Thời trang, Mỹ phẩm...).
 The review classifier (issues + sentiment) is tested on hand-written reviews against the keyword rules (lexicon).
-Computer vision: the category of a product photo, MobileNetV2 features + logistic regression, against colour matching.
+Computer vision: the category of a product photo, MobileNetV2 features + logistic regression, against colour matching;
+and image search (a product's other photos searched among every cover image), MobileNetV2 against colour matching.
 
 Needs:    pip install -r requirements-train.txt (psycopg, matplotlib on top of the service libraries)
 Database: PGHOST (127.0.0.1), PGPORT (5433), PGUSER (postgres), PGPASSWORD (123456), PGDATABASE (marketplace).
@@ -486,12 +487,58 @@ def train_vision(db):
     for k, v in results["perIndustry"].items():
         print(f"  {k:30}{results['perIndustryCount'][k]:>4} ảnh  {v:.0%}")
 
+    results["search"] = image_search_test(data, emb, col, groups)
+
     # the model the platform uses: every photo
     vision.save(vision.fit(emb, [r["category"] for r in data]), vision.fit(emb, [r["industry"] for r in data]),
                 {"images": len(data), "products": len(set(groups)), "categories": len({r["category"] for r in data}),
                  "industries": len({r["industry"] for r in data}), "metrics": {k: results[k] for k in ("industry", "category")}})
     chart_vision(results)
     return results
+
+
+def image_search_test(data, emb, col, groups):
+    """Image search as the buyer uses it: the gallery is each product's cover (first photo), the queries its other
+    photos. Is the right product first / in the top 5, and how many of the top 10 are of the same category?
+    The category bonus uses a classifier that never saw the product (5 parts by product), like a new upload."""
+    from sklearn.model_selection import GroupKFold
+    from app import vision
+    cat = np.array([r["category"] for r in data])
+    first = {}
+    for i, p in enumerate(groups):
+        first.setdefault(p, i)
+    g = np.array(sorted(first.values()))
+    q = np.array([i for i in range(len(data)) if first[groups[i]] != i])
+    if len(q) == 0:
+        return None
+    cat_p = {}
+    for tr, te in GroupKFold(n_splits=5).split(emb, cat, groups):
+        clf = vision.fit(emb[tr], cat[tr])
+        for k, j in enumerate(te):
+            cat_p[j] = dict(zip(clf.classes_, clf.predict_proba(emb[j:j + 1])[0]))
+
+    def score(sims):
+        top1 = top5 = same = 0
+        for qi, s in zip(q, sims):
+            order = g[np.argsort(-s)]
+            top1 += groups[order[0]] == groups[qi]
+            top5 += groups[qi] in groups[order[:5]]
+            same += np.mean(cat[order[:10]] == cat[qi])
+        n = len(q)
+        return {"top1": round(top1 / n, 3), "top5": round(top5 / n, 3), "sameCategory10": round(same / n, 3)}
+
+    out = {"queries": len(q), "gallery": len(g),
+           "colour": score([col[g] @ col[qi] for qi in q]),
+           "mobilenet": score([emb[g] @ emb[qi] for qi in q]),
+           # what ImageSearchService does: cosine + 0.2 x probability of the product's category
+           "boosted": score([emb[g] @ emb[qi] + 0.2 * np.array([cat_p[qi].get(cat[gi], 0) for gi in g]) for qi in q])}
+    print(f"\nTìm kiếm bằng ảnh: {len(q)} ảnh phụ của sản phẩm, tìm trong {len(g)} ảnh bìa")
+    print(f"  {'Cách tìm':36}{'Đúng SP top-1':>14}{'Đúng SP top-5':>14}{'Cùng danh mục/10':>18}")
+    for m, label in (("colour", "So màu ảnh (cách cũ)"), ("mobilenet", "MobileNet, ảnh giống nhất"),
+                     ("boosted", "MobileNet + ưu tiên danh mục")):
+        r = out[m]
+        print(f"  {label:36}{r['top1']:>14.1%}{r['top5']:>14.1%}{r['sameCategory10']:>18.1%}")
+    return out
 
 
 def nearest_labels(train_x, train_y, x, k=3):
@@ -577,6 +624,13 @@ def write_summary(results):
         for m, label in (("colour", "So màu (cách cũ)"), ("nearest", "MobileNet, ảnh giống nhất"), ("model", "**MobileNet + hồi quy logistic**")):
             lines.append(f"| {label} | {v['industry'][m]['top1']:.1%} | {v['industry'][m]['top3']:.1%} | {v['category'][m]['top1']:.1%} | {v['category'][m]['top3']:.1%} |")
         lines += ["", "![](vision.png)", ""]
+        s = v.get("search")
+        if s:
+            lines += ["### Tìm kiếm bằng ảnh", "", f"{s['queries']} ảnh phụ của sản phẩm, tìm trong {s['gallery']} ảnh bìa.", "",
+                      "| Cách tìm | Đúng sản phẩm top-1 | Đúng sản phẩm top-5 | Cùng danh mục trong top-10 |", "|---|---|---|---|"]
+            for m, label in (("colour", "So màu (cách cũ)"), ("mobilenet", "MobileNet"), ("boosted", "**MobileNet + ưu tiên danh mục**")):
+                lines.append(f"| {label} | {s[m]['top1']:.1%} | {s[m]['top5']:.1%} | {s[m]['sameCategory10']:.1%} |")
+            lines.append("")
     for key, title in (("churn", "Dự đoán rời bỏ"), ("fraud", "Phát hiện gian lận đơn")):
         info = results.get(key, {}).get("info")
         if info and info.get("metrics"):
@@ -612,5 +666,18 @@ if __name__ == "__main__":
         for name, fn in (("reco", train_reco), ("churn", train_churn), ("fraud", train_fraud), ("reviews", train_reviews), ("vision", train_vision)):
             if name in wanted:
                 results[name] = fn(db)
+    # keep the sections not trained this time, so summary.md always shows every model
+    saved = os.path.join(REPORTS, "results.json")
+    try:
+        with open(saved, encoding="utf-8") as f:
+            results = {**json.load(f), **results}
+    except (OSError, ValueError):
+        pass
+    try:
+        text = json.dumps(results, ensure_ascii=False, default=lambda o: o.item() if hasattr(o, "item") else str(o))
+        with open(saved, "w", encoding="utf-8") as f:
+            f.write(text)
+    except (TypeError, ValueError) as e:
+        print(f"(không lưu được {saved}: {e})")
     write_summary(results)
     reload_service()

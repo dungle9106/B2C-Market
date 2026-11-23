@@ -150,6 +150,7 @@ export function OrderDetailScreen({ route, navigation }) {
       ) : null}
 
       <View style={{ paddingHorizontal: 12, gap: 8 }}>
+        {o.status === 'AWAITING_PAYMENT' && o.checkoutCode ? <Button title="Thanh toán ngay" onPress={() => navigation.navigate('Payment', { code: o.checkoutCode })} /> : null}
         {(o.canCancel || o.canRequestCancel) && !cancelling ? <Button title="Hủy đơn hàng" kind="ghost" onPress={() => setCancelling(true)} /> : null}
         {o.canConfirmReceived ? <Button title="Đã nhận được hàng" onPress={received} disabled={busy} /> : null}
         {o.canReturn ? (
@@ -161,6 +162,7 @@ export function OrderDetailScreen({ route, navigation }) {
           const c = await post('/buyer/chats', { shopId: o.shopId })
           navigation.navigate('ChatThread', { id: c.id, title: o.shopName })
         }} />
+        <Button title="🛟 Cần hỗ trợ với đơn này" kind="ghost" onPress={() => navigation.navigate('NewTicket', { orderId: o.id, category: 'ORDER' })} />
       </View>
     </ScrollView>
   )

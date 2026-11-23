@@ -1,8 +1,20 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native'
+import { Alert, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native'
 import { get, post, errorText } from '../api'
 import { formatDay, formatVnd } from '../format'
 import { BottomBar, Button, C, Empty, Field, Img, Loading, Row, Select, styles } from '../ui'
+
+// the same methods as the web checkout; E_WALLET / CARD / BANK_TRANSFER go to the (simulated) payment page, VNPAY to
+// the real VNPay gateway when the admin has connected it
+const METHODS = [
+  { value: 'COD', label: '💵 Thanh toán khi nhận hàng (COD)' },
+  { value: 'SHOPPI_PAY', label: '💳 Ví ShoppiPay' },
+  { value: 'E_WALLET', label: '📱 Ví điện tử (MoMo, ZaloPay, VNPay)', hint: 'Quét mã ở bước tiếp theo (mô phỏng)' },
+  { value: 'CARD', label: '💳 Thẻ Tín dụng/Ghi nợ', hint: 'Visa, Mastercard, JCB (mô phỏng)' },
+  { value: 'BANK_TRANSFER', label: '🏦 Chuyển khoản ngân hàng', hint: 'Nhận thông tin chuyển khoản sau khi đặt' }
+]
+const VNPAY = { value: 'VNPAY', label: '🏧 VNPay (ATM/QR/Thẻ)', hint: 'Chuyển sang cổng VNPay' }
+const WALLETS = [{ value: 'MOMO', label: 'Ví MoMo' }, { value: 'ZALOPAY', label: 'ZaloPay' }, { value: 'VNPAY', label: 'VNPay' }]
 
 export default function CheckoutScreen({ route, navigation }) {
   const { cartItemIds, addressId: pickedAddress } = route.params
@@ -12,6 +24,9 @@ export default function CheckoutScreen({ route, navigation }) {
   const [platformCode, setPlatformCode] = useState(null)
   const [useCoins, setUseCoins] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('COD')
+  const [paymentProvider, setPaymentProvider] = useState('MOMO')
+  const [vnpay, setVnpay] = useState(false)
+  useEffect(() => { get('/payments/methods').then(m => setVnpay(!!m?.vnpay)).catch(() => {}) }, [])
   const [vouchers, setVouchers] = useState([])
   const [quote, setQuote] = useState(null)
   const [error, setError] = useState(null)
@@ -42,9 +57,10 @@ export default function CheckoutScreen({ route, navigation }) {
     shops: groups.map(g => ({ cartItemIds: g.cartItemIds, ...choice[g.shopId] })),
     addressId: address?.id,
     paymentMethod,
+    paymentProvider: paymentMethod === 'E_WALLET' ? paymentProvider : null,
     platformVoucherCode: platformCode || undefined,
     useCoins
-  }), [groups, choice, address, platformCode, useCoins, paymentMethod])
+  }), [groups, choice, address, platformCode, useCoins, paymentMethod, paymentProvider])
 
   useEffect(() => {
     if (!groups || address === undefined) return
@@ -58,6 +74,14 @@ export default function CheckoutScreen({ route, navigation }) {
     setBusy(true)
     try {
       const res = await post('/orders/checkout', body())
+      if (res.paymentRequired) {
+        // online payment: VNPay opens in the browser, the others on the payment screen (which also retries VNPay)
+        navigation.reset({ index: 2, routes: [{ name: 'Tabs' }, { name: 'Orders' }, { name: 'Payment', params: { code: res.checkoutCode } }] })
+        if (paymentMethod === 'VNPAY') {
+          try { Linking.openURL((await post(`/payments/${res.checkoutCode}/vnpay`)).url) } catch (e) { /* the payment screen offers it again */ }
+        }
+        return
+      }
       Alert.alert('Đặt hàng thành công', `${res.orders.length} đơn hàng · ${formatVnd(res.amount)}\n${paymentMethod === 'COD' ? 'Thanh toán khi nhận hàng.' : 'Đã thanh toán bằng ví ShoppiPay.'}`)
       navigation.reset({ index: 1, routes: [{ name: 'Tabs' }, { name: 'Orders' }] })
     } catch (e) {
@@ -131,8 +155,8 @@ export default function CheckoutScreen({ route, navigation }) {
             </Row>
           ) : null}
           <Select label="Phương thức thanh toán" value={paymentMethod} onChange={setPaymentMethod}
-                  options={[{ value: 'COD', label: '💵 Thanh toán khi nhận hàng (COD)' },
-                    { value: 'SHOPPI_PAY', label: '💳 Ví ShoppiPay', hint: `Số dư ${formatVnd(quote.walletBalance)}` }]} />
+                  options={[...METHODS.map(m => (m.value === 'SHOPPI_PAY' ? { ...m, hint: `Số dư ${formatVnd(quote.walletBalance)}` } : m)), ...(vnpay ? [VNPAY] : [])]} />
+          {paymentMethod === 'E_WALLET' ? <Select label="Ví" value={paymentProvider} onChange={setPaymentProvider} options={WALLETS} /> : null}
           {paymentMethod === 'SHOPPI_PAY' ? (
             <Text style={{ color: walletShort ? C.danger : C.muted, marginTop: -8 }} onPress={() => navigation.navigate('Wallet')}>
               Số dư ví: {formatVnd(quote.walletBalance)}{walletShort ? ', chưa đủ để thanh toán.' : ''} Nạp tiền ›

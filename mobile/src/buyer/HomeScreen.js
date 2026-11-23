@@ -4,13 +4,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { get, errorText } from '../api'
 import { formatVnd } from '../format'
 import { C, Empty, Img, ProductCard, Row, styles } from '../ui'
+import { HomePromos } from './MoreScreens'
 
 const ICONS = ['👕', '📱', '🏠', '💄', '⚽', '🍜', '📚', '🧸', '🚗', '💊']
 const SHORTCUTS = [
   ['🏬', 'Shoppi Mall', ['Search', { mall: true, title: 'Shoppi Mall' }]],
   ['🪙', 'Điểm danh nhận Xu', ['Coins']],
   ['🎡', 'Vòng quay', ['LuckySpin']],
-  ['🎟', 'Kho Voucher', ['VoucherWallet']]
+  ['🎟', 'Kho Voucher', ['VoucherWallet']],
+  ['⚡', 'Flash Sale', ['FlashSale']]
 ]
 
 export function SearchBar({ navigation }) {
@@ -29,6 +31,7 @@ export function SearchBar({ navigation }) {
 export default function HomeScreen({ navigation }) {
   const [categories, setCategories] = useState([])
   const [flash, setFlash] = useState([])
+  const [forYou, setForYou] = useState([])
   const [items, setItems] = useState([])
   const [page, setPage] = useState({ page: -1, totalPages: 1 })
   const [loading, setLoading] = useState(false)
@@ -56,6 +59,8 @@ export default function HomeScreen({ navigation }) {
     await Promise.all([
       get('/categories/tree').then(setCategories).catch(() => {}),
       get('/products/flash-sale', { limit: 12 }).then(setFlash).catch(() => {}),
+      // the trained recommendation model, as on the web home page (empty for a new buyer: the section hides)
+      get('/buyer/recommendations/for-you').then(r => setForYou((r || []).slice(0, 12))).catch(() => setForYou([])),
       loadMore(true)
     ])
     setRefreshing(false)
@@ -74,6 +79,7 @@ export default function HomeScreen({ navigation }) {
           </Pressable>
         ))}
       </Row>
+      <HomePromos navigation={navigation} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ backgroundColor: 'white', marginBottom: 8 }}
                   contentContainerStyle={{ padding: 10, gap: 6 }}>
         {categories.map((c, i) => (
@@ -98,6 +104,21 @@ export default function HomeScreen({ navigation }) {
                     Đã bán {p.flashSaleSold || 0}/{p.flashSaleStock}
                   </Text>
                 ) : null}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+      {forYou.length ? (
+        <View style={{ backgroundColor: 'white', marginBottom: 8, paddingVertical: 10 }}>
+          <Text style={{ color: C.primary, fontWeight: '700', fontSize: 16, paddingHorizontal: 12, marginBottom: 2 }}>✨ DÀNH RIÊNG CHO BẠN</Text>
+          <Text style={{ color: C.faint, fontSize: 11, paddingHorizontal: 12, marginBottom: 8 }}>AI gợi ý theo những gì bạn đã xem và mua</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 8, gap: 8 }}>
+            {forYou.map(p => (
+              <Pressable key={p.id} onPress={() => navigation.navigate('Product', { id: p.id })} style={{ width: 120 }}>
+                <Img uri={p.thumbnailUrl} style={{ width: 120, height: 120 }} />
+                <Text numberOfLines={2} style={{ fontSize: 12, marginTop: 4 }}>{p.name}</Text>
+                <Text style={{ color: C.primary, fontWeight: '600', marginTop: 2 }}>{formatVnd(p.price)}</Text>
               </Pressable>
             ))}
           </ScrollView>

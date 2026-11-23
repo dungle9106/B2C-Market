@@ -107,11 +107,15 @@
           <button type="button" class="btn sm ghost tw-ml-auto" :disabled="imgBusy" @click="reindexImages">{{ imgBusy ? 'Đang lập chỉ mục...' : 'Lập chỉ mục ngay' }}</button>
         </div>
         <div class="tw-grid tw-grid-cols-2 tw-gap-3 tw-text-[13px] md:tw-grid-cols-4">
-          <div><div class="tw-text-neutral-500">Ảnh đã lập chỉ mục</div><b>{{ img.indexed }}</b> / {{ img.products }} sản phẩm</div>
+          <div><div class="tw-text-neutral-500">Ảnh MobileNet đã đọc</div><b>{{ img.embedded ?? 0 }}</b> / {{ img.products }} sản phẩm
+            <div class="tw-text-xs tw-text-neutral-400">So màu: {{ img.indexed }} (Java không đọc được WEBP)</div></div>
           <div><div class="tw-text-neutral-500">Đang chờ</div><b>{{ img.pending }}</b></div>
           <div><div class="tw-text-neutral-500">AI nhận diện ảnh</div><b :class="img.aiReady ? 'tw-text-green-600' : 'tw-text-neutral-500'">{{ img.aiReady ? 'Đang bật' : 'Chưa bật: chỉ so sánh hình ảnh' }}</b></div>
         </div>
-        <p class="tw-mb-0 tw-mt-2 tw-text-xs tw-text-neutral-400">Mỗi ảnh bìa sản phẩm được lưu đặc trưng màu sắc và hình dáng (tự cập nhật mỗi 2 phút khi ảnh đổi).
+        <p class="tw-mb-0 tw-mt-2 tw-text-xs tw-text-neutral-400">Khi dịch vụ AI Python chạy ({{ img.visionReady ? 'đã cấu hình' : 'chưa cấu hình' }}), mỗi ảnh bìa được mạng MobileNetV2 đọc thành 1280 con số;
+          ảnh người mua tải lên được so với các vector đó và ưu tiên danh mục mà mô hình thị giác đoán được.
+          Thử trên 256 ảnh sản phẩm: đúng sản phẩm ở vị trí đầu 79%, trong top 5 là 93% (so màu: 38% / 60%).
+          Không có dịch vụ AI thì quay về so màu sắc và hình dáng. Chỉ mục tự cập nhật mỗi 2 phút khi ảnh đổi.
           Khi bật AI (OpenAI hoặc Claude), ảnh người mua tải lên được AI nhận diện thành mô tả để tìm chính xác hơn; bước này chỉ chạy với người dùng đã đăng nhập.</p>
       </section>
 

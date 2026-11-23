@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { post, upload, errorText } from '../api'
 import { formatDateTime, formatVnd } from '../format'
 import { BottomBar, Button, C, Field, Img, Row, Select, styles } from '../ui'
+import DisputeThread from '../common/DisputeThread'
 
 export const RETURN_REASONS = [
   { value: 'DAMAGED', label: 'Hàng bị hư hỏng / lỗi' },
@@ -180,6 +181,7 @@ export function ReturnCard({ order, onChanged }) {
           </Row>
         </View>
       ) : null}
+      {r.complaint ? <DisputeThread returnId={r.id} side="buyer" open={r.status === 'ESCALATED'} /> : null}
     </View>
   )
 }

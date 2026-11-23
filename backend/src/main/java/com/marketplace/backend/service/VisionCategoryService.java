@@ -75,6 +75,53 @@ public class VisionCategoryService {
         }
     }
 
+    /** A photo as MobileNetV2 sees it: 1280 numbers of length 1 (cosine = dot product), plus category id -> probability. */
+    public record Seen(float[] vector, Map<Long, Double> categories) {
+    }
+
+    public boolean configured() {
+        return serviceUrl != null && !serviceUrl.isBlank();
+    }
+
+    /** null when the AI service is off or cannot read the picture. categories: the k likeliest (empty if not trained). */
+    public Seen see(byte[] image, int categories) {
+        if (!configured() || image == null || image.length == 0 || image.length > MAX_BYTES) return null;
+        try {
+            String raw = webClient.post().uri(serviceUrl.replaceAll("/+$", "") + "/vision/embed")
+                    .bodyValue(Map.of("image", Base64.getEncoder().encodeToString(image), "categories", categories))
+                    .retrieve().bodyToMono(String.class).block(Duration.ofSeconds(20));
+            JsonNode n = JSON.readTree(raw);
+            Map<Long, Double> cats = new HashMap<>();
+            n.path("categories").forEach(c -> cats.put(c.path("id").asLong(), c.path("probability").asDouble()));
+            return new Seen(decode(n.path("embedding").asText()), cats);
+        } catch (Exception e) {
+            log.debug("Vision embedding unavailable: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /** base64 of little-endian float32 (what the service and the index store). */
+    public static float[] decode(String b64) {
+        if (b64 == null || b64.isBlank()) return null;
+        java.nio.FloatBuffer f = java.nio.ByteBuffer.wrap(Base64.getDecoder().decode(b64)).order(java.nio.ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
+        float[] v = new float[f.remaining()];
+        f.get(v);
+        return v;
+    }
+
+    public static String encode(float[] v) {
+        java.nio.ByteBuffer b = java.nio.ByteBuffer.allocate(v.length * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        for (float x : v) b.putFloat(x);
+        return Base64.getEncoder().encodeToString(b.array());
+    }
+
+    public static double cosine(float[] a, float[] b) {
+        if (a == null || b == null || a.length != b.length) return 0;
+        double s = 0;
+        for (int i = 0; i < a.length; i++) s += a[i] * b[i];
+        return s;
+    }
+
     private byte[] read(String url) throws Exception {
         if (url.startsWith("/uploads/")) {
             Path file = uploadService.root().resolve(url.substring("/uploads/".length())).normalize();

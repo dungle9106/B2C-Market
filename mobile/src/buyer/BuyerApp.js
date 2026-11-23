@@ -20,6 +20,9 @@ import LuckySpinScreen from './LuckySpinScreen'
 import VideosScreen from './VideosScreen'
 import ReturnRequestScreen from './ReturnScreens'
 import ChangePasswordScreen from '../common/ChangePasswordScreen'
+import { CampaignScreen, FlashSaleScreen, PaymentScreen } from './MoreScreens'
+import { HelpCenterScreen, NewTicketScreen, PoliciesScreen, PolicyScreen, TicketScreen } from '../common/SupportScreens'
+import SecurityScreen from '../common/SecurityScreen'
 import AccountScreen, { AIChatScreen, CoinsScreen, FollowingScreen, LikesScreen, PriceWatchesScreen, VoucherWalletScreen, WalletScreen } from './AccountScreens'
 
 const Stack = createNativeStackNavigator()
@@ -28,7 +31,15 @@ const Tab = createBottomTabNavigator()
 // notification links are web routes: '/orders/12', '/products/5', '/shops/3'
 function openLink(link) {
   const m = /^\/(orders|products|shops)\/(\d+)/.exec(link || '')
-  if (!m) return link?.startsWith('/account/vouchers') ? ['VoucherWallet'] : link?.startsWith('/account/coins') ? ['Coins'] : null
+  if (!m) {
+    const t = /^\/help\/tickets\/(\d+)/.exec(link || '')
+    if (t) return ['Ticket', { id: Number(t[1]) }]
+    const c = /^\/campaigns\/([\w-]+)/.exec(link || '')
+    if (c) return ['Campaign', { slug: c[1] }]
+    const pay = /^\/payment\/([\w-]+)/.exec(link || '')
+    if (pay) return ['Payment', { code: pay[1] }]
+    return link?.startsWith('/account/vouchers') ? ['VoucherWallet'] : link?.startsWith('/account/coins') ? ['Coins'] : null
+  }
   return [{ orders: 'OrderDetail', products: 'Product', shops: 'Shop' }[m[1]], { id: Number(m[2]) }]
 }
 
@@ -82,6 +93,15 @@ export default function BuyerApp() {
       <Stack.Screen name="PriceWatches" component={PriceWatchesScreen} options={{ title: 'Theo dõi giá' }} />
       <Stack.Screen name="Following" component={FollowingScreen} options={{ title: 'Shop đang theo dõi' }} />
       <Stack.Screen name="AIChat" component={AIChatScreen} options={{ title: '🤖 Trợ lý mua sắm AI' }} />
+      <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Thanh toán' }} />
+      <Stack.Screen name="FlashSale" component={FlashSaleScreen} options={{ title: '⚡ Shoppi Flash Sale' }} />
+      <Stack.Screen name="Campaign" component={CampaignScreen} options={{ title: 'Chương trình' }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ title: 'Trung tâm hỗ trợ' }} />
+      <Stack.Screen name="NewTicket" component={NewTicketScreen} options={{ title: 'Gửi yêu cầu hỗ trợ' }} />
+      <Stack.Screen name="Ticket" component={TicketScreen} options={{ title: 'Yêu cầu hỗ trợ' }} />
+      <Stack.Screen name="Policies" component={PoliciesScreen} options={{ title: 'Chính sách Shoppi' }} />
+      <Stack.Screen name="Policy" component={PolicyScreen} options={({ route }) => ({ title: route.params?.title || 'Chính sách' })} />
+      <Stack.Screen name="Security" component={SecurityScreen} options={{ title: 'Bảo mật tài khoản' }} />
       <Stack.Screen name="ChatThread" options={({ route }) => ({ title: route.params?.title || 'Chat' })}>
         {(props) => <ChatThreadScreen {...props} side="buyer" />}
       </Stack.Screen>

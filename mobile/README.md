@@ -12,22 +12,24 @@ Biến môi trường `APP_VARIANT` (`buyer` / `seller`) lúc build quyết đ�
 ## Chức năng
 
 **App Người mua**
-- Trang chủ: danh mục, Flash Sale, gợi ý sản phẩm (cuộn vô hạn)
-- Tìm kiếm có gợi ý từ khóa, sắp xếp, lọc **Shoppi Mall**; **tìm bằng hình ảnh** (chụp camera / chọn ảnh)
-- Chi tiết sản phẩm: ảnh, chọn phân loại, yêu thích, đánh giá, sản phẩm tương tự; trang shop (theo dõi, chat)
-- Giỏ hàng → Thanh toán: chọn địa chỉ, đơn vị vận chuyển, voucher shop / Shoppi, dùng **Shoppi Xu**, thanh toán khi nhận hàng (COD) hoặc **ví ShoppiPay**
-- Đơn mua: theo dõi hành trình, hủy / yêu cầu hủy, đã nhận hàng, mua lại, đánh giá
-- **Ví ShoppiPay** (nạp tiền mô phỏng, thanh toán, lịch sử), **Shoppi Xu** (số dư, điểm danh hằng ngày, hạng thành viên, lịch sử), Kho Voucher, Đã thích, Shop đang theo dõi, Sổ địa chỉ
-- Chat với shop, **Trợ lý mua sắm AI**, Thông báo
+- Trang chủ: banner, chương trình khuyến mãi của Shoppi, **Shoppi Flash Sale** theo khung giờ, danh mục, **"Dành riêng cho bạn"** (mô hình gợi ý đã train), gợi ý hôm nay
+- Tìm kiếm có gợi ý từ khóa, sắp xếp, lọc **Shoppi Mall**; **tìm bằng hình ảnh** (MobileNetV2, chụp camera / chọn ảnh)
+- Chi tiết sản phẩm: ảnh, phân loại, yêu thích, theo dõi giá, **phí ship tới tỉnh của bạn**, voucher của shop, **combo**, **mua kèm deal sốc / quà tặng**, **hỏi đáp với shop**, đánh giá, sản phẩm tương tự, báo cáo sản phẩm
+- Trang shop: theo dõi, chat, voucher của shop, danh mục của shop
+- Thanh toán: địa chỉ, đơn vị vận chuyển, voucher, Shoppi Xu; **COD, ví ShoppiPay, ví điện tử (MoMo/ZaloPay/VNPay), thẻ, chuyển khoản, cổng VNPay thật** (khi admin bật) và màn **thanh toán online** (đếm ngược, thẻ thử, hủy giao dịch)
+- Đơn mua: hành trình, thanh toán lại đơn chờ thanh toán, hủy, đã nhận, mua lại, đánh giá, trả hàng/hoàn tiền, **khiếu nại và trao đổi với Shoppi**
+- Ví ShoppiPay, Shoppi Xu, Vòng quay may mắn, Kho Voucher, Đã thích, Theo dõi giá, Shop đang theo dõi, Sổ địa chỉ, Shoppi Video
+- Chat với shop, **Trợ lý mua sắm AI**, Thông báo, **Trung tâm hỗ trợ** (câu hỏi thường gặp, gửi và theo dõi yêu cầu), Chính sách Shoppi, **Bảo mật tài khoản** (xác thực 2 lớp, thiết bị đăng nhập, lịch sử đăng nhập)
 
 **App Người bán**
-- Tổng quan: việc cần làm, số liệu hôm nay so với hôm qua, sản phẩm bán chạy
-- Đơn hàng: xác nhận, chuẩn bị hàng (hẹn lấy / gửi bưu cục), giao ĐVVC, cập nhật vận chuyển, hủy, xử lý yêu cầu hủy
-- Sản phẩm: thêm / sửa (chụp ảnh, **AI viết mô tả**), kho theo phân loại, ẩn / hiện, xóa, gửi duyệt lại
-- Chat với khách (**AI gợi ý câu trả lời**), **Trợ lý doanh số AI**, Hiệu quả hoạt động (điểm phạt, Shop Yêu thích)
+- Tổng quan, Đơn hàng, Sản phẩm (thêm / sửa, **AI viết mô tả**, **AI gợi ý danh mục từ ảnh**, **AI gợi ý giá**, nhân bản, ẩn / hiện), Chat (**AI gợi ý câu trả lời**)
+- Chăm sóc khách hàng: trả hàng/hoàn tiền (kèm trao đổi khiếu nại), trả lời đánh giá, **hỏi đáp sản phẩm** (AI gợi ý), **tin nhắn tự động & mẫu trả lời**
+- Kênh Marketing: **mã giảm giá của shop**, **Flash Sale của shop**, **đăng ký Shoppi Flash Sale**, **combo**, **mua kèm deal sốc / quà tặng**, **quảng cáo** (ví quảng cáo, giá thầu, từ khóa), **Shoppi Video**
+- Báo cáo & AI: **phân tích doanh thu / sản phẩm / lượt xem / đánh giá**, **doanh thu & đối soát**, hiệu quả hoạt động, trợ lý bán hàng AI, **AI phân tích đánh giá**, **AI gợi ý thời điểm khuyến mãi**, **tồn kho** (điều chỉnh, lịch sử), dự báo nhập hàng AI
+- Quản lý shop: **hồ sơ shop**, **danh mục của shop**, **chính sách đổi trả & vận chuyển**, **xác minh shop**; bảo mật tài khoản, hỗ trợ từ Shoppi
 - Tài khoản người mua chưa có shop có thể **mở shop ngay trong app**
 
-Các chức năng còn lại (cài đặt shop, voucher, quảng cáo, báo cáo chi tiết, quản trị) dùng trên web.
+Chỉ dùng trên web: trang quản trị, in phiếu giao hàng hàng loạt, nhập / xuất sản phẩm bằng Excel, thao tác hàng loạt trên nhiều đơn / sản phẩm.
 
 ## Cấu trúc
 
@@ -40,7 +42,8 @@ mobile/
     ├── api.js              gọi API (JWT + tự làm mới token), upload ảnh
     ├── auth.js             trạng thái đăng nhập (lưu token bằng SecureStore)
     ├── ui.js               component dùng chung (nút, ô nhập, thẻ sản phẩm, tab...)
-    ├── common/             đăng nhập, chat, thông báo (dùng cho cả 2 app)
+    ├── support.js          danh mục hỗ trợ + câu hỏi thường gặp (chép từ web)
+    ├── common/             đăng nhập, chat, thông báo, hỗ trợ, bảo mật, khiếu nại (dùng cho cả 2 app)
     ├── buyer/              màn hình app Người mua
     └── seller/             màn hình app Người bán
 ```

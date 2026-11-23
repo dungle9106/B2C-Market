@@ -4,6 +4,7 @@ import { get, post, fileUrl, errorText } from '../api'
 import { formatDateTime, formatVnd } from '../format'
 import { Badge, Button, C, Empty, Field, Img, Loading, Row, Stars, styles, Tabs, useLoad } from '../ui'
 import { RETURN_REASONS, RETURN_STATUS } from '../buyer/ReturnScreens'
+import DisputeThread from '../common/DisputeThread'
 
 // =====================================================================
 // "Tra hang/Hoan tien" of the shop (same rules as the web page /seller/returns)
@@ -103,6 +104,7 @@ function ReturnItem({ r, onChanged, onPhoto }) {
           </Row>
         </View>
       ) : null}
+      {r.complaint ? <DisputeThread returnId={r.id} side="seller" open={r.status === 'ESCALATED'} /> : null}
     </View>
   )
 }

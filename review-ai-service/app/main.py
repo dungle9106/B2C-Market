@@ -16,6 +16,7 @@
   POST /risk/{churn|fraud}/score    {items: [{id, features}]} -> probability, main factors (+ how unusual, fraud)
   GET  /vision/status        whether the photo -> category model is trained, its test scores
   POST /vision/category      {image: base64} -> the most likely categories and industries of a product photo
+  POST /vision/embed         {image: base64} -> the photo's MobileNetV2 vector (image search) and likely categories
   POST /reload               reads the model files again (after training with train_from_db.py)
 
 Run:  uvicorn app.main:app --port 8000      (the backend calls it when REVIEW_AI_URL=http://localhost:8000)
@@ -281,3 +282,24 @@ def vision_category(req: PhotoRequest):
         return vision.predict(data, req.k)
     except Exception as e:
         raise HTTPException(status_code=400, detail="không đọc được ảnh: " + str(e)[:200])
+
+
+class EmbedRequest(BaseModel):
+    image: str = Field(max_length=15_000_000)
+    categories: int = Field(default=0, ge=0, le=50)  # also the k most likely categories (needs the trained model)
+
+
+@app.post("/vision/embed")
+def vision_embed(req: EmbedRequest):
+    """For image search: the photo's 1280 MobileNetV2 numbers (base64 float32, length 1) and, optionally,
+    the categories it most likely belongs to."""
+    import base64
+    try:
+        data = base64.b64decode(req.image.split(",")[-1])
+        vec = vision.embed([data])[0].astype("<f4")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="không đọc được ảnh: " + str(e)[:200])
+    out = {"embedding": base64.b64encode(vec.tobytes()).decode(), "dim": int(vec.shape[0]), "categories": []}
+    if req.categories:
+        out["categories"] = vision.predict(data, req.categories, vec).get("categories", [])
+    return out

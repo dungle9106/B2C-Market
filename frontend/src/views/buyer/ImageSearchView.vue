@@ -18,7 +18,8 @@
               <router-link :to="{ name: 'search', query: { q: result.description } }" class="tw-ml-2 tw-text-[#2673dd]">Tìm theo mô tả này ›</router-link>
             </p>
             <p v-else class="tw-my-1 tw-text-sm tw-text-neutral-500">
-              So sánh theo màu sắc và hình dáng với {{ result.indexed }} ảnh sản phẩm.
+              <template v-if="result.engine?.includes('MOBILENET')">AI thị giác máy tính (MobileNetV2) so sánh với {{ result.indexed }} ảnh sản phẩm.</template>
+              <template v-else>So sánh theo màu sắc và hình dáng với {{ result.indexed }} ảnh sản phẩm.</template>
               <template v-if="!auth.isLoggedIn"> <router-link :to="{ name: 'login', query: { redirect: '/search/image' } }">Đăng nhập</router-link> để AI nhận diện sản phẩm chính xác hơn.</template>
             </p>
             <div v-if="result.keywords?.length" class="tw-flex tw-flex-wrap tw-gap-1.5">

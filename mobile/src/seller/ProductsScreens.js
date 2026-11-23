@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { get, post, put, patch, del, upload, errorText } from '../api'
 import { formatVnd } from '../format'
 import { Badge, Button, C, Empty, Field, Img, Loading, Row, Select, styles, Tabs, useLoad } from '../ui'
+import { PriceSuggestion } from './ReportScreens'
 
 const TABS = [{ key: 'ALL', label: 'Tất cả' }, { key: 'ACTIVE', label: 'Đang bán' }, { key: 'OUT', label: 'Hết hàng' }, { key: 'HIDDEN', label: 'Đã ẩn' }]
 const MODERATION = { PENDING: 'Chờ duyệt', REJECTED: 'Bị từ chối', REMOVED: 'Vi phạm' }
@@ -48,6 +49,10 @@ export default function SellerProductsScreen({ navigation }) {
                         </View>
                       </Pressable>
                       <Row style={{ gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                        <Button small kind="ghost" title="Nhân bản" onPress={() => run(async () => {
+                          const copy = await post(`/seller/products/${p.id}/duplicate`)
+                          if (copy?.id) navigation.navigate('ProductForm', { id: copy.id })
+                        })} />
                         <Button small kind="ghost" title="Kho hàng" onPress={() => navigation.navigate('ProductForm', { id: p.id })} />
                         <Button small kind="ghost" title={p.active ? 'Ẩn' : 'Hiện'} onPress={() => run(() => patch(`/seller/products/${p.id}/toggle-active`))} />
                         <Button small kind="danger" title="Xóa" onPress={() => remove(p)} />
@@ -92,6 +97,21 @@ export function ProductFormScreen({ route, navigation }) {
     if (id) get(`/seller/products/${id}`).then(p => setF({ ...toRequest(p), price: String(p.basePrice ?? p.price), originalPrice: p.listPrice ? String(p.listPrice) : '', stock: String(p.stock), moderationReason: p.moderationReason, moderationStatus: p.moderationStatus }))
       .catch(e => Alert.alert('Lỗi', errorText(e)))
   }, [id, navigation])
+
+  // computer vision (as on the web): the categories the cover photo looks like, MobileNetV2 + a classifier trained on
+  // Shoppi's product photos. Only a suggestion: the seller taps one or picks another.
+  const cover = f?.imageUrls?.[0]
+  const [vision, setVision] = useState({ for: null, items: [], busy: false })
+  useEffect(() => {
+    if (!cover || cover === vision.for) { if (!cover && vision.items.length) setVision({ for: null, items: [], busy: false }); return }
+    let live = true
+    setVision({ for: cover, items: [], busy: true })
+    post('/seller/ai/category-from-image', { imageUrl: cover })
+      .then(r => { if (live) setVision({ for: cover, items: r.items || [], busy: false }) })
+      .catch(() => { if (live) setVision({ for: cover, items: [], busy: false }) })
+    return () => { live = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cover])
 
   if (!f) return <Loading />
 
@@ -165,6 +185,21 @@ export function ProductFormScreen({ route, navigation }) {
       <View style={styles.card}>
         <Field label="Tên sản phẩm" value={f.name} onChangeText={set('name')} maxLength={200} />
         <Select label="Ngành hàng" value={f.categoryId} options={categories} onChange={set('categoryId')} placeholder="Chọn ngành hàng" />
+        {vision.busy || vision.items.length ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: -4, marginBottom: 10 }}>
+            <Text style={{ fontSize: 12, color: C.muted }}>📷 AI nhận diện từ ảnh bìa:</Text>
+            {vision.busy ? <Text style={{ fontSize: 12, color: C.faint }}>đang xem ảnh...</Text> : null}
+            {vision.items.map(v => {
+              const chosen = f.categoryId === v.categoryId
+              return (
+                <Pressable key={v.categoryId} onPress={() => set('categoryId')(v.categoryId)}
+                           style={{ borderWidth: 1, borderColor: chosen ? C.primary : C.border, backgroundColor: chosen ? C.primarySoft : 'white', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 12, color: chosen ? C.primary : C.text }}>{v.path} · {Math.round(v.probability * 100)}%</Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        ) : null}
         <Row style={{ justifyContent: 'space-between' }}>
           <Text style={styles.label}>Mô tả sản phẩm</Text>
           <Text onPress={aiDescription} style={{ color: C.primary, marginBottom: 4 }}>{aiBusy ? 'AI đang viết...' : '✨ AI viết mô tả'}</Text>
@@ -172,6 +207,7 @@ export function ProductFormScreen({ route, navigation }) {
         <Field value={f.description || ''} onChangeText={set('description')} multiline />
       </View>
       <View style={styles.card}>
+        <PriceSuggestion name={f.name} categoryId={f.categoryId} onApply={set('price')} />
         <Row style={{ gap: 10 }}>
           <Field label="Giá bán (₫)" value={f.price} onChangeText={set('price')} keyboardType="number-pad" style={{ flex: 1 }} />
           <Field label="Giá gốc (nếu giảm giá)" value={f.originalPrice} onChangeText={set('originalPrice')} keyboardType="number-pad" style={{ flex: 1 }} />
