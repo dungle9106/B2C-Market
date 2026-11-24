@@ -8,7 +8,23 @@
       </div>
     </div>
 
-    <div v-else-if="product" class="container page">
+    <!-- still loading: the shape of the page (gallery + title, price, buttons) -->
+    <div v-else-if="!product" class="container page" aria-busy="true">
+      <div class="content-block pd-skel">
+        <div class="sk pd-skel-img"></div>
+        <div class="pd-skel-info">
+          <div class="sk" style="height: 22px; width: 90%"></div>
+          <div class="sk" style="height: 22px; width: 55%"></div>
+          <div class="sk" style="height: 14px; width: 40%"></div>
+          <div class="sk" style="height: 64px"></div>
+          <div class="sk" style="height: 14px; width: 70%"></div>
+          <div class="sk" style="height: 14px; width: 60%"></div>
+          <div class="pd-skel-btns"><div class="sk"></div><div class="sk"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="container page">
       <!-- breadcrumb -->
       <nav class="breadcrumb" aria-label="Breadcrumb">
         <router-link to="/">Shoppi</router-link>
@@ -23,9 +39,10 @@
       <div class="detail-card">
         <!-- ===== gallery: video first (if any), then images ===== -->
         <div class="gallery">
-          <div class="main-media">
+          <div class="main-media" :class="{ zooming: !!zoom }">
             <video v-if="current && current.type === 'video'" :src="current.url" controls playsinline></video>
-            <img v-else :src="variantImage || (current ? current.url : placeholder)" :alt="product.name" />
+            <img v-else :src="variantImage || (current ? current.url : placeholder)" :alt="product.name"
+                 :style="zoom ? { transform: 'scale(2)', transformOrigin: zoom } : null" @mousemove="onZoom" @mouseleave="zoom = null" />
             <span v-if="product.discountPercent" class="discount-badge">-{{ product.discountPercent }}%</span>
           </div>
           <div v-if="media.length > 1" class="thumbs">
@@ -44,6 +61,7 @@
               <span v-if="m.type === 'video'" class="play">▶</span>
             </button>
           </div>
+          <div class="gallery-actions"><LikeButton :product-id="product.id" /><PriceWatchButton v-if="!auth.isSeller && !auth.isAdmin" :product-id="product.id" :price="Number(product.price)" /></div>
         </div>
 
         <!-- ===== info ===== -->
@@ -96,8 +114,27 @@
               <div v-if="product.freeShipping" class="freeship">
                 <span class="freeship-tag">Freeship</span> Miễn phí vận chuyển
               </div>
-              <div v-else>Phí vận chuyển <strong>{{ formatVnd(20000) }}</strong></div>
-              <div v-if="product.province" class="text-muted small">Gửi từ {{ product.province }}</div>
+              <div class="ship-to">
+                <span class="text-muted">Vận chuyển tới</span>
+                <select v-model="shipTo" class="ship-select" aria-label="Tỉnh/thành nhận hàng" @change="onShipTo">
+                  <option v-for="p in PROVINCES" :key="p" :value="p">{{ p }}</option>
+                </select>
+              </div>
+              <div v-if="shipBest" class="ship-best">
+                Phí vận chuyển
+                <s v-if="shipBest.feeToPay < shipBest.fee" class="text-muted">{{ formatVnd(shipBest.fee) }}</s>
+                <strong>{{ formatVnd(shipBest.feeToPay) }}</strong>
+                · Nhận hàng {{ shipDay(shipBest.etaFrom) }} – {{ shipDay(shipBest.etaTo) }}
+                <button v-if="shipChoices.length > 1" type="button" class="ship-more" @click="showAllShip = !showAllShip">
+                  {{ showAllShip ? 'Thu gọn' : 'Giao nhanh hơn' }}
+                </button>
+              </div>
+              <ul v-if="showAllShip && shipping" class="ship-list">
+                <li v-for="o in shipChoices" :key="o.methodName">
+                  {{ o.carrierName }} – {{ o.methodName }}: <strong>{{ formatVnd(o.feeToPay) }}</strong> · {{ shipDay(o.etaFrom) }} – {{ shipDay(o.etaTo) }}
+                </li>
+              </ul>
+              <div v-if="product.province" class="text-muted small">Gửi từ {{ product.province }} · phí ước tính, chốt ở bước thanh toán</div>
               <div v-if="shopInfo?.freeShipMinOrder" class="small freeship-shop">Shop miễn phí vận chuyển cho đơn từ {{ formatVnd(shopInfo.freeShipMinOrder) }}</div>
             </dd>
 
@@ -176,6 +213,10 @@
         </div>
       </div>
 
+      <router-link v-if="videoCount" :to="{ name: 'videos', query: { product: product.id } }" class="content-block video-link">
+        ▶ Xem {{ videoCount }} video về sản phẩm này trên Shoppi Video
+      </router-link>
+
       <!-- ===== shop ===== -->
       <div class="content-block shop-row">
         <div class="shop-avatar">
@@ -184,8 +225,10 @@
         </div>
         <div class="shop-meta">
           <router-link :to="{ name: 'shop', params: { id: product.shopId } }" class="shop-name">
+            <span v-if="product.shopMall" class="mall-badge">Mall</span>
             {{ product.shopName }}
             <span v-if="shopInfo?.verified" class="verified-badge" title="Shop đã được Shoppi xác minh giấy tờ">✓ Đã xác minh</span>
+            <span v-if="shopInfo?.favorite" class="fav-badge" title="Shop đạt tiêu chí Shop Yêu Thích của Shoppi">Yêu thích</span>
           </router-link>
           <div class="text-faint small">
             <span v-if="product.shopRating">★ {{ product.shopRating.toFixed(1) }} đánh giá shop ({{ product.shopRatingCount }})</span>
@@ -198,10 +241,38 @@
         </div>
         <!-- guests are sent to login and come back to the chat (route guard) -->
         <button v-if="!auth.isSeller && !auth.isAdmin" type="button" class="btn sm chat-btn" @click="openChat">💬 Chat ngay</button>
+        <FollowButton :shop-id="product.shopId" />
         <router-link :to="{ name: 'shop', params: { id: product.shopId } }" class="btn secondary sm">Xem Shop</router-link>
       </div>
 
       <!-- ===== combo deals ("Mua 2 giam 5%") ===== -->
+      <!-- ===== "Mua kem deal soc" / gifts unlocked by this product ===== -->
+      <section v-for="d in addOnDeals" :key="'deal' + d.id" class="content-block combo-block deal-block">
+        <div class="combo-head">
+          <span class="combo-tag">{{ d.type === 'GIFT' ? 'Mua để nhận quà' : 'Mua kèm deal sốc' }}</span>
+          <strong>{{ d.name }}</strong>
+        </div>
+        <p class="small text-muted">
+          <template v-if="d.type === 'GIFT'">Mua sản phẩm này{{ d.minSpend > 0 ? ` từ ${formatVnd(d.minSpend)}` : '' }} để được tặng quà dưới đây (thêm quà vào giỏ, quà được miễn phí khi thanh toán).</template>
+          <template v-else>Mua kèm sản phẩm này để được giá sốc, tối đa {{ d.purchaseLimit }} mỗi loại trong một đơn — giá tự động áp dụng khi thanh toán.</template>
+        </p>
+        <div class="deal-items">
+          <div v-for="it in d.items" :key="it.product.id" class="deal-item">
+            <router-link :to="{ name: 'product-detail', params: { id: it.product.id } }" class="deal-img">
+              <img :src="it.product.thumbnailUrl || placeholder" alt="" />
+            </router-link>
+            <div class="deal-info">
+              <router-link :to="{ name: 'product-detail', params: { id: it.product.id } }" class="deal-name">{{ it.product.name }}</router-link>
+              <div><span class="deal-price">{{ Number(it.dealPrice) > 0 ? formatVnd(it.dealPrice) : 'Miễn phí' }}</span> <s class="text-faint small">{{ formatVnd(it.product.price) }}</s></div>
+              <button v-if="!it.hasVariants" type="button" class="btn sm secondary" :disabled="busy" @click="addDealItem(it)">
+                {{ addedDeal === it.product.id ? '✓ Đã thêm' : d.type === 'GIFT' ? 'Nhận quà' : 'Thêm vào giỏ' }}
+              </button>
+              <router-link v-else :to="{ name: 'product-detail', params: { id: it.product.id } }" class="btn sm secondary">Chọn phân loại</router-link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section v-for="c in combos" :key="c.id" class="content-block combo-block">
         <div class="combo-head">
           <span class="combo-tag">Combo khuyến mãi</span>
@@ -273,6 +344,9 @@
 </template>
 
 <script setup>
+import LikeButton from '../../components/LikeButton.vue'
+import PriceWatchButton from '../../components/PriceWatchButton.vue'
+import FollowButton from '../../components/FollowButton.vue'
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '../../components/AppHeader.vue'
@@ -281,9 +355,12 @@ import StarRating from '../../components/StarRating.vue'
 import ProductReviews from '../../components/product/ProductReviews.vue'
 import ReportProductButton from '../../components/product/ReportProductButton.vue'
 import ProductQuestions from '../../components/product/ProductQuestions.vue'
-import { getProduct, similarProducts, getCategory } from '../../api/products'
+import { getProduct, similarProducts, getCategory, productShipping } from '../../api/products'
+import { myAddresses } from '../../api/orders'
+import { PROVINCES } from '../../utils/provinces'
+import { videoFeed } from '../../api/videos'
 import { getMyShop, publicShop } from '../../api/shop'
-import { productCombos } from '../../api/marketing'
+import { productCombos, productAddOnDeals } from '../../api/marketing'
 import ShopVoucherStrip from '../../components/ShopVoucherStrip.vue'
 import ProductChatPopup from '../../components/chat/ProductChatPopup.vue'
 import { useAuthStore } from '../../stores/auth'
@@ -296,12 +373,69 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const cart = useCartStore()
+const addOnDeals = ref([])
+const addedDeal = ref(null)
+// an add-on item / gift goes in the cart as usual; its deal price is applied at checkout next to a main product
+async function addDealItem(it) {
+  if (!auth.isLoggedIn) return router.push({ name: 'login', query: { redirect: route.fullPath } })
+  try {
+    await cart.add(it.product.id, 1, null)
+    addedDeal.value = it.product.id
+  } catch (e) {
+    actionError.value = extractError(e)
+  }
+}
 
 const product = ref(null)
 const notFound = ref(false)
 const similar = ref([])
 const categoryPath = ref([])
 const myShopId = ref(null)
+const videoCount = ref(0)
+
+// ---- image zoom (mouse only): the picture follows the pointer at 2x ----
+const zoom = ref(null)
+const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches
+function onZoom(e) {
+  if (!canHover) return
+  const r = e.currentTarget.getBoundingClientRect()
+  zoom.value = `${((e.clientX - r.left) / r.width) * 100}% ${((e.clientY - r.top) / r.height) * 100}%`
+}
+
+// ---- "Van chuyen toi": an estimate to the buyer's province (their default address, else the last one picked) ----
+const SHIP_KEY = 'shoppi.shipTo'
+const shipping = ref(null)
+const showAllShip = ref(false)
+const shipTo = ref((() => { try { return localStorage.getItem(SHIP_KEY) } catch { return null } })() || 'TP. Hồ Chí Minh')
+const shipBest = computed(() => shipping.value?.options?.[0] || null)
+// the cheapest carrier for each kind of delivery (economy, fast, same day), not every carrier
+const shipChoices = computed(() => {
+  const seen = new Set()
+  return (shipping.value?.options || []).filter(o => !seen.has(o.methodName) && seen.add(o.methodName))
+})
+const shipDay = (d) => { const [, m, day] = String(d).split('-'); return day + '/' + m }
+let shipAddressChecked = false
+async function loadShipping() {
+  if (!product.value) return
+  if (!shipAddressChecked && auth.isBuyer) {
+    shipAddressChecked = true
+    try {
+      const { data } = await myAddresses()
+      const home = data.find(a => a.default) || data[0]
+      if (home?.province && PROVINCES.includes(home.province)) shipTo.value = home.province
+    } catch { /* keep the remembered province */ }
+  }
+  try {
+    shipping.value = (await productShipping(product.value.id, shipTo.value)).data
+  } catch {
+    shipping.value = null
+  }
+}
+function onShipTo() {
+  try { localStorage.setItem(SHIP_KEY, shipTo.value) } catch { /* per-browser convenience only */ }
+  showAllShip.value = false
+  loadShipping()
+}
 const shopInfo = ref(null) // verified badge + shop policies
 const combos = ref([])
 const quantity = ref(1)
@@ -452,11 +586,16 @@ async function load(id) {
   }
   window.scrollTo({ top: 0 })
 
+  videoCount.value = 0
+  loadShipping()
+  videoFeed({ productId: id, size: 1 }).then(({ data }) => { videoCount.value = data.totalItems }).catch(() => {})
   similarProducts(id).then(({ data }) => { similar.value = data }).catch(() => { similar.value = [] })
   shopInfo.value = null
   publicShop(product.value.shopId).then(({ data }) => { shopInfo.value = data }).catch(() => {})
   combos.value = []
   productCombos(id).then(({ data }) => { combos.value = data }).catch(() => {})
+  addOnDeals.value = []
+  productAddOnDeals(id).then(({ data }) => { addOnDeals.value = data }).catch(() => {})
   categoryPath.value = []
   if (product.value.categoryId) {
     getCategory(product.value.categoryId).then(({ data }) => { categoryPath.value = data.path }).catch(() => {})
@@ -480,8 +619,18 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 
 .main-media { position: relative; aspect-ratio: 1; background: #f5f5f5; }
 .main-media img, .main-media video { width: 100%; height: 100%; object-fit: contain; background: #000; }
-.main-media img { background: #f5f5f5; }
+.main-media img { background: #f5f5f5; transition: transform 0.08s; }
+.main-media { overflow: hidden; }
+.main-media.zooming img { cursor: zoom-in; transition: none; }
+.ship-to { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.ship-select { width: auto; margin: 0; padding: 3px 6px; font-size: 13px; }
+.ship-best { margin-top: 6px; }
+.ship-best s { margin-right: 2px; }
+.ship-more { background: none; border: none; color: #2673dd; cursor: pointer; font-size: 13px; padding: 0 0 0 6px; }
+.ship-list { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--color-text-muted); }
 .discount-badge { position: absolute; top: 0; right: 0; background: #ffe97a; color: var(--color-primary); font-weight: 700; padding: 4px 8px; }
+.fav-badge { background: var(--color-primary); color: white; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 2px; margin-left: 6px; }
+.gallery-actions { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin-top: 12px; }
 .thumbs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 8px; }
 .thumb { position: relative; aspect-ratio: 1; padding: 0; border: 2px solid transparent; background: #f5f5f5; cursor: pointer; overflow: hidden; }
 .thumb.active { border-color: var(--color-primary); }
@@ -505,6 +654,12 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 .quota-limit { color: var(--color-text-muted); }
 .voucher-strip { margin: 14px 0 4px; }
 .combo-block { border-left: 3px solid var(--color-primary); }
+.deal-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-top: 8px; }
+.deal-item { display: flex; gap: 10px; border: 1px solid var(--color-border); border-radius: 4px; padding: 8px; }
+.deal-img img { width: 72px; height: 72px; object-fit: cover; border-radius: 2px; }
+.deal-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; align-items: flex-start; }
+.deal-name { color: var(--color-text); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
+.deal-price { color: var(--color-primary); font-weight: 600; }
 .combo-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .combo-tag { background: var(--color-primary); color: white; font-size: 12px; padding: 2px 8px; border-radius: 2px; }
 .combo-tier { border: 1px dashed var(--color-primary); color: var(--color-primary); font-size: 12px; padding: 2px 8px; border-radius: 2px; background: var(--color-primary-light); }
@@ -563,6 +718,12 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 
 .not-found { text-align: center; padding: 60px; margin-top: 16px; }
 
+.pd-skel { display: grid; grid-template-columns: 450px 1fr; gap: 24px; }
+.pd-skel-img { aspect-ratio: 1; }
+.pd-skel-info { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
+.pd-skel-btns { display: flex; gap: 12px; margin-top: 12px; }
+.pd-skel-btns .sk { height: 46px; width: 180px; }
+@media (max-width: 760px) { .pd-skel { grid-template-columns: 1fr; } }
 .toast { position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background: rgba(0, 0, 0, 0.75); color: white; padding: 28px 32px; border-radius: 4px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .toast-icon { width: 52px; height: 52px; border-radius: 50%; background: #00bfa5; display: flex; align-items: center; justify-content: center; font-size: 26px; }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
@@ -575,4 +736,6 @@ watch(() => route.params.id, (id) => { if (id) load(id) }, { immediate: true })
 }
 .resp { color: var(--color-primary); font-weight: 500; }
 .report { margin-left: auto; }
+.mall-badge { background: #d0011b; color: white; font-size: 11px; padding: 0 4px; border-radius: 2px; margin-right: 4px; }
+.video-link { display: block; color: var(--color-primary); font-weight: 500; }
 </style>

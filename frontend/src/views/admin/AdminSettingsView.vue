@@ -55,6 +55,13 @@
           </div>
           <div class="num"><input v-model.number="ops.disputeResponseHours" type="number" min="12" max="168" /> giờ</div>
         </div>
+        <div class="row-setting">
+          <div>
+            <strong>Ngân sách Vòng quay may mắn</strong>
+            <p>Tổng Shoppi Xu vòng quay được phát mỗi ngày cho mọi người mua. Khi gần hết, giải Xu lớn tự đổi sang giải nhỏ hơn; 0 = chỉ còn voucher và "chúc may mắn".</p>
+          </div>
+          <div class="num"><input v-model.number="ops.spinDailyBudget" type="number" min="0" max="10000000" step="1000" /> Xu/ngày</div>
+        </div>
         <div class="actions">
           <span v-if="msg.ops" class="ok">{{ msg.ops }}</span>
           <button type="button" class="btn sm" :disabled="saving" @click="saveOps">Lưu</button>
@@ -132,7 +139,7 @@ import { extractError } from '../../utils/apiError'
 const settings = ref(null)
 const roots = ref([])
 const fees = ref({ commissionPercent: 5, categoryCommission: {}, settlementHoldDays: 3 })
-const ops = ref({ paymentWindowMinutes: 15, disputeResponseHours: 48 })
+const ops = ref({ paymentWindowMinutes: 15, disputeResponseHours: 48, spinDailyBudget: 100000 })
 const sec = ref({})
 const keywordText = ref('')
 const saving = ref(false)
@@ -148,7 +155,7 @@ function fill(s) {
   const cats = {}
   roots.value.forEach(c => { cats[c.id] = s.categoryCommission[c.id] != null ? Number(s.categoryCommission[c.id]) : '' })
   fees.value = { commissionPercent: Number(s.commissionPercent), categoryCommission: cats, settlementHoldDays: s.settlementHoldDays }
-  ops.value = { paymentWindowMinutes: s.paymentWindowMinutes, disputeResponseHours: s.disputeResponseHours }
+  ops.value = { paymentWindowMinutes: s.paymentWindowMinutes, disputeResponseHours: s.disputeResponseHours, spinDailyBudget: s.spinDailyBudget }
   sec.value = { maxFailedLogins: s.maxFailedLogins, lockMinutes: s.lockMinutes, ipFailLimit: s.ipFailLimit, registerPerIp: s.registerPerIp,
     requireAdmin2fa: s.requireAdmin2fa }
 }

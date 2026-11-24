@@ -1,55 +1,40 @@
 package com.marketplace.backend.controller;
 
 import com.marketplace.backend.dto.response.ProductResponse;
-import com.marketplace.backend.entity.ViewHistory;
-import com.marketplace.backend.repository.ProductRepository;
-import com.marketplace.backend.repository.ViewHistoryRepository;
 import com.marketplace.backend.security.CurrentUser;
+import com.marketplace.backend.service.reco.RecommendationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.Map;
 
-// Rule-based "Co the ban thich" feed: recently viewed products + same-category
-// products, deduplicated. No ML model is trained here - see the recommendation
-// pipeline note in ProductService.recommendSimilar for the same technique.
+// "Co the ban thich": the recommendation model trained on buyers' behaviour (RecommendationService), with the old
+// rules (same category as the recently viewed products, best sellers) when the model can't answer.
 @RestController
-@RequestMapping("/api/buyer/recommendations")
 @RequiredArgsConstructor
 public class RecommendationController {
 
-    private final ViewHistoryRepository viewHistoryRepository;
-    private final ProductRepository productRepository;
+    private final RecommendationService recommendationService;
 
-    @Transactional(readOnly = true) // touches lazy product/category/shop
-    @GetMapping("/for-you")
+    @GetMapping("/api/buyer/recommendations/for-you")
     public ResponseEntity<List<ProductResponse>> forYou() {
-        List<ViewHistory> recentViews = viewHistoryRepository.findTop10ByUserIdOrderByViewedAtDesc(CurrentUser.id());
+        return ResponseEntity.ok(recommendationService.forUser(CurrentUser.id()));
+    }
 
-        Set<ProductResponse> results = new LinkedHashSet<>();
-        for (ViewHistory view : recentViews) {
-            Long categoryId = view.getProduct().getCategory() != null ? view.getProduct().getCategory().getId() : null;
-            if (categoryId == null) continue;
-            productRepository.findSimilarByCategory(categoryId, view.getProduct().getId())
-                    .stream().limit(4)
-                    .map(ProductResponse::from)
-                    .forEach(results::add);
-            if (results.size() >= 12) break;
+    // admin "Mo hinh goi y": what the model learned from and how well it does on held-out data
+    @GetMapping("/api/admin/reco/status")
+    public ResponseEntity<Map<String, Object>> status() {
+        return ResponseEntity.ok(recommendationService.status());
+    }
+
+    @PostMapping("/api/admin/reco/train")
+    public ResponseEntity<Map<String, Object>> train() {
+        try {
+            return ResponseEntity.ok(recommendationService.train());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
-
-        if (results.isEmpty()) {
-            // cold start: no view history yet -> just show best sellers
-            productRepository.findTop10ByActiveTrueOrderBySoldCountDesc()
-                    .forEach(p -> results.add(ProductResponse.from(p)));
-        }
-
-        return ResponseEntity.ok(results.stream().limit(12).collect(Collectors.toList()));
     }
 }

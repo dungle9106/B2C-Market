@@ -94,6 +94,7 @@ public class ReviewHubService {
     public void onReviewWritten(ReviewHubEvents.ReviewWritten e) {
         try {
             reviewRepository.findById(e.reviewId()).ifPresent(r -> {
+                lockShop(r.getProduct().getShop().getId());
                 if (repository.findByReviewId(r.getId()).isPresent()) return;
                 ReviewHubItem i = repository.save(fromReview(r));
                 refreshShop(i.getShopId());
@@ -222,6 +223,7 @@ public class ReviewHubService {
         if (added > 0) {
             refreshShop(shop.getId());
             checkRecurring(shop);
+            alertUrgentImported(shop, source, batch);
         }
         auditless(shop, source, added, origin);
         return AdminMap.of("source", source.name(), "batch", batch, "rows", rows.size(), "added", added, "duplicates", duplicates,
@@ -270,7 +272,17 @@ public class ReviewHubService {
     }
 
     // the FastAPI service's reading of the new items, then priorities and anomaly signals for the whole shop
+    /**
+     * One writer per shop at a time (until the transaction ends). Each new review re-scores the shop's recent items;
+     * two reviews of one shop arriving together would otherwise update the same rows in a different order, and
+     * PostgreSQL would abort one of them (deadlock) - that review would then be missing from the hub.
+     */
+    private void lockShop(Long shopId) {
+        repository.lockShop(shopId);
+    }
+
     void refreshShop(Long shopId) {
+        lockShop(shopId);
         List<ReviewHubItem> recent = repository.since(shopId, LocalDateTime.now().minusDays(ANOMALY_WINDOW_DAYS));
         if (ai.serviceAvailable()) {
             List<ReviewHubItem> fresh = recent.stream().filter(i -> "RULE".equals(i.getAnalyzedBy()) && i.getContent() != null && !i.isIssuesManual()).toList();
@@ -355,6 +367,20 @@ public class ReviewHubService {
                 ReviewTextAnalyzer.cut(Objects.requireNonNullElse(i.getIssueSummary(), Objects.requireNonNullElse(i.getContent(), "")), 160)
                         + " · Hạn trả lời: " + i.getReplyDueAt().toLocalTime().withNano(0) + " " + i.getReplyDueAt().toLocalDate(),
                 "/seller/review-hub?item=" + i.getId());
+    }
+
+    // one alert per import, however many reviews the file holds, opening the most urgent one
+    private void alertUrgentImported(Shop shop, Source source, String batch) {
+        List<ReviewHubItem> urgent = repository.findByShopIdAndImportBatchAndPriorityLevelAndStatus(shop.getId(), batch, Level.URGENT, Status.NEW);
+        if (urgent.isEmpty()) return;
+        if (urgent.size() == 1) {
+            alertIfUrgent(urgent.get(0), shop);
+            return;
+        }
+        ReviewHubItem top = urgent.stream().max(Comparator.comparingInt(ReviewHubItem::getPriority)).orElseThrow();
+        notificationService.notify(shop.getSeller().getId(), NotificationType.SYSTEM, urgent.size() + " đánh giá cần trả lời gấp từ " + source.name(),
+                ReviewTextAnalyzer.cut(Objects.requireNonNullElse(top.getIssueSummary(), Objects.requireNonNullElse(top.getContent(), "")), 160),
+                "/seller/review-hub?item=" + top.getId());
     }
 
     /** A complaint repeating on one product (3+ in 14 days, more than the 14 days before): tell the seller once. */
@@ -784,10 +810,12 @@ public class ReviewHubService {
         return m;
     }
 
-    /** Trains the FastAPI service's classifier on the reviews labelled by sellers and by the LLM. */
+    /**
+     * Trains the FastAPI service's classifier on the reviews labelled by sellers and by the LLM, on top of the
+     * service's own base set of labelled reviews (review-ai-service/app/review_data.py): it works from zero corrections.
+     */
     public Map<String, Object> train() {
         List<ReviewHubItem> labelled = repository.labeled();
-        if (labelled.size() < 20) throw bad("Cần ít nhất 20 đánh giá đã gán nhãn (do AI hoặc người bán sửa), hiện có " + labelled.size());
         try {
             Map<String, Object> r = ai.train(labelled);
             auditService.log("TRAIN_REVIEW_MODEL", "SETTING", null, "Mô hình phân loại đánh giá", "Huấn luyện trên " + labelled.size() + " đánh giá");

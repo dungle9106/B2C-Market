@@ -40,5 +40,6 @@ export const SELLER_CANCEL_REASONS = [
 // ---- refunds & disputes ----
 export const REFUND_STATUS = { PENDING: 'Chờ chuyển khoản', COMPLETED: 'Đã hoàn tiền', FAILED: 'Thất bại' }
 export const REFUND_SOURCE = { ORDER_CANCELLED: 'Hủy đơn', RETURN: 'Trả hàng/Hoàn tiền', DISPUTE: 'Giải quyết khiếu nại', ADMIN: 'Shoppi hoàn thủ công' }
+export const RISK_LEVEL = { LOW: 'Rủi ro thấp', MEDIUM: 'Rủi ro trung bình', HIGH: 'Rủi ro cao' }
 export const REFUND_CHANNEL = { ORIGINAL_METHOD: 'Về phương thức thanh toán ban đầu', BANK_TRANSFER: 'Chuyển khoản ngân hàng' }
 export const DISPUTE_DECISION = { REFUND_FULL: 'Hoàn toàn bộ', REFUND_PARTIAL: 'Hoàn một phần', REJECT: 'Không hoàn tiền' }

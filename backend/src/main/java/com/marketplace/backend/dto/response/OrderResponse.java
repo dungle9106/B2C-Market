@@ -23,6 +23,9 @@ public class OrderResponse {
     private BigDecimal discount;          // shopDiscount + platformDiscount
     private BigDecimal shopDiscount;
     private BigDecimal platformDiscount;
+    private BigDecimal coinDiscount;      // Shoppi Xu used
+    private Integer coinsToEarn;
+    private boolean coinsAwarded;
     private BigDecimal comboDiscount;
     private BigDecimal shippingFee;
     private BigDecimal shippingDiscount;
@@ -131,6 +134,9 @@ public class OrderResponse {
         r.setDiscount(order.getDiscount());
         r.setShopDiscount(order.getShopDiscount());
         r.setPlatformDiscount(order.getPlatformDiscount());
+        r.setCoinDiscount(order.getCoinDiscount());
+        r.setCoinsToEarn(order.getCoinsToEarn());
+        r.setCoinsAwarded(order.getCoinsAwardedAt() != null);
         r.setComboDiscount(order.getComboDiscount());
         r.setShippingFee(order.getShippingFee());
         r.setShippingDiscount(order.getShippingDiscount());

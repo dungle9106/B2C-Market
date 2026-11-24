@@ -160,6 +160,7 @@ const menu = [
       { label: 'Thêm Sản Phẩm', to: { name: 'seller-product-new' } },
       { label: 'Đăng Hàng Loạt (Excel)', to: { name: 'seller-product-import' } },
       { label: 'Quản Lý Tồn Kho', to: { name: 'seller-inventory' } },
+      { label: 'Dự Báo Nhập Hàng (AI)', to: { name: 'seller-stock-forecast' } },
       { label: 'Danh Mục Của Shop', to: { name: 'seller-categories' } }
     ]
   },
@@ -171,7 +172,9 @@ const menu = [
       { label: 'Flash Sale Của Shop', to: { name: 'seller-flash-sale' } },
       { label: 'Flash Sale Của Shoppi', to: { name: 'seller-flash-events' } },
       { label: 'Combo Khuyến Mãi', to: { name: 'seller-combos' } },
-      { label: 'Quảng Cáo Shoppi', to: { name: 'seller-ads' } }
+      { label: 'Mua Kèm Deal Sốc', to: { name: 'seller-addon-deals' } },
+      { label: 'Quảng Cáo Shoppi', to: { name: 'seller-ads' } },
+      { label: 'Shoppi Video', to: { name: 'seller-videos' } }
     ]
   },
   {
@@ -182,7 +185,8 @@ const menu = [
       { label: 'Hỏi Đáp Doanh Thu', to: { name: 'seller-ai-assistant' } },
       { label: 'Phân Tích Đánh Giá', to: { name: 'seller-ai-reviews' } },
       { label: 'AI Trả Lời & Xử Lý Đánh Giá', to: { name: 'seller-review-hub', query: { tab: 'inbox' } } },
-      { label: 'Gợi Ý Thời Điểm Khuyến Mãi', to: { name: 'seller-ai-promo' } }
+      { label: 'Gợi Ý Thời Điểm Khuyến Mãi', to: { name: 'seller-ai-promo' } },
+      { label: 'Dự Báo Nhập Hàng', to: { name: 'seller-stock-forecast' } }
     ]
   },
   {
@@ -209,6 +213,7 @@ const menu = [
     icon: ICON('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
     items: [
       { label: 'Tổng Quan Shop', to: { name: 'seller-dashboard' } },
+      { label: 'Hiệu Quả Hoạt Động', to: { name: 'seller-performance' } },
       { label: 'Phân Tích Doanh Thu', to: { name: 'seller-analytics-revenue' } },
       { label: 'Sản Phẩm & Tồn Kho', to: { name: 'seller-analytics-products' } },
       { label: 'Lượt Xem & Chuyển Đổi', to: { name: 'seller-analytics-traffic' } },
@@ -272,7 +277,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.sc { min-height: 100vh; background: #f6f6f6; }
+.sc { min-height: var(--vh); background: #f6f6f6; }
 
 /* ---- header ---- */
 .sc-header {
@@ -339,7 +344,7 @@ onBeforeUnmount(() => {
 .sidebar {
   position: sticky; top: 64px;
   width: 232px; flex-shrink: 0;
-  height: calc(100vh - 64px);
+  height: calc(var(--vh) - 64px);
   overflow-y: auto;
   background: var(--color-surface);
   padding: 12px 0 24px;

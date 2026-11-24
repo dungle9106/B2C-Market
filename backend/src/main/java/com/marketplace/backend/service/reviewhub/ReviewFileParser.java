@@ -118,7 +118,7 @@ public final class ReviewFileParser {
 
     public static LocalDateTime time(String v) {
         if (v == null || v.isBlank()) return null;
-        String s = v.trim().replace('T', ' ').replaceAll("\\.\\d+$", "").replaceAll("Z$", "");
+        String s = v.trim().replace('T', ' ').replaceAll("Z$", "").replaceAll("\\.\\d+$", "");   // "Z" first, then the fraction before it
         for (DateTimeFormatter f : DATE_TIMES) {
             try {
                 return LocalDateTime.parse(s.replace(' ', f == DateTimeFormatter.ISO_LOCAL_DATE_TIME ? 'T' : ' '), f);

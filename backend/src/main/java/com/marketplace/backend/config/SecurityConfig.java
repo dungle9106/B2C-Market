@@ -59,7 +59,8 @@ public class SecurityConfig {
                                                    OAuth2LoginSuccessHandler oAuth2SuccessHandler,
                                                    OAuth2LoginFailureHandler oAuth2FailureHandler,
                                                    OAuth2FrontendRedirect frontendRedirect,
-                                                   ClientRegistrationRepository clientRegistrationRepository) throws Exception {
+                                                   ClientRegistrationRepository clientRegistrationRepository,
+                                                   com.marketplace.backend.security.SocialOAuth2UserService socialUserService) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             // the API only returns JSON / files: forbid framing, sniffing and leaking the referrer
@@ -77,13 +78,15 @@ public class SecurityConfig {
             // without this, an anonymous API call would get a 302 to Google's
             // login page (oauth2Login's default entry point) instead of a 401
             .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-            // "Dang nhap voi Google": browser goes to /oauth2/authorization/google,
-            // Google redirects back to /login/oauth2/code/google, Spring Security
+            // "Tiep tuc voi Google/Facebook/GitHub": browser goes to /oauth2/authorization/{provider},
+            // the provider redirects back to /login/oauth2/code/{provider}, Spring Security
             // exchanges the code + loads the profile, then our success handler
             // issues a JWT and redirects to the frontend.
             .oauth2Login(oauth2 -> oauth2
                 .authorizationEndpoint(ep -> ep.authorizationRequestResolver(
                     authorizationRequestResolver(clientRegistrationRepository, frontendRedirect)))
+                // Facebook / GitHub profiles (Google is OpenID Connect and needs nothing extra)
+                .userInfoEndpoint(ui -> ui.userService(socialUserService))
                 .successHandler(oAuth2SuccessHandler)
                 .failureHandler(oAuth2FailureHandler)
             )
@@ -97,12 +100,14 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/shops/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/shops/**", "/api/videos").permitAll()
+                // Shoppi Video views, guests included
+                .requestMatchers(HttpMethod.POST, "/api/videos/*/view").permitAll()
                 // clicks on sponsored search results, guests included
-                .requestMatchers(HttpMethod.POST, "/api/ads/*/click", "/api/banners/*/click").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/ads/*/click", "/api/banners/*/click", "/api/products/image-search").permitAll()
                 // payment gateway callbacks (signature-checked) and the list of available gateways
                 .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/return", "/api/payments/vnpay/ipn", "/api/payments/methods").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/shipping/ghn/webhook").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/shipping/ghn/webhook", "/api/shipping/ghtk/webhook").permitAll()
                 // platform marketing shown to everyone: home banners, programme pages, Shoppi Flash Sale slots
                 .requestMatchers(HttpMethod.GET, "/api/banners", "/api/campaigns/**", "/api/flash-sale/**", "/api/policies/**", "/api/policies").permitAll()
                 // must come before the generic /api/seller/** rule below: a BUYER
@@ -114,15 +119,15 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/shops/**", "/api/admin/verifications/**").hasAuthority("PERM_SHOPS")
                 // a manual refund is a finance action even though it hangs off an order
                 .requestMatchers("/api/admin/orders/*/refund").hasAuthority("PERM_FINANCE")
-                .requestMatchers("/api/admin/complaints/**", "/api/admin/orders/**", "/api/admin/disputes/**").hasAuthority("PERM_ORDERS")
+                .requestMatchers("/api/admin/complaints/**", "/api/admin/orders/**", "/api/admin/disputes/**", "/api/admin/return-risk/**", "/api/admin/fraud/**").hasAuthority("PERM_ORDERS")
                 .requestMatchers("/api/admin/refunds/**", "/api/admin/settlements/**", "/api/admin/reconciliation/**").hasAuthority("PERM_FINANCE")
-                .requestMatchers("/api/admin/vouchers/**", "/api/admin/campaigns/**", "/api/admin/banners/**", "/api/admin/flash-sales/**")
+                .requestMatchers("/api/admin/vouchers/**", "/api/admin/campaigns/**", "/api/admin/banners/**", "/api/admin/flash-sales/**", "/api/admin/churn/**")
                     .hasAuthority("PERM_VOUCHERS")
                 .requestMatchers("/api/admin/support/**").hasAuthority("PERM_SUPPORT")
                 .requestMatchers("/api/admin/broadcasts/**").hasAuthority("PERM_BROADCAST")
                 .requestMatchers("/api/admin/staff/**", "/api/admin/audit/**").hasAuthority("PERM_STAFF")
-                .requestMatchers("/api/admin/products/**", "/api/admin/categories/**").hasAuthority("PERM_PRODUCTS")
-                .requestMatchers("/api/admin/settings/**", "/api/admin/system/**", "/api/admin/policies/**", "/api/admin/review-ai/**").hasAuthority("PERM_SETTINGS")
+                .requestMatchers("/api/admin/products/**", "/api/admin/categories/**", "/api/admin/videos/**").hasAuthority("PERM_PRODUCTS")
+                .requestMatchers("/api/admin/settings/**", "/api/admin/system/**", "/api/admin/policies/**", "/api/admin/review-ai/**", "/api/admin/reco/**").hasAuthority("PERM_SETTINGS")
                 .requestMatchers("/api/admin/analytics/**").hasAuthority("PERM_REPORTS")
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers("/api/buyer/**", "/api/cart/**", "/api/orders/**", "/api/payments/**", "/api/vouchers/**", "/api/ai/**").hasAuthority("ROLE_BUYER")
@@ -142,14 +147,24 @@ public class SecurityConfig {
                 new DefaultOAuth2AuthorizationRequestResolver(clientRegistrationRepository, "/oauth2/authorization");
 
         return new OAuth2AuthorizationRequestResolver() {
+            // a provider that is not set up (or switched off) has no registration: Spring's resolver throws,
+            // we let the request through to SocialLoginUnavailableController, which sends the user back with a message
             @Override
             public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
-                return remember(request, defaultResolver.resolve(request));
+                try {
+                    return remember(request, defaultResolver.resolve(request));
+                } catch (IllegalArgumentException e) {
+                    return null;
+                }
             }
 
             @Override
             public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
-                return remember(request, defaultResolver.resolve(request, clientRegistrationId));
+                try {
+                    return remember(request, defaultResolver.resolve(request, clientRegistrationId));
+                } catch (IllegalArgumentException e) {
+                    return null;
+                }
             }
 
             private OAuth2AuthorizationRequest remember(HttpServletRequest request, OAuth2AuthorizationRequest authRequest) {

@@ -5,7 +5,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
-// A one-time link sent by e-mail (verify the address, reset the password); only its hash is stored.
+// A one-time link sent by e-mail (verify the address, reset the password) or a 6-digit reset code; only a hash is stored.
 @Entity
 @Table(name = "email_tokens", indexes = @Index(name = "idx_email_token_hash", columnList = "token_hash", unique = true))
 @Getter
@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Builder
 public class EmailToken {
 
-    public enum Purpose { VERIFY_EMAIL, RESET_PASSWORD }
+    public enum Purpose { VERIFY_EMAIL, RESET_PASSWORD, RESET_CODE }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,6 +35,9 @@ public class EmailToken {
     private LocalDateTime expiresAt;
 
     private LocalDateTime usedAt;
+
+    // RESET_CODE: wrong codes entered so far (the code is dropped after 5)
+    private Integer attempts;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

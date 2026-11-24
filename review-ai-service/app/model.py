@@ -1,7 +1,8 @@
 """The trainable part: TF-IDF features + one logistic regression per issue (multi-label) and one for sentiment.
 
-Trained on reviews labelled by sellers (their corrections in the review hub) and by the LLM. Small, fast,
-CPU only: a few thousand reviews train in seconds, and classifying costs nothing per call.
+Trained on a base set of labelled Vietnamese reviews (app/review_data.py) plus the reviews labelled by sellers
+(their corrections in the review hub) and by the LLM. Small, fast, CPU only: a few thousand reviews train in
+seconds, and classifying costs nothing per call.
 """
 import os
 import threading
@@ -12,12 +13,12 @@ import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score
-from sklearn.model_selection import train_test_split
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.pipeline import FeatureUnion
 from sklearn.preprocessing import MultiLabelBinarizer
 
 from .lexicon import ISSUES, normalize
+from .review_data import base_set, test_set
 
 MODEL_PATH = os.environ.get("MODEL_PATH", os.path.join(os.path.dirname(__file__), "..", "models", "review_model.joblib"))
 # scipy/scikit-learn version chatter, not a problem
@@ -42,6 +43,12 @@ def sentiment_of(rating: int) -> str:
     return "NEGATIVE" if rating <= 2 else "NEUTRAL" if rating == 3 else "POSITIVE"
 
 
+def reload():
+    global _model
+    with _lock:
+        _model = None
+
+
 def load():
     global _model
     with _lock:
@@ -54,11 +61,13 @@ def info() -> dict:
     m = load()
     if not m:
         return {"trained": False}
-    return {"trained": True, "samples": m["samples"], "labels": m["labels"], "trainedAt": m["trainedAt"], "metrics": m["metrics"]}
+    return {"trained": True, "samples": m["samples"], "own": m.get("own"), "labels": m["labels"], "trainedAt": m["trainedAt"], "metrics": m["metrics"]}
 
 
-def train(items: list[dict]) -> dict:
-    items = [i for i in items if (i.get("content") or "").strip()]
+def train(items: list[dict], with_base: bool = True) -> dict:
+    """items: the platform's labelled reviews. with_base adds the base set, so a few corrections are enough."""
+    own = [i for i in items if (i.get("content") or "").strip()]
+    items = own + (base_set() if with_base else [])
     if len(items) < 20:
         raise ValueError(f"cần ít nhất 20 đánh giá có nội dung, có {len(items)}")
     texts = [_text(i) for i in items]
@@ -69,15 +78,18 @@ def train(items: list[dict]) -> dict:
     y = mlb.fit_transform(labels)
 
     metrics = {}
-    # held-out score when there is enough data (reported to the admin; the final model uses everything)
-    if len(items) >= 40 and y.shape[1] > 0:
-        xt, xv, yt, yv = train_test_split(texts, y, test_size=0.2, random_state=42)
+    # score reported to the admin: on the hand-written test reviews (never trained on, worded differently from the
+    # base set). A random split of the base set would score ~1.0 and say nothing about new sentences.
+    test = test_set()
+    if y.shape[1] > 0:
         f = _features()
         clf = OneVsRestClassifier(LogisticRegression(max_iter=2000, class_weight="balanced"))
-        clf.fit(f.fit_transform(xt), yt)
-        pred = clf.predict(f.transform(xv))
-        metrics["issuesMicroF1"] = round(float(f1_score(yv, pred, average="micro", zero_division=0)), 3)
-        metrics["heldOut"] = len(xv)
+        clf.fit(f.fit_transform(texts), y)
+        pred = clf.predict(f.transform([_text(t) for t in test]))
+        gold = mlb.transform([[k for k in t["issues"] if k in mlb.classes_] for t in test])
+        metrics["issuesMicroF1"] = round(float(f1_score(gold, pred, average="micro", zero_division=0)), 3)
+        metrics["heldOut"] = len(test)
+        metrics["testSet"] = "đánh giá viết tay (app/review_data.py)"
 
     features = _features()
     x = features.fit_transform(texts)
@@ -90,7 +102,7 @@ def train(items: list[dict]) -> dict:
         sent_clf = LogisticRegression(max_iter=2000, class_weight="balanced")
         sent_clf.fit(x, sentiments)
 
-    model = {"features": features, "issues": issue_clf, "mlb": mlb, "sentiment": sent_clf, "samples": len(items),
+    model = {"features": features, "issues": issue_clf, "mlb": mlb, "sentiment": sent_clf, "samples": len(items), "own": len(own),
              "labels": list(mlb.classes_), "trainedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"), "metrics": metrics}
     os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
     joblib.dump(model, MODEL_PATH)

@@ -41,6 +41,7 @@ public class DisputeService {
     private final RefundService refundService;
     private final NotificationService notificationService;
     private final AdminAuditService auditService;
+    private final com.marketplace.backend.repository.ReturnRiskAssessmentRepository riskRepository;
 
     // ==================== thread (buyer / seller / admin) ====================
 
@@ -151,6 +152,10 @@ public class DisputeService {
                 "sellerResponseDeadline", rr.getSellerResponseDeadline(), "sellerAnswered", sellerAnswered,
                 "messageCount", messageRepository.countByReturnRequestId(rr.getId()),
                 "evidenceCount", rr.getEvidenceUrls().size());
+        riskRepository.findByReturnRequestId(rr.getId()).ifPresent(a -> {
+            m.put("riskScore", a.getScore());
+            m.put("riskLevel", a.getLevel());
+        });
         // how long it has been waiting, and whether the seller let the deadline pass
         m.put("waitingHours", rr.getEscalatedAt() == null || RESOLVED.contains(rr.getStatus()) ? null : Duration.between(rr.getEscalatedAt(), now).toHours());
         m.put("sellerOverdue", rr.getStatus() == ReturnStatus.ESCALATED && !sellerAnswered && rr.getSellerResponseDeadline() != null

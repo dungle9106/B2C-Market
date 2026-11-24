@@ -105,7 +105,7 @@ watch(() => route.params.slug, load, { immediate: true })
 
 <style scoped>
 .state { padding: 60px 0; text-align: center; color: var(--color-text-muted); }
-.campaign { background: color-mix(in srgb, var(--theme) 8%, #f5f5f5); min-height: 100vh; padding-bottom: 40px; }
+.campaign { background: color-mix(in srgb, var(--theme) 8%, #f5f5f5); min-height: var(--vh); padding-bottom: 40px; }
 .hero { background: linear-gradient(120deg, var(--theme), color-mix(in srgb, var(--theme) 65%, #000)); color: white; }
 .hero.image { background: var(--theme); }
 .hero img { display: block; width: 100%; max-height: 360px; object-fit: cover; }

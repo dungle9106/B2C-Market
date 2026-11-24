@@ -18,3 +18,9 @@ frontend/vite.e2e.config.js
 review-ai-service/.venv/
 review-ai-service/models/
 __pycache__/
+
+# local Spring Boot settings of one computer
+/config/
+
+# charts and summary written by train_from_db.py
+review-ai-service/reports/

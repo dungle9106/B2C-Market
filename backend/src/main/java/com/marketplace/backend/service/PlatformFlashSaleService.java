@@ -30,6 +30,7 @@ public class PlatformFlashSaleService {
     private static final Set<FlashSaleRegistration.Status> LIVE = EnumSet.of(FlashSaleRegistration.Status.PENDING, FlashSaleRegistration.Status.APPROVED);
     private static final DateTimeFormatter SLOT = DateTimeFormatter.ofPattern("HH:mm dd/MM");
 
+    private final ShopPerformanceService performanceService;
     private final FlashSaleEventRepository eventRepository;
     private final FlashSaleRegistrationRepository registrationRepository;
     private final PromoCampaignRepository campaignRepository;
@@ -299,6 +300,7 @@ public class PlatformFlashSaleService {
         FlashSaleEvent e = find(eventId);
         LocalDateTime now = LocalDateTime.now();
         if (!e.status(now).equals("REGISTERING")) throw bad("Khung giờ này đã hết hạn đăng ký");
+        performanceService.checkCanJoinFlashSale(shop);   // 6+ penalty points
         if (items == null || items.isEmpty()) throw bad("Vui lòng chọn sản phẩm");
         long used = registrationRepository.countForShop(eventId, shop.getId(), LIVE);
         if (used + items.size() > e.getMaxProductsPerShop()) {

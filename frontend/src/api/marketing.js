@@ -37,3 +37,11 @@ export const visibleCampaigns = () => http.get('/campaigns')
 export const campaignPage = (slug) => http.get(`/campaigns/${slug}`)
 export const flashSlots = (limit = 12) => http.get('/flash-sale/slots', { params: { limit } })
 export const flashSlot = (id, limit = 60) => http.get(`/flash-sale/slots/${id}`, { params: { limit } })
+
+// ---- "Mua Kem Deal Soc" / "Mua de nhan qua" ----
+export const myAddOnDeals = () => http.get('/seller/addon-deals')
+export const createAddOnDeal = (body) => http.post('/seller/addon-deals', body)
+export const updateAddOnDeal = (id, body) => http.put(`/seller/addon-deals/${id}`, body)
+export const toggleAddOnDeal = (id) => http.patch(`/seller/addon-deals/${id}/toggle`)
+export const endAddOnDeal = (id) => http.post(`/seller/addon-deals/${id}/end`)
+export const productAddOnDeals = (productId) => http.get(`/products/${productId}/addon-deals`)

@@ -73,6 +73,7 @@ public class PlatformSettingService {
         m.put("settlementHoldDays", config.settlementHoldDays());
         m.put("paymentWindowMinutes", config.paymentWindowMinutes());
         m.put("disputeResponseHours", config.disputeResponseHours());
+        m.put("spinDailyBudget", config.spinDailyBudget());
         m.put("maxFailedLogins", config.maxFailedLogins());
         m.put("lockMinutes", config.lockMinutes());
         m.put("ipFailLimit", config.ipFailLimit());
@@ -174,6 +175,7 @@ public class PlatformSettingService {
         number(body, "maxFailedLogins", PlatformConfig.MAX_FAILED_LOGINS, config.maxFailedLogins(), 3, 20, "Số lần nhập sai mật khẩu trước khi khóa tạm", "lần");
         number(body, "lockMinutes", PlatformConfig.LOCK_MINUTES, config.lockMinutes(), 1, 1440, "Thời gian khóa tạm khi nhập sai", "phút");
         number(body, "ipFailLimit", PlatformConfig.IP_FAIL_LIMIT, config.ipFailLimit(), 1, 1000, "Số lần đăng nhập sai tối đa mỗi IP / 15 phút", "lần");
+        number(body, "spinDailyBudget", PlatformConfig.SPIN_DAILY_BUDGET, config.spinDailyBudget(), 0, 10_000_000, "Ngân sách Xu vòng quay mỗi ngày", "Xu");
         number(body, "registerPerIp", PlatformConfig.REGISTER_PER_IP, config.registerPerIp(), 1, 1000, "Số tài khoản mới tối đa mỗi IP / 10 phút", "tài khoản");
         if (body.get("requireAdmin2fa") instanceof Boolean v && v != config.requireAdmin2fa()) {
             put(PlatformConfig.REQUIRE_ADMIN_2FA, String.valueOf(v));

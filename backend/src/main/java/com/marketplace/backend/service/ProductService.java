@@ -30,6 +30,9 @@ public class ProductService {
 
     private static final int MAX_PAGE_SIZE = 60;
 
+    private final com.marketplace.backend.repository.ProductImageIndexRepository imageIndexRepository;
+    private final com.marketplace.backend.repository.AddOnDealRepository addOnDealRepository;
+    private final com.marketplace.backend.repository.ProductLikeRepository productLikeRepository;
     private final ProductRepository productRepository;
     private final ShopRepository shopRepository;
     private final CategoryRepository categoryRepository;
@@ -44,6 +47,8 @@ public class ProductService {
     private final StockService stockService;
     private final ProductModerationService moderationService;
     private final ProductReportRepository reportRepository;
+    private final ShippingService shippingService;
+    private final com.marketplace.backend.service.reco.RecommendationService recommendationService;
 
     // ==== Buyer-facing browsing ====
 
@@ -77,6 +82,38 @@ public class ProductService {
                 .stream().map(ProductResponse::from).toList();
     }
 
+    /**
+     * The product page's "Van chuyen toi": delivery options to a province, from the same fee table the checkout uses
+     * (carriers connected through their own API may still quote a slightly different fee at checkout).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> shippingEstimate(Long id, String province) {
+        if (!com.marketplace.backend.util.Provinces.isValid(province)) throw new ApiException("Vui lòng chọn tỉnh/thành phố", HttpStatus.BAD_REQUEST);
+        Product product = productRepository.findById(id).filter(p -> p.isActive() && p.getShop().isActive())
+                .orElseThrow(() -> new ApiException("Sản phẩm không tồn tại hoặc đã ngừng bán", HttpStatus.NOT_FOUND));
+        Shop shop = product.getShop();
+        List<ShippingService.ShippingOption> options = shippingService.options(shop.getProvince(), province, 1,
+                ShippingService.carrierCodes(shop.getCarriers()), shop.getHandlingDays() != null ? shop.getHandlingDays() : 1);
+        // a freeship product: the shop covers up to the cheapest economy fee, as at checkout
+        BigDecimal covered = product.isFreeShipping() ? shippingService.economyFee(options) : BigDecimal.ZERO;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("from", shop.getProvince());
+        m.put("to", province);
+        m.put("freeShipping", product.isFreeShipping());
+        m.put("freeShipMinOrder", shop.getFreeShipMinOrder());
+        m.put("options", options.stream().map(o -> {
+            Map<String, Object> x = new LinkedHashMap<>();
+            x.put("carrierName", o.getCarrierName());
+            x.put("methodName", o.getMethodName());
+            x.put("fee", o.getFee());
+            x.put("feeToPay", o.getFee().subtract(covered).max(BigDecimal.ZERO));
+            x.put("etaFrom", o.getEtaFrom());
+            x.put("etaTo", o.getEtaTo());
+            return x;
+        }).toList());
+        return m;
+    }
+
     public ProductResponse getDetail(Long id, Long viewerUserId) {
         Product product = productRepository.findById(id)
                 .filter(p -> p.isActive() && p.getShop().isActive())
@@ -95,14 +132,13 @@ public class ProductService {
         return r;
     }
 
-    // rule-based recommendation: same category products, best sellers first
+    // "San pham tuong tu": the recommendation model, then same category products (RecommendationService)
     @Transactional(readOnly = true)
     public List<ProductResponse> recommendSimilar(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ApiException("Sản phẩm không tồn tại", HttpStatus.NOT_FOUND));
-        if (product.getCategory() == null) return List.of();
-        return productRepository.findSimilarByCategory(product.getCategory().getId(), productId)
-                .stream().limit(12).map(ProductResponse::from).collect(Collectors.toList());
+        // learned from what buyers look at / buy together, then the same category
+        return recommendationService.similar(product);
     }
 
     @Transactional(readOnly = true)
@@ -173,6 +209,9 @@ public class ProductService {
         reportRepository.deleteByProductId(product.getId());
         cartItemRepository.deleteByProductId(product.getId());
         viewHistoryRepository.deleteByProductId(product.getId());
+        productLikeRepository.deleteByProductId(product.getId());
+        imageIndexRepository.deleteById(product.getId());
+        addOnDealRepository.removeMainProduct(product.getId());
         questionRepository.deleteByProductId(product.getId());
         productRepository.delete(product);
     }

@@ -5,6 +5,7 @@ import com.marketplace.backend.service.PromoAdvisorService;
 import com.marketplace.backend.service.ReviewInsightService;
 import com.marketplace.backend.service.SalesAssistantService;
 import com.marketplace.backend.service.SellerAIService;
+import com.marketplace.backend.service.VisionCategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,13 @@ public class SellerAIController {
     private final ReviewInsightService reviewInsightService;
     private final SalesAssistantService salesAssistant;
     private final PromoAdvisorService promoAdvisor;
+    private final VisionCategoryService visionCategory;
+
+    // computer vision: { imageUrl } -> { available, items: [{ categoryId, name, path, probability }] } (the seller picks)
+    @PostMapping("/category-from-image")
+    public ResponseEntity<Map<String, Object>> categoryFromImage(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(visionCategory.suggest(body.get("imageUrl")));
+    }
 
     // { reply: description draft, titleSuggestion, source: ai | rule }
     @PostMapping("/generate-description")

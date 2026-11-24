@@ -27,7 +27,9 @@ public class AdminSystemController {
     private final EmailService email;
     private final AdminSecurityService security;
     private final VnpayService vnpay;
-    private final GhnService ghn;
+    private final com.marketplace.backend.security.SocialLoginSettings socialLogin;
+    private final com.marketplace.backend.service.shipping.CarrierGateways carrierGateways;
+    private final com.marketplace.backend.service.search.ImageSearchService imageSearch;
     private final com.marketplace.backend.service.search.SemanticSearchService semanticSearch;
 
     // ==================== AI ====================
@@ -200,22 +202,53 @@ public class AdminSystemController {
         return ResponseEntity.ok(vnpay.update(body));
     }
 
-    // ==================== shipping gateway ====================
+    // ==================== social sign-in (Google, Facebook, GitHub) ====================
 
-    @GetMapping("/api/admin/system/shipping/ghn")
-    public ResponseEntity<Map<String, Object>> ghnConfig() {
-        return ResponseEntity.ok(ghn.config());
+    @GetMapping("/api/admin/system/social-login")
+    public ResponseEntity<Map<String, Object>> socialLogin() {
+        return ResponseEntity.ok(socialLogin.config());
     }
 
-    // body: { enabled, shopId, token?, apiUrl? }
-    @PutMapping("/api/admin/system/shipping/ghn")
-    public ResponseEntity<Map<String, Object>> updateGhn(@RequestBody Map<String, Object> body) {
-        return ResponseEntity.ok(ghn.update(body));
+    // body: { publicUrl?, providers: [{ id, enabled, clientId, clientSecret? }] }
+    @PutMapping("/api/admin/system/social-login")
+    public ResponseEntity<Map<String, Object>> updateSocialLogin(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(socialLogin.update(body));
     }
 
-    @PostMapping("/api/admin/system/shipping/ghn/test")
-    public ResponseEntity<Map<String, Object>> testGhn() {
-        return ResponseEntity.ok(ghn.test());
+    // ==================== "tim bang hinh anh": the product image index ====================
+
+    @GetMapping("/api/admin/system/image-search")
+    public ResponseEntity<Map<String, Object>> imageIndex() {
+        return ResponseEntity.ok(imageSearch.status());
+    }
+
+    @PostMapping("/api/admin/system/image-search/reindex")
+    public ResponseEntity<Map<String, Object>> imageReindex() {
+        return ResponseEntity.ok(imageSearch.reindexAll());
+    }
+
+    // ==================== shipping gateways (GHN, GHTK...) ====================
+
+    // every carrier, its services and whether it runs on a real API
+    @GetMapping("/api/admin/system/shipping/carriers")
+    public ResponseEntity<List<Map<String, Object>>> carriers() {
+        return ResponseEntity.ok(carrierGateways.overview());
+    }
+
+    @GetMapping("/api/admin/system/shipping/{carrier}")
+    public ResponseEntity<Map<String, Object>> carrierConfig(@PathVariable String carrier) {
+        return ResponseEntity.ok(carrierGateways.require(carrier.toUpperCase()).config());
+    }
+
+    // GHN body: { enabled, shopId, token?, apiUrl? } · GHTK body: { enabled, partnerCode, token?, apiUrl? }
+    @PutMapping("/api/admin/system/shipping/{carrier}")
+    public ResponseEntity<Map<String, Object>> updateCarrier(@PathVariable String carrier, @RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(carrierGateways.require(carrier.toUpperCase()).update(body));
+    }
+
+    @PostMapping("/api/admin/system/shipping/{carrier}/test")
+    public ResponseEntity<Map<String, Object>> testCarrier(@PathVariable String carrier) {
+        return ResponseEntity.ok(carrierGateways.require(carrier.toUpperCase()).test());
     }
 
     // ==================== policies ====================

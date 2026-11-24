@@ -36,6 +36,7 @@ public class ShopService {
 
     private static final Set<Integer> RETURN_DAY_OPTIONS = Set.of(0, 3, 7, 15, 30);
 
+    private final com.marketplace.backend.repository.ShopFollowRepository shopFollowRepository;
     private final ShopRepository shopRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
@@ -131,6 +132,9 @@ public class ShopService {
         }
         List<String> carriers = req.getCarriers().stream().distinct().toList();
         if (carriers.stream().anyMatch(c -> !ShippingService.isCarrier(c))) throw bad("Đơn vị vận chuyển không hợp lệ");
+        if (!carriers.isEmpty() && ShippingService.CARRIERS.stream().filter(c -> carriers.contains(c.code())).allMatch(ShippingService.Carrier::instantOnly)) {
+            throw bad("Vui lòng chọn thêm ít nhất một đơn vị giao toàn quốc: Ahamove và GrabExpress chỉ giao hỏa tốc nội tỉnh");
+        }
         BigDecimal threshold = req.getFreeShipMinOrder();
         if (threshold != null && threshold.signum() > 0 && threshold.compareTo(BigDecimal.valueOf(10_000)) < 0) {
             throw bad("Giá trị đơn tối thiểu để miễn phí vận chuyển phải từ ₫10.000");
@@ -157,6 +161,19 @@ public class ShopService {
 
     // ==== public ====
 
+    /** [{ id, name, logoUrl, productCount }] of the "Shoppi Mall" shops buyers can see. */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> mallShops() {
+        return shopRepository.findTop12ByMallTrueAndActiveTrueOrderByIdAsc().stream().map(s -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", s.getId());
+            m.put("name", s.getName());
+            m.put("logoUrl", s.getLogoUrl());
+            m.put("productCount", productRepository.countByShopIdAndActiveTrue(s.getId()));
+            return m;
+        }).toList();
+    }
+
     @Transactional(readOnly = true)
     public ShopPublicResponse publicShop(Long id) {
         Shop shop = shopRepository.findById(id)
@@ -168,6 +185,7 @@ public class ShopService {
         Map<String, Object> chat = chatService.responseStats(id);
         r.setChatResponseRate((Double) chat.get("responseRate"));
         r.setChatResponseTime((String) chat.get("responseTime"));
+        r.setFollowerCount(shopFollowRepository.countByShopId(id));
         return r;
     }
 
@@ -178,6 +196,7 @@ public class ShopService {
             m.put("code", c.code());
             m.put("name", c.name());
             m.put("methods", c.methods().stream().map(ShippingService::methodName).sorted().toList());
+            m.put("note", c.note());
             return m;
         }).toList();
     }

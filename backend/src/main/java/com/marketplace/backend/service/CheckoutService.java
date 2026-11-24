@@ -1,5 +1,6 @@
 package com.marketplace.backend.service;
 
+import com.marketplace.backend.service.shipping.CarrierGateways;
 import com.marketplace.backend.dto.request.CheckoutRequest;
 import com.marketplace.backend.dto.response.CartItemResponse;
 import com.marketplace.backend.dto.response.CheckoutQuote;
@@ -29,6 +30,7 @@ import java.util.*;
  *
  *   per shop:  subtotal - shop voucher - share of platform voucher
  *              + shipping fee - shipping discount (freeship products, shipping vouchers)
+ *              - share of the Shoppi Xu used
  *
  * A platform ("Shoppi") voucher applies to the whole checkout and is split
  * across the shops' orders in proportion to their amounts.
@@ -40,7 +42,7 @@ public class CheckoutService {
 
     private static final Set<String> WALLETS = Set.of("MOMO", "ZALOPAY", "VNPAY");
 
-    private final GhnService ghnService;
+    private final CarrierGateways carrierGateways;
     private final VnpayService vnpayService;
     private final CartItemRepository cartItemRepository;
     private final AddressRepository addressRepository;
@@ -49,11 +51,16 @@ public class CheckoutService {
     private final ShippingService shippingService;
     private final StockService stockService;
     private final ComboService comboService;
+    private final AddOnDealService addOnDealService;
     private final OrderItemRepository orderItemRepository;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final TrackingService trackingService;
+    private final CoinService coinService;
+    private final ShoppiPayService shoppiPayService;
+    private final MembershipService membershipService;
+    private final PlatformConfig config;
 
     // everything the pricing step works out, kept for placeOrders()
     private record Priced(CheckoutQuote quote, List<List<CartItem>> items, Address address,
@@ -80,10 +87,15 @@ public class CheckoutService {
         }
 
         Priced p = price(req, true);
-        boolean payNow = req.getPaymentMethod() != PaymentMethod.COD;
+        // ShoppiPay is charged right here, so such an order is already paid and goes straight to the seller
+        boolean walletPaid = req.getPaymentMethod() == PaymentMethod.SHOPPI_PAY;
+        boolean payNow = req.getPaymentMethod() != PaymentMethod.COD && !walletPaid;
         String checkoutCode = "CK" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss"))
                 + (new Random().nextInt(900) + 100);
         User buyer = userRepository.getReferenceById(CurrentUser.id());
+
+        // every product of the checkout locked up front, in id order: concurrent checkouts cannot deadlock
+        stockService.lockProducts(p.items().stream().flatMap(List::stream).map(ci -> ci.getProduct().getId()).toList());
 
         List<OrderResponse> created = new ArrayList<>();
         for (int i = 0; i < p.quote().getShops().size(); i++) {
@@ -99,6 +111,8 @@ public class CheckoutService {
                     .subtotal(sq.getSubtotal())
                     .shopDiscount(sq.getShopDiscount())
                     .platformDiscount(sq.getPlatformDiscount())
+                    .coinDiscount(sq.getCoinDiscount())
+                    .coinsToEarn(sq.getCoinsToEarn())
                     .comboDiscount(sq.getComboDiscount())
                     .shopVoucherDiscount(sq.getShopVoucherDiscount())
                     .discount(sq.getShopDiscount().add(sq.getPlatformDiscount()).add(sq.getComboDiscount()))
@@ -150,7 +164,9 @@ public class CheckoutService {
                     .order(order)
                     .method(req.getPaymentMethod())
                     .provider(provider)
-                    .status(PaymentStatus.PENDING)
+                    .status(walletPaid ? PaymentStatus.PAID : PaymentStatus.PENDING)
+                    .paidAt(walletPaid ? LocalDateTime.now() : null)
+                    .transactionId(walletPaid ? checkoutCode : null)
                     .amount(sq.getTotal())
                     .build());
 
@@ -166,6 +182,9 @@ public class CheckoutService {
         if (p.platformVoucher() != null) {
             p.platformVoucher().setUsedCount(p.platformVoucher().getUsedCount() + 1); // once per checkout
         }
+        long coinsUsed = p.quote().getCoinDiscountTotal().longValue();
+        if (coinsUsed > 0) coinService.spend(buyer.getId(), coinsUsed, checkoutCode);
+        if (walletPaid) shoppiPayService.pay(buyer.getId(), p.quote().getTotal(), checkoutCode);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("checkoutCode", checkoutCode);
@@ -214,8 +233,15 @@ public class CheckoutService {
             }
             checkFlashSaleLimits(items, buyerId, sq, strict);
 
-            // combo deals (buy more, save more)
-            ComboService.Result combo = comboService.apply(shop.getId(), items, lineTotals);
+            // combo deals (buy more, save more), then "mua kem deal soc" / gifts on the lines combos left alone;
+            // both are shop-funded savings, kept together as the order's combo discount
+            ComboService.Result bundles = comboService.apply(shop.getId(), items, lineTotals);
+            ComboService.Result deals = addOnDealService.apply(shop.getId(), items, lineTotals, bundles.discountByCartItem());
+            Map<Long, BigDecimal> promoLines = new HashMap<>(bundles.discountByCartItem());
+            deals.discountByCartItem().forEach((k, v) -> promoLines.merge(k, v, BigDecimal::add));
+            List<Map<String, Object>> promoNotes = new ArrayList<>(bundles.notes());
+            promoNotes.addAll(deals.notes());
+            ComboService.Result combo = new ComboService.Result(promoLines, promoNotes);
             sq.setComboDiscount(combo.total());
             sq.setCombos(combo.notes());
 
@@ -224,8 +250,8 @@ public class CheckoutService {
             List<ShippingOption> options = shippingService.options(shop.getProvince(),
                     address != null ? address.getProvince() : null, sq.getQuantity(),
                     ShippingService.carrierCodes(shop.getCarriers()), shop.getHandlingDays() != null ? shop.getHandlingDays() : 1);
-            // GHN connected: its parcels are priced by GHN's own API (falls back to the table if GHN can't quote)
-            options = ghnService.adjustOptions(options, shop, address, sq.getQuantity(), sq.getSubtotal());
+            // carriers connected through their API (GHN, GHTK) price their own parcels (the table is the fallback)
+            options = carrierGateways.adjustOptions(options, shop, address, sq.getQuantity(), sq.getSubtotal());
             sq.setShippingOptions(options);
             ShippingOption chosen = options.stream()
                     .filter(o -> o.getCode().equals(part.getShippingOption())).findFirst()
@@ -310,7 +336,39 @@ public class CheckoutService {
             quote.setTotal(quote.getTotal().add(total));
             quote.setItemCount(quote.getItemCount() + sq.getQuantity());
         }
+        applyCoins(req, quote, buyerId);
         return new Priced(quote, groups, address, shopVouchers, platformVoucher);
+    }
+
+    // Shoppi Xu come off last, on what is left to pay, and are split across the shops by their totals
+    private void applyCoins(CheckoutRequest req, CheckoutQuote quote, Long buyerId) {
+        long balance = coinService.balance(buyerId);
+        long cap = quote.getTotal().multiply(BigDecimal.valueOf(config.coinMaxSpendPercent()))
+                .divide(BigDecimal.valueOf(100), 0, RoundingMode.DOWN).longValue();
+        long usable = Math.min(balance, cap);
+        quote.setCoinBalance(balance);
+        quote.setCoinsUsable(usable);
+        if (req.isUseCoins() && usable > 0) {
+            BigDecimal used = BigDecimal.valueOf(usable);
+            List<BigDecimal> shares = split(used, quote.getShops().stream().map(ShopQuote::getTotal).toList());
+            for (int i = 0; i < shares.size(); i++) {
+                ShopQuote sq = quote.getShops().get(i);
+                sq.setCoinDiscount(shares.get(i));
+                sq.setTotal(sq.getTotal().subtract(shares.get(i)));
+            }
+            quote.setCoinDiscountTotal(used);
+            quote.setTotal(quote.getTotal().subtract(used));
+        }
+        MembershipService.Tier tier = membershipService.tierOf(buyerId);
+        quote.setMembershipTier(tier.name());
+        quote.setCoinMultiplierPercent(tier.coinMultiplierPercent());
+        quote.setWalletBalance(shoppiPayService.balance(buyerId));
+        for (ShopQuote sq : quote.getShops()) {
+            sq.setCoinsToEarn(coinService.earnedFor(sq.getSubtotal().subtract(sq.getComboDiscount())
+                    .subtract(sq.getShopDiscount()).subtract(sq.getPlatformDiscount()).subtract(sq.getCoinDiscount()),
+                    tier.coinMultiplierPercent()));
+            quote.setCoinsToEarn(quote.getCoinsToEarn() + sq.getCoinsToEarn());
+        }
     }
 
     private Voucher applyPlatformVoucher(String code, CheckoutQuote quote, List<List<CartItem>> groups, Long buyerId, boolean strict) {
@@ -423,6 +481,9 @@ public class CheckoutService {
 
     private List<CartItem> loadItems(List<Long> ids, Long buyerId) {
         List<CartItem> items = new ArrayList<>();
+        if (ids == null || ids.isEmpty() || ids.contains(null)) {
+            throw bad("Vui lòng chọn sản phẩm trong giỏ hàng để đặt");
+        }
         for (Long id : new LinkedHashSet<>(ids)) {
             CartItem item = cartItemRepository.findById(id)
                     .filter(i -> i.getUser().getId().equals(buyerId))

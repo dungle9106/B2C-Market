@@ -108,7 +108,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.assistant { display: flex; flex-direction: column; height: calc(100vh - 130px); min-height: 520px; margin-bottom: 0; }
+.assistant { display: flex; flex-direction: column; height: calc(var(--vh) - 130px); min-height: 520px; margin-bottom: 0; }
 .thread { flex: 1; overflow-y: auto; padding: 4px 4px 12px; }
 .welcome { text-align: center; max-width: 640px; margin: 30px auto; color: var(--color-text-muted); line-height: 1.6; }
 .bot-icon { font-size: 44px; }

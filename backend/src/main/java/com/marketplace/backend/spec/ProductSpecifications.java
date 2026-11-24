@@ -57,6 +57,7 @@ public final class ProductSpecifications {
             if (c.getMinRating() != null) where.add(cb.greaterThanOrEqualTo(root.get("ratingAvg"), c.getMinRating().doubleValue()));
             if (c.getProvinces() != null && !c.getProvinces().isEmpty()) where.add(shop.get("province").in(c.getProvinces()));
             if (Boolean.TRUE.equals(c.getFreeShipping())) where.add(cb.isTrue(root.get("freeShipping")));
+            if (Boolean.TRUE.equals(c.getMall())) where.add(cb.isTrue(shop.get("mall")));
             if (Boolean.TRUE.equals(c.getOnSale())) {
                 where.add(cb.or(flashActive, cb.and(
                         cb.isNotNull(root.get("originalPrice")),

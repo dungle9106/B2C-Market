@@ -69,6 +69,12 @@ public class Voucher {
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean publicVisible = true;
 
+    // shop vouchers: who may use it (followers, first-time or returning customers of the shop)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(nullable = false, length = 24, columnDefinition = "varchar(24) default 'ALL'")
+    private VoucherAudience audience = VoucherAudience.ALL;
+
     // the products the voucher applies to; empty = every product of the shop.
     // A List (bag), not a Set: Product's Lombok hashCode walks its variants back to the product.
     @ManyToMany

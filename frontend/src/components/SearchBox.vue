@@ -1,9 +1,9 @@
 <template>
-  <form ref="rootEl" class="search-form" role="search" @submit.prevent="submit(keyword)">
+  <form ref="rootEl" class="search-form" role="search" @submit.prevent="submit(keyword || hint)">
     <input
       v-model="keyword"
       type="text"
-      placeholder="Tìm kiếm sản phẩm, thương hiệu và shop..."
+      :placeholder="placeholder"
       autocomplete="off"
       role="combobox"
       aria-autocomplete="list"
@@ -15,6 +15,10 @@
       @keydown.enter.prevent="onEnter"
       @keydown.esc="open = false"
     />
+    <button type="button" class="camera-btn" title="Tìm kiếm bằng hình ảnh" aria-label="Tìm kiếm bằng hình ảnh" @click="fileEl.click()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.6l1.4-2h7l1.4 2h1.6A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5v-9Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="13" r="3.5" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>
+    <input ref="fileEl" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden @change="onImage" />
     <button class="search-btn" type="submit" aria-label="Tìm kiếm">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M21 21L15.5 15.5M18 10.5C18 14.6421 14.6421 18 10.5 18C6.35786 18 3 14.6421 3 10.5C3 6.35786 6.35786 3 10.5 3C14.6421 3 18 6.35786 18 10.5Z" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
@@ -50,11 +54,30 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { suggestProducts } from '../api/products'
+import { pickImage } from '../utils/imageSearch'
+
+// hints: hot keywords shown one after another as the placeholder; searching with an empty box uses the one shown
+const props = defineProps({ hints: { type: Array, default: () => [] } })
+const DEFAULT_PLACEHOLDER = 'Tìm kiếm sản phẩm, thương hiệu và shop...'
+const hintIndex = ref(0)
+const hint = computed(() => (props.hints.length ? props.hints[hintIndex.value % props.hints.length] : ''))
+const placeholder = computed(() => hint.value || DEFAULT_PLACEHOLDER)
+let hintTimer = null
+onMounted(() => { hintTimer = setInterval(() => { hintIndex.value++ }, 4000) })
+onBeforeUnmount(() => clearInterval(hintTimer))
 
 const route = useRoute()
 const router = useRouter()
 
 const keyword = ref(route.query.q || '')
+const fileEl = ref(null)
+function onImage(e) {
+  const f = e.target.files[0]
+  e.target.value = ''
+  if (!f) return
+  pickImage(f)
+  router.push({ name: 'image-search', query: { t: Date.now() } })
+}
 const open = ref(false)
 const active = ref(-1)
 const suggestions = ref({ keywords: [], categories: [] })
@@ -112,7 +135,7 @@ function move(step) {
 function onEnter() {
   const e = entries.value[active.value]
   if (open.value && e) choose(e)
-  else submit(keyword.value)
+  else submit(keyword.value || hint.value)
 }
 
 function choose(e) {
@@ -185,4 +208,6 @@ onBeforeUnmount(() => {
 .entry.active { background: #fafafa; }
 .entry strong { font-weight: 700; }
 .entry-icon { color: var(--color-text-faint); flex-shrink: 0; }
+.camera-btn { background: none; border: none; color: var(--color-text-muted); cursor: pointer; padding: 0 10px; display: flex; align-items: center; }
+.camera-btn:hover { color: var(--color-primary); }
 </style>

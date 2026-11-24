@@ -2,3 +2,8 @@ fastapi==0.115.6
 uvicorn[standard]==0.32.1
 scikit-learn==1.6.1
 joblib==1.4.2
+numpy>=1.26
+scipy>=1.11
+pillow>=10.0
+onnxruntime>=1.18
+onnx>=1.16

@@ -24,6 +24,7 @@ export const approveShop = (id) => http.post(`/admin/shops/${id}/approve`)
 export const rejectShop = (id, reason) => http.post(`/admin/shops/${id}/reject`, { reason })
 export const suspendShop = (id, reason) => http.post(`/admin/shops/${id}/suspend`, { reason })
 export const reinstateShop = (id) => http.post(`/admin/shops/${id}/reinstate`)
+export const setShopMall = (id, mall) => http.post(`/admin/shops/${id}/mall`, { mall })
 
 // ---- platform settings: { requireShopApproval } ----
 export const adminSettings = () => http.get('/admin/settings')
@@ -66,6 +67,27 @@ export const adminOrderSummary = (from, to) => http.get('/admin/orders/summary',
 export const adminOrder = (id) => http.get(`/admin/orders/${id}`)
 export const adminCancelOrder = (id, reason) => http.post(`/admin/orders/${id}/cancel`, { reason })
 export const adminManualRefund = (id, amount, note) => http.post(`/admin/orders/${id}/refund`, { amount, note })
+
+// ---- AI return abuse checks ----
+export const returnRiskSummary = () => http.get('/admin/return-risk/summary')
+export const returnRiskList = ({ level = 'ALL', review = 'ALL', page = 0, size = 20 } = {}) => http.get('/admin/return-risk', { params: { level, review, page, size } })
+export const returnRiskDetail = (returnId) => http.get(`/admin/return-risk/${returnId}`)
+export const reanalyzeReturnRisk = (returnId) => http.post(`/admin/return-risk/${returnId}/reanalyze`)
+export const reviewReturnRisk = (returnId, label, note) => http.post(`/admin/return-risk/${returnId}/review`, { label, note })
+export const trainReturnRisk = () => http.post('/admin/return-risk/train')
+// recommendation model (review-ai-service/app/recommender.py): status + held-out metrics, and training
+export const recoStatus = () => http.get('/admin/reco/status')
+export const trainReco = () => http.post('/admin/reco/train', null, { timeout: 600000 })
+// order fraud model + flagged orders (FraudService) and churn model + win-back vouchers (ChurnService)
+export const fraudStatus = () => http.get('/admin/fraud/status')
+export const trainFraud = () => http.post('/admin/fraud/train', null, { timeout: 600000 })
+export const fraudOrders = ({ level = '', verdict = '', page = 0, size = 20 } = {}) => http.get('/admin/fraud/orders', { params: { level: level || undefined, verdict: verdict || undefined, page, size } })
+export const setFraudVerdict = (id, verdict) => http.patch(`/admin/fraud/${id}/verdict`, { verdict })
+export const churnStatus = () => http.get('/admin/churn/status')
+export const trainChurn = () => http.post('/admin/churn/train', null, { timeout: 600000 })
+export const churnBuyers = ({ level = '', sort = 'risk', limit = 100 } = {}) => http.get('/admin/churn/buyers', { params: { level: level || undefined, sort, limit }, timeout: 120000 })
+export const sendWinback = (body) => http.post('/admin/churn/winback', body)
+export const releaseReturnHold = (returnId) => http.post(`/admin/return-risk/${returnId}/release`)
 
 // ---- buyer / seller disputes ----
 // status: OPEN | RESOLVED | ALL
@@ -162,8 +184,19 @@ export const securityLogins = ({ failedOnly = true, page = 0, size = 30 } = {}) 
 export const unlockLogin = (userId) => http.post(`/admin/system/security/unlock/${userId}`)
 
 // ---- payment & shipping gateways ----
+export const socialLoginConfig = () => http.get('/admin/system/social-login')
+export const saveSocialLoginConfig = (body) => http.put('/admin/system/social-login', body)
 export const vnpayConfig = () => http.get('/admin/system/payment/vnpay')
 export const saveVnpayConfig = (body) => http.put('/admin/system/payment/vnpay', body) // { enabled, tmnCode, hashSecret?, payUrl?, apiUrl? }
 export const ghnConfig = () => http.get('/admin/system/shipping/ghn')
 export const saveGhnConfig = (body) => http.put('/admin/system/shipping/ghn', body) // { enabled, shopId, token?, apiUrl? }
 export const testGhn = () => http.post('/admin/system/shipping/ghn/test')
+// any carrier connected through its API: 'ghn' | 'ghtk'
+export const carrierConfig = (code) => http.get(`/admin/system/shipping/${code}`)
+export const saveCarrierConfig = (code, body) => http.put(`/admin/system/shipping/${code}`, body) // GHTK: { enabled, partnerCode, token?, apiUrl? }
+export const testCarrier = (code) => http.post(`/admin/system/shipping/${code}/test`)
+export const shippingCarriers = () => http.get('/admin/system/shipping/carriers')
+
+// "tim bang hinh anh": the product image index
+export const imageIndexStatus = () => http.get('/admin/system/image-search')
+export const reindexImageIndex = () => http.post('/admin/system/image-search/reindex')

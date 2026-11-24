@@ -100,6 +100,25 @@
         <p v-if="trainMsg" class="tw-mb-0 tw-mt-2 tw-text-sm" :class="trainOk ? 'tw-text-green-700' : 'tw-text-red-600'">{{ trainMsg }}</p>
       </section>
 
+      <!-- "tim bang hinh anh": the product image index -->
+      <section v-if="img" class="sc-card">
+        <div class="sc-card-head tw-items-center">
+          <h2 class="sc-card-title">Tìm Kiếm Bằng Hình Ảnh</h2>
+          <button type="button" class="btn sm ghost tw-ml-auto" :disabled="imgBusy" @click="reindexImages">{{ imgBusy ? 'Đang lập chỉ mục...' : 'Lập chỉ mục ngay' }}</button>
+        </div>
+        <div class="tw-grid tw-grid-cols-2 tw-gap-3 tw-text-[13px] md:tw-grid-cols-4">
+          <div><div class="tw-text-neutral-500">Ảnh MobileNet đã đọc</div><b>{{ img.embedded ?? 0 }}</b> / {{ img.products }} sản phẩm
+            <div class="tw-text-xs tw-text-neutral-400">So màu: {{ img.indexed }} (Java không đọc được WEBP)</div></div>
+          <div><div class="tw-text-neutral-500">Đang chờ</div><b>{{ img.pending }}</b></div>
+          <div><div class="tw-text-neutral-500">AI nhận diện ảnh</div><b :class="img.aiReady ? 'tw-text-green-600' : 'tw-text-neutral-500'">{{ img.aiReady ? 'Đang bật' : 'Chưa bật: chỉ so sánh hình ảnh' }}</b></div>
+        </div>
+        <p class="tw-mb-0 tw-mt-2 tw-text-xs tw-text-neutral-400">Khi dịch vụ AI Python chạy ({{ img.visionReady ? 'đã cấu hình' : 'chưa cấu hình' }}), mỗi ảnh bìa được mạng MobileNetV2 đọc thành 1280 con số;
+          ảnh người mua tải lên được so với các vector đó và ưu tiên danh mục mà mô hình thị giác đoán được.
+          Thử trên 256 ảnh sản phẩm: đúng sản phẩm ở vị trí đầu 79%, trong top 5 là 93% (so màu: 38% / 60%).
+          Không có dịch vụ AI thì quay về so màu sắc và hình dáng. Chỉ mục tự cập nhật mỗi 2 phút khi ảnh đổi.
+          Khi bật AI (OpenAI hoặc Claude), ảnh người mua tải lên được AI nhận diện thành mô tả để tìm chính xác hơn; bước này chỉ chạy với người dùng đã đăng nhập.</p>
+      </section>
+
       <!-- semantic search index (embeddings, pgvector) - Tailwind utilities -->
       <section v-if="emb" class="sc-card">
         <div class="sc-card-head tw-items-center">
@@ -233,7 +252,7 @@
 import { ref, computed, onMounted } from 'vue'
 import TrendChart from '../../components/analytics/TrendChart.vue'
 import PaginationBar from '../../components/PaginationBar.vue'
-import { aiConfig, saveAiConfig, testAi, aiUsage, aiCalls, aiEmbeddings, reindexEmbeddings } from '../../api/admin'
+import { aiConfig, saveAiConfig, testAi, aiUsage, aiCalls, aiEmbeddings, reindexEmbeddings, imageIndexStatus, reindexImageIndex } from '../../api/admin'
 import { reviewAiStatus, trainReviewAi } from '../../api/reviewHub'
 import { isoDate, daysAgo } from '../../composables/useAnalyticsRange'
 import { formatVnd, formatDateTime } from '../../utils/format'
@@ -340,6 +359,17 @@ async function train() {
     training.value = false
   }
 }
+const img = ref(null)
+const imgBusy = ref(false)
+const loadImg = () => imageIndexStatus().then(({ data }) => { img.value = data }).catch(() => {})
+async function reindexImages() {
+  imgBusy.value = true
+  try {
+    img.value = (await reindexImageIndex()).data
+  } finally {
+    imgBusy.value = false
+  }
+}
 const emb = ref(null)
 const reindexing = ref(false)
 const loadEmb = () => aiEmbeddings().then(({ data }) => { emb.value = data }).catch(() => {})
@@ -359,6 +389,7 @@ onMounted(async () => {
     fill((await aiConfig()).data)
     loadUsage()
     loadEmb()
+    loadImg()
     loadRai()
   } catch (e) {
     error.value = extractError(e)

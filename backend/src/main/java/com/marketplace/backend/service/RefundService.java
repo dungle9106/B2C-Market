@@ -20,6 +20,7 @@ import java.util.*;
 /**
  * "Quan ly hoan tien": every refund to a buyer is recorded here.
  *  - paid online (e-wallet / card / bank transfer at checkout): refunded through the (simulated) gateway at once;
+ *  - paid with ShoppiPay: credited back to the wallet at once;
  *  - cash on delivery: the finance team transfers the money and records the bank reference (PENDING until then).
  * Refunds born from returns and disputes are later deducted from the seller's statement (SettlementService);
  * refunds of cancelled orders are not, since such orders are never paid out.
@@ -30,6 +31,7 @@ import java.util.*;
 public class RefundService {
 
     private final VnpayService vnpayService;
+    private final ShoppiPayService shoppiPayService;
     private final RefundRepository refundRepository;
     private final OrderRepository orderRepository;
     private final NotificationService notificationService;
@@ -48,6 +50,12 @@ public class RefundService {
                 online = false;
                 note = cut((note == null ? "" : note + " · ") + e.getMessage(), 500);
             }
+        }
+        if (online && p.getMethod() == PaymentMethod.SHOPPI_PAY) {
+            reference = shoppiPayService.refund(order, amount);
+            notificationService.notify(order.getBuyer().getId(), NotificationType.ORDER, "Đã hoàn tiền vào ví ShoppiPay",
+                    "Đơn " + order.getCode() + ": đã hoàn " + NotificationService.vnd(amount) + " vào ví ShoppiPay của bạn.",
+                    "/orders/" + order.getId());
         }
         Refund r = refundRepository.save(Refund.builder()
                 .order(order).returnRequestId(returnRequestId).amount(amount).source(source)

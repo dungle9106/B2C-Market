@@ -48,7 +48,7 @@ public class NotificationService {
 
     public void notify(Long userId, NotificationType type, String title, String content, String link, String imageUrl) {
         if (userId == null) return;
-        pushed(List.of(userId), type, title);
+        pushed(List.of(userId), type, title, content, link, imageUrl);
         notificationRepository.save(Notification.builder()
                 .user(userRepository.getReferenceById(userId))
                 .type(type)
@@ -59,10 +59,12 @@ public class NotificationService {
                 .build());
     }
 
-    // the bell updates at once for connected users (WebSocket, after commit)
-    private void pushed(Collection<Long> userIds, NotificationType type, String title) {
+    // the bell updates at once for connected users (WebSocket, after commit), and the user's browsers and phones
+    // get a push notification (PushService, after commit)
+    private void pushed(Collection<Long> userIds, NotificationType type, String title, String content, String link, String imageUrl) {
         events.publishEvent(new com.marketplace.backend.realtime.RealtimeEvent(userIds, "notification",
                 Map.of("kind", type.name(), "title", cut(title, 200))));
+        events.publishEvent(new com.marketplace.backend.push.PushEvent(userIds, type.name(), cut(title, 200), cut(content, 300), link, imageUrl));
     }
 
     public void notify(Long userId, NotificationType type, String title, String content, String link) {
@@ -78,7 +80,7 @@ public class NotificationService {
             n.setTitle(cut(title, 200));
             n.setContent(cut(content, 1000));
             n.setCreatedAt(LocalDateTime.now()); // jumps back to the top of the list
-            pushed(List.of(userId), type, title);
+            pushed(List.of(userId), type, title, content, link, null);
             return;
         }
         notify(userId, type, title, content, link);
@@ -88,7 +90,7 @@ public class NotificationService {
     public int notifyMany(Collection<Long> userIds, NotificationType type, String title, String content, String link) {
         List<Long> ids = userIds.stream().filter(Objects::nonNull).distinct().toList();
         if (ids.isEmpty()) return 0;
-        pushed(ids, type, title);
+        pushed(ids, type, title, content, link, null);
         Timestamp now = Timestamp.valueOf(LocalDateTime.now());
         jdbc.batchUpdate("INSERT INTO notifications (user_id, type, title, content, link, is_read, created_at) "
                         + "VALUES (?, ?, ?, ?, ?, false, ?)",

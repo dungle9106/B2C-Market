@@ -17,7 +17,7 @@
         <div v-else-if="!page.items.length" class="sc-empty">{{ status === 'OPEN' ? 'Không có tranh chấp nào chờ xử lý 👍' : 'Không có tranh chấp nào' }}</div>
         <button v-for="r in page.items" :key="r.id" type="button" class="item" :class="{ active: selectedId === r.id }" @click="select(r.id)">
           <div class="item-top">
-            <strong>{{ r.orderCode }}</strong>
+            <strong>{{ r.orderCode }}<span v-if="r.riskLevel && r.riskLevel !== 'LOW'" class="risk-badge" :class="r.riskLevel" :title="RISK_LEVEL[r.riskLevel]">AI {{ r.riskScore }}</span></strong>
             <span v-if="r.status === 'ESCALATED'" class="wait" :class="{ long: r.waitingHours >= 48 }">chờ {{ waiting(r.waitingHours) }}</span>
             <span v-else class="dec" :class="r.decision">{{ DISPUTE_DECISION[r.decision] || RETURN_STATUS[r.status] }}</span>
           </div>
@@ -45,6 +45,8 @@
           </div>
 
           <ReturnCaseCard :rr="d.request" />
+
+          <ReturnRiskPanel :return-id="d.id" />
 
           <DisputeThread :return-id="d.id" side="ADMIN" :open="d.status === 'ESCALATED'" :deadline="d.sellerResponseDeadline"
                          :seller-answered="d.sellerAnswered" :reload-key="threadKey" />
@@ -91,12 +93,13 @@ import { useRoute, useRouter } from 'vue-router'
 import PaginationBar from '../../components/PaginationBar.vue'
 import ReturnCaseCard from '../../components/orders/ReturnCaseCard.vue'
 import DisputeThread from '../../components/orders/DisputeThread.vue'
+import ReturnRiskPanel from '../../components/admin/ReturnRiskPanel.vue'
 import { adminDisputes, adminDisputeCounts, adminDispute, resolveDispute } from '../../api/admin'
 import { useAdminMe } from '../../composables/useAdminMe'
 import { formatVnd, formatDateTime } from '../../utils/format'
 import { extractError } from '../../utils/apiError'
 import { PAYMENT_METHOD, PAYMENT_STATUS } from '../../utils/adminLabels'
-import { RETURN_STATUS, RETURN_REASONS, REFUND_STATUS, REFUND_SOURCE, DISPUTE_DECISION } from '../../utils/returns'
+import { RETURN_STATUS, RETURN_REASONS, REFUND_STATUS, REFUND_SOURCE, DISPUTE_DECISION, RISK_LEVEL } from '../../utils/returns'
 
 const SELLER_HOURS = 48
 const TABS = [{ key: 'OPEN', label: 'Chờ xử lý' }, { key: 'RESOLVED', label: 'Đã giải quyết' }, { key: 'ALL', label: 'Tất cả' }]
@@ -212,4 +215,7 @@ onMounted(loadCounts)
 .resolved { font-size: 14px; padding: 12px 14px; border-radius: 6px; background: #eaf7ef; }
 .error { color: #d33; font-size: 13px; margin: 0; }
 @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } .options, .facts { grid-template-columns: 1fr; } }
+.risk-badge { color: white; font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 8px; margin-left: 6px; }
+.risk-badge.MEDIUM { background: #d98a00; }
+.risk-badge.HIGH { background: #d0011b; }
 </style>

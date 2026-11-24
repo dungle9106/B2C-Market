@@ -137,7 +137,7 @@ onMounted(() => {
 .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .filters input { grid-column: 1 / -1; }
 .filters input, .filters select { margin: 0; }
-.list { list-style: none; margin: 10px 0 0; padding: 0; max-height: calc(100vh - 330px); overflow-y: auto; }
+.list { list-style: none; margin: 10px 0 0; padding: 0; max-height: calc(var(--vh) - 330px); overflow-y: auto; }
 .list li { padding: 12px 10px; border-bottom: 1px solid var(--color-border); cursor: pointer; }
 .list li:hover { background: #fafafa; }
 .list li.active { background: var(--color-primary-light); }

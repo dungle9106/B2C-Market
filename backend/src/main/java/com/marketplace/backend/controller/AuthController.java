@@ -13,10 +13,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-// Email/password auth lives here. "Dang nhap voi Google" does NOT go through
-// this controller: the browser is sent to /oauth2/authorization/google and
-// Spring Security's oauth2Login() handles it (see SecurityConfig and
-// OAuth2LoginSuccessHandler).
+// Email/password auth lives here. "Tiep tuc voi Google / Facebook / GitHub" does NOT go through
+// this controller: the browser is sent to /oauth2/authorization/{provider} and
+// Spring Security's oauth2Login() handles it (see SecurityConfig, SocialLoginSettings and
+// OAuth2LoginSuccessHandler); this controller only lists the providers that are set up.
 // /api/account/** is the signed-in user's own security page (every role).
 @RestController
 @RequiredArgsConstructor
@@ -25,6 +25,13 @@ public class AuthController {
     private final AuthService authService;
     private final AccountSecurityService security;
     private final com.marketplace.backend.service.EmailAccountService emailAccount;
+    private final com.marketplace.backend.security.SocialLoginSettings socialLogin;
+
+    // { providers: [{ id, name }], startBase } - the social sign-in buttons to show
+    @GetMapping("/api/auth/oauth2/providers")
+    public ResponseEntity<Map<String, Object>> socialProviders() {
+        return ResponseEntity.ok(socialLogin.publicInfo());
+    }
 
     @PostMapping("/api/auth/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -84,6 +91,12 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    // body: { email, code } -> { resetToken } (valid 10 minutes, for /api/auth/reset-password)
+    @PostMapping("/api/auth/reset-password/verify-code")
+    public ResponseEntity<Map<String, Object>> verifyResetCode(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(emailAccount.verifyResetCode(body.get("email"), body.get("code")));
+    }
+
     // body: { token, newPassword }
     @PostMapping("/api/auth/reset-password")
     public ResponseEntity<Void> resetPassword(@RequestBody Map<String, String> body) {
@@ -107,6 +120,19 @@ public class AuthController {
     @PostMapping("/api/account/password")
     public ResponseEntity<Map<String, Object>> changePassword(@RequestBody Map<String, String> body) {
         return ResponseEntity.ok(security.changePassword(body.get("currentPassword"), body.get("newPassword")));
+    }
+
+    // ==================== linked Google / Facebook / GitHub accounts ====================
+
+    // -> { token, startBase }: open /oauth2/authorization/{provider}?link=<token>
+    @PostMapping("/api/account/oauth/link-token")
+    public ResponseEntity<Map<String, Object>> linkToken() {
+        return ResponseEntity.ok(security.linkToken());
+    }
+
+    @DeleteMapping("/api/account/oauth/{provider}")
+    public ResponseEntity<Map<String, Object>> unlink(@PathVariable String provider) {
+        return ResponseEntity.ok(security.unlink(provider));
     }
 
     @PostMapping("/api/account/2fa/setup")

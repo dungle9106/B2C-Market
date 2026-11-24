@@ -42,6 +42,18 @@ public class StockService {
     private final InventoryLogRepository logRepository;
     private final NotificationService notificationService;
 
+    /**
+     * Locks the products an order (or a cancellation) is about to change, in id order, before any stock update.
+     * Without it two checkouts with the same products in a different order (A: shirt then cap, B: cap then shirt,
+     * or two variants of one product) each hold one row the other needs: PostgreSQL kills one with "deadlock detected"
+     * and that buyer sees an error - exactly when many people buy at once (flash sale).
+     * Variant rows are only touched while their product's lock is held, so they follow the same order.
+     */
+    public void lockProducts(java.util.Collection<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) return;
+        productRepository.lockInIdOrder(new java.util.TreeSet<>(productIds));
+    }
+
     /** An order line is placed: take qty out of stock or fail with "only N left". */
     public void take(Product p, ProductVariant v, int qty, String orderCode) {
         if (v != null && variantRepository.takeStock(v.getId(), qty) == 0) {

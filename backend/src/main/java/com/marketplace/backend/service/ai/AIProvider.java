@@ -12,6 +12,16 @@ public interface AIProvider {
      */
     Completion call(AiSettings settings, String systemPrompt, String userPrompt);
 
+    /** The same with one image (vision models: OpenAI, Claude). Providers without vision say so. */
+    default Completion callWithImage(AiSettings settings, String systemPrompt, String userPrompt, byte[] image, String mime) {
+        return Completion.failed("Mô hình hiện tại không hỗ trợ đọc ảnh", 0);
+    }
+
+    /** One step of a conversation with tools (see Agent). Providers without function calling say so. */
+    default Agent.Reply converse(AiSettings settings, String systemPrompt, java.util.List<Agent.Msg> messages, java.util.List<Agent.Tool> tools) {
+        return Agent.Reply.failed("Mô hình hiện tại không hỗ trợ gọi công cụ");
+    }
+
     record Completion(String text, int promptTokens, int completionTokens, boolean estimated, String error) {
         public static Completion failed(String error, int promptTokens) {
             return new Completion(null, promptTokens, 0, true, error);

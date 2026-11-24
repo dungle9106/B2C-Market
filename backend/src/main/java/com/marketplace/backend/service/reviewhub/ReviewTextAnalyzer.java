@@ -49,12 +49,13 @@ public final class ReviewTextAnalyzer {
     private static final Map<String, List<String>> COMPLAINT = new LinkedHashMap<>();
 
     static {
-        TOPIC.put("QUALITY", List.of("chat luong", "chat lieu", "vai", "duong may", "ben", "mong", "may", "pin", "hoat dong", "su dung", "mau"));
+        TOPIC.put("QUALITY", List.of("chat luong", "chat lieu", "vai", "duong may", "ben", "mong qua", "hoi mong", "may", "pin", "hoat dong", "su dung", "mau"));
         TOPIC.put("DELIVERY", List.of("giao", "giao hang", "ship", "shipper", "van chuyen", "nhan hang", "don vi van chuyen"));
         TOPIC.put("PACKAGING", List.of("dong goi", "goi hang", "hop", "bao bi", "thung"));
-        TOPIC.put("SIZE", List.of("size", "kich thuoc", "kich co", "form", "mac"));
-        TOPIC.put("PRICE", List.of("gia ca", "gia tien", "muc gia", "tien"));
-        TOPIC.put("SERVICE", List.of("shop", "tu van", "phan hoi", "tra loi", "thai do", "ho tro", "doi tra", "doi hang", "hoan tien", "chat"));
+        TOPIC.put("SIZE", List.of("size", "kich thuoc", "kich co", "form"));
+        TOPIC.put("PRICE", List.of("gia ca", "gia tien", "muc gia"));
+        // no bare "chat" ("chat luong"), "shop" or "hoan tien" ("hang te, mong shop hoan tien" is about the goods)
+        TOPIC.put("SERVICE", List.of("shop te", "shop lam an", "chu shop", "nhan vien", "nhan tin", "chat voi shop", "tu van", "phan hoi", "tra loi", "thai do", "ho tro", "doi tra"));
 
         COMPLAINT.put("QUALITY", List.of("bi loi", "hang loi", "loi", "hong", "hu", "hu hong", "rach", "bung chi", "bung", "phai mau", "ra mau",
                 "xu", "kem chat luong", "chat luong kem", "khong hoat dong", "khong len", "khong chay", "nhanh hong", "dung vai lan", "bi gay",
@@ -73,7 +74,7 @@ public final class ReviewTextAnalyzer {
                 "nham hang", "sai hang", "thieu so luong", "khong co qua tang", "thieu qua"));
         COMPLAINT.put("AUTHENTICITY", List.of("hang gia", "hang nhai", "fake", "nhai", "khong chinh hang", "hang dom", "di ung", "noi man",
                 "ngua", "mui hac", "chay no", "phat no", "doc hai", "nguy hiem", "giat dien", "bong da", "kich ung"));
-        COMPLAINT.put("PRICE", List.of("dat qua", "khong dang tien", "mac qua", "gia cao", "gia hoi cao", "hoi dat", "gia hoi dat", "khong xung dang"));
+        COMPLAINT.put("PRICE", List.of("dat qua", "khong dang tien", "mac qua", "gia cao", "gia tien cao", "gia hoi cao", "hoi dat", "gia hoi dat", "khong xung dang"));
         COMPLAINT.put("SERVICE", List.of("khong tra loi", "khong phan hoi", "thai do", "khong ho tro", "lua dao", "khong cho doi", "khong cho tra",
                 "khong hoan tien", "chua hoan tien", "block", "chan tin nhan", "doi tra kho", "tu van sai"));
     }
@@ -83,7 +84,7 @@ public final class ReviewTextAnalyzer {
             "chuan", "ok", "oke", "on", "thich", "tuyet voi", "ben", "day dan", "min", "thom", "hop ly", "chu dao", "than thien",
             "chong soc", "ky", "chat luong tot", "good", "dang mua", "se ung ho", "ung ho", "5 sao", "10 diem", "xin", "yeu");
     private static final List<String> NEGATIVE = List.of("xau", "te", "cham", "tre", "lau", "loi", "rach", "khong giong", "khac hinh",
-            "sai", "that vong", "kem", "phai mau", "hong", "hu", "mop", "bep", "vo nat", "nat", "thieu", "cau tha", "xu", "chan qua", "buc",
+            "sai", "that vong", "kem", "phai mau", "hong", "hu", "mop", "bep", "vo nat", "nat", "thieu", "cau tha", "xu", "chan qua", "kho chiu", "buc",
             "buc minh", "phi tien", "khong nen mua", "dung mua", "dung dat", "lua dao", "hang gia", "nhai", "fake", "moc", "mui hoi", "di ung", "1 sao");
     private static final Set<String> NEGATIONS = Set.of("khong", "ko", "k", "chua", "chang", "cha", "khg", "hok");
     /** words that make a review urgent whatever its stars */
@@ -113,6 +114,7 @@ public final class ReviewTextAnalyzer {
             for (String w : NEGATIVE) if (has(c, w) && !negated(c, w)) cn++;
             // "khong loi", "chua hong": a negated defect is praise, not a complaint
             for (Map.Entry<String, List<String>> e : COMPLAINT.entrySet()) {
+                if (aboutShipper(c, e.getKey())) continue;
                 for (String w : e.getValue()) {
                     if (has(c, w) && !negated(c, w)) {
                         issues.add(e.getKey());
@@ -123,7 +125,7 @@ public final class ReviewTextAnalyzer {
             }
             if (cn > cp) {
                 for (Map.Entry<String, List<String>> e : TOPIC.entrySet()) {
-                    if (e.getValue().stream().anyMatch(w -> has(c, w))) issues.add(e.getKey());
+                    if (!aboutShipper(c, e.getKey()) && e.getValue().stream().anyMatch(w -> has(c, w))) issues.add(e.getKey());
                 }
             }
             pos += cp;
@@ -160,6 +162,11 @@ public final class ReviewTextAnalyzer {
             if (!n.isEmpty() && (n.contains(clause) || clause.contains(n))) return cut(part.trim(), 200);
         }
         return cut(clause, 200);
+    }
+
+    // a rude courier is a delivery problem, not the shop's service
+    private static boolean aboutShipper(String clause, String issue) {
+        return issue.equals("SERVICE") && has(clause, "shipper");
     }
 
     static boolean has(String text, String word) {

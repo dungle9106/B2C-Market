@@ -23,13 +23,13 @@
         <div class="row">
           <div>
             <h3>Mật khẩu</h3>
-            <p v-if="data.provider === 'GOOGLE'">Tài khoản đăng nhập bằng Google, không dùng mật khẩu Shoppi.</p>
+            <p v-if="!data.hasPassword">Tài khoản chưa có mật khẩu Shoppi (đăng nhập bằng {{ PROVIDER[data.provider] || 'mạng xã hội' }}). Tạo mật khẩu để đăng nhập được bằng email.</p>
             <p v-else>{{ data.passwordChangedAt ? 'Đổi lần cuối ' + formatDateTime(data.passwordChangedAt) : 'Chưa đổi mật khẩu kể từ khi đăng ký' }}</p>
           </div>
-          <button v-if="data.provider !== 'GOOGLE' && !pw.open" type="button" class="btn sm ghost" @click="pw.open = true">Đổi mật khẩu</button>
+          <button v-if="!pw.open" type="button" class="btn sm ghost" @click="pw.open = true">{{ data.hasPassword ? 'Đổi mật khẩu' : 'Tạo mật khẩu' }}</button>
         </div>
         <form v-if="pw.open" class="form" @submit.prevent="savePassword">
-          <input v-model="pw.current" type="password" placeholder="Mật khẩu hiện tại" autocomplete="current-password" />
+          <input v-if="data.hasPassword" v-model="pw.current" type="password" placeholder="Mật khẩu hiện tại" autocomplete="current-password" />
           <input v-model="pw.next" type="password" placeholder="Mật khẩu mới (≥ 8 ký tự, có chữ và số)" autocomplete="new-password" />
           <input v-model="pw.confirm" type="password" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" />
           <p class="faint">Các thiết bị khác sẽ bị đăng xuất.</p>
@@ -40,6 +40,24 @@
           </div>
         </form>
         <p v-if="pw.msg" class="ok">{{ pw.msg }}</p>
+      </section>
+
+      <!-- linked Google / Facebook / GitHub accounts -->
+      <section v-if="data.linkedAccounts?.length" class="card">
+        <h3>Tài khoản liên kết</h3>
+        <p>Liên kết để đăng nhập nhanh bằng tài khoản mạng xã hội. Shoppi không đăng gì lên tài khoản của bạn.</p>
+        <div v-for="a in data.linkedAccounts" :key="a.id" class="device">
+          <SocialIcon :provider="a.id" :size="24" />
+          <div class="grow">
+            <b>{{ a.name }}</b><span v-if="a.linked" class="tag ok">Đã liên kết</span>
+            <div v-if="a.linked" class="faint">{{ a.email || a.displayName }} · liên kết {{ formatDateTime(a.linkedAt) }}<template v-if="a.lastUsedAt"> · đăng nhập gần nhất {{ formatDateTime(a.lastUsedAt) }}</template></div>
+            <div v-else class="faint">Chưa liên kết</div>
+          </div>
+          <button v-if="a.linked" type="button" class="link danger" :disabled="busy.link" @click="unlink(a)">Gỡ liên kết</button>
+          <button v-else-if="a.available" type="button" class="btn sm ghost" :disabled="busy.link" @click="link(a)">Liên kết</button>
+        </div>
+        <p v-if="linkMsg" class="ok">{{ linkMsg }}</p>
+        <p v-if="linkError" class="error">{{ linkError }}</p>
       </section>
 
       <!-- two-step verification -->
@@ -75,7 +93,7 @@
 
         <div v-if="data.twoFactorEnabled && !tf.codes" class="manage">
           <input v-model.trim="tf.code" maxlength="6" inputmode="numeric" placeholder="Mã 6 số hiện tại" class="code small" />
-          <input v-if="data.provider !== 'GOOGLE'" v-model="tf.password" type="password" placeholder="Mật khẩu (để tắt)" />
+          <input v-if="data.hasPassword" v-model="tf.password" type="password" placeholder="Mật khẩu (để tắt)" />
           <button type="button" class="btn sm ghost" :disabled="tf.code.length !== 6 || busy.tf" @click="regenerate">Tạo mã dự phòng mới</button>
           <button type="button" class="btn sm ghost danger" :disabled="tf.code.length !== 6 || busy.tf" @click="disable">Tắt xác thực 2 lớp</button>
         </div>
@@ -120,9 +138,11 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import SocialIcon from '../auth/SocialIcon.vue'
 import QRCode from 'qrcode'
 import { accountSecurity, changePassword, sendVerificationEmail, setupTwoFactor, enableTwoFactor, disableTwoFactor, newBackupCodes,
-  revokeSession, revokeOtherSessions } from '../../api/auth'
+  revokeSession, revokeOtherSessions, oauthLinkToken, unlinkOAuth, socialLoginUrl } from '../../api/auth'
 import { useAuthStore } from '../../stores/auth'
 import { formatDateTime } from '../../utils/format'
 import { extractError } from '../../utils/apiError'
@@ -133,7 +153,8 @@ const emit = defineEmits(['changed'])
 
 const RESULT = { SUCCESS: 'Thành công', BAD_PASSWORD: 'Sai mật khẩu', UNKNOWN_EMAIL: 'Sai email', LOCKED: 'Tài khoản bị khóa', TEMP_LOCKED: 'Đang khóa tạm',
   RATE_LIMITED: 'Bị chặn (quá nhiều lần)', TWO_FACTOR_FAILED: 'Sai mã 2 lớp', TWO_FACTOR_REQUIRED: 'Chờ mã 2 lớp' }
-const METHOD = { PASSWORD: 'Mật khẩu', GOOGLE: 'Google', TOTP: 'Mã ứng dụng', BACKUP_CODE: 'Mã dự phòng', TWO_FACTOR: 'Mã 2 lớp' }
+const PROVIDER = { GOOGLE: 'Google', FACEBOOK: 'Facebook', GITHUB: 'GitHub' }
+const METHOD = { PASSWORD: 'Mật khẩu', GOOGLE: 'Google', FACEBOOK: 'Facebook', GITHUB: 'GitHub', TOTP: 'Mã ứng dụng', BACKUP_CODE: 'Mã dự phòng', TWO_FACTOR: 'Mã 2 lớp' }
 
 const auth = useAuthStore()
 const data = ref(null)
@@ -142,6 +163,10 @@ const busy = reactive({})
 const verifySent = ref(false)
 const copied = ref(false)
 const pw = reactive({ open: false, current: '', next: '', confirm: '', error: '', msg: '' })
+const route = useRoute()
+const router = useRouter()
+const linkMsg = ref('')
+const linkError = ref('')
 const tf = reactive({ secret: null, qr: null, code: '', password: '', codes: null, error: '' })
 
 async function load() {
@@ -220,7 +245,29 @@ async function copyCodes() {
 const signOut = (s) => act('dev', async () => { await revokeSession(s.id); load() }, (m) => { error.value = m })
 const signOutOthers = () => confirm('Đăng xuất tất cả thiết bị khác?') && act('dev', async () => { await revokeOtherSessions(); auth.saveSeed(); load() }, (m) => { error.value = m })
 
-onMounted(load)
+// full-page round trip to the provider; OAuth2RedirectView brings the browser back here with ?linked= or ?linkError=
+const link = (a) => act('link', async () => {
+  const { data: t } = await oauthLinkToken()
+  sessionStorage.setItem('oauth2_link_return', route.path)
+  window.location.href = socialLoginUrl(a.id, t.startBase, t.token)
+}, (m) => { linkError.value = m })
+
+function unlink(a) {
+  if (!confirm(`Gỡ liên kết ${a.name}? Bạn sẽ không đăng nhập bằng ${a.name} được nữa.`)) return
+  act('link', async () => {
+    data.value = (await unlinkOAuth(a.id)).data
+    linkMsg.value = `Đã gỡ liên kết ${a.name}.`
+    linkError.value = ''
+  }, (m) => { linkError.value = m; linkMsg.value = '' })
+}
+
+onMounted(() => {
+  const { linked, linkError: err } = route.query
+  if (linked) linkMsg.value = `Đã liên kết tài khoản ${{ google: 'Google', facebook: 'Facebook', github: 'GitHub' }[linked] || linked}.`
+  if (err) linkError.value = err
+  if (linked || err) router.replace({ query: { ...route.query, linked: undefined, linkError: undefined } })
+  load()
+})
 </script>
 
 <style scoped>

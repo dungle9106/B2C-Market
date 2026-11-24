@@ -52,6 +52,8 @@
               <span class="label">🎁 {{ c.name }}</span>
               <span v-if="c.percent" class="applied">Đã giảm {{ c.percent }}% cho {{ c.quantity }} sản phẩm</span>
               <span v-if="c.nextMinQuantity" class="combo-hint">Mua thêm {{ c.nextMinQuantity - c.quantity }} sản phẩm để được giảm {{ c.nextPercent }}%</span>
+              <span v-if="c.message" class="applied">{{ c.message }}</span>
+              <span v-if="c.hint" class="combo-hint">{{ c.hint }}</span>
             </div>
             <p v-for="n in sq.notices" :key="n" class="notice">⚠ {{ n }}</p>
             <div class="extra-row voucher-row">
@@ -85,7 +87,7 @@
           </div>
 
           <div class="shop-total">
-            <span v-if="sq.comboDiscount > 0" class="combo-saved">Combo giảm {{ formatVnd(sq.comboDiscount) }} ·</span>
+            <span v-if="sq.comboDiscount > 0" class="combo-saved">Combo & deal giảm {{ formatVnd(sq.comboDiscount) }} ·</span>
             Tổng số tiền ({{ sq.quantity }} sản phẩm): <strong>{{ formatVnd(sq.total) }}</strong>
           </div>
         </section>
@@ -98,6 +100,16 @@
           </span>
           <span v-else-if="quote.platformVoucherError" class="voucher-error">{{ quote.platformVoucherError }}</span>
           <button type="button" class="link" @click="platformOpen = true">{{ quote.platformVoucher ? 'Đổi Voucher' : 'Chọn Voucher' }}</button>
+        </section>
+
+        <!-- ===== Shoppi Xu ===== -->
+        <section v-if="quote.coinBalance > 0" class="card voucher-card">
+          <span class="label big">🪙 Shoppi Xu</span>
+          <span class="text-muted">Bạn có {{ quote.coinBalance.toLocaleString('vi-VN') }} Xu, dùng được {{ quote.coinsUsable.toLocaleString('vi-VN') }} Xu cho đơn này</span>
+          <label class="coin-toggle">
+            <input v-model="useCoins" type="checkbox" :disabled="!quote.coinsUsable" />
+            <span>-{{ formatVnd(quote.coinsUsable) }}</span>
+          </label>
         </section>
 
         <!-- ===== payment method + totals ===== -->
@@ -118,21 +130,27 @@
             </button>
           </div>
           <p class="pay-note">{{ (methods.find(m => m.value === paymentMethod) || METHODS[0]).note }}</p>
+          <p v-if="paymentMethod === 'SHOPPI_PAY'" class="pay-note" :class="{ short: walletShort }">
+            Số dư ví: {{ formatVnd(quote.walletBalance) }}<template v-if="walletShort">, chưa đủ để thanh toán.</template>
+            <router-link to="/account/wallet" target="_blank" class="text-primary"> Nạp tiền</router-link>
+          </p>
 
           <dl class="totals">
             <dt>Tổng tiền hàng</dt><dd>{{ formatVnd(quote.merchandiseTotal) }}</dd>
             <dt>Tổng tiền phí vận chuyển</dt><dd>{{ formatVnd(quote.shippingFeeTotal) }}</dd>
             <template v-if="quote.shippingDiscountTotal > 0"><dt>Giảm giá phí vận chuyển</dt><dd>-{{ formatVnd(quote.shippingDiscountTotal) }}</dd></template>
-            <template v-if="quote.comboDiscountTotal > 0"><dt>Combo khuyến mãi</dt><dd>-{{ formatVnd(quote.comboDiscountTotal) }}</dd></template>
+            <template v-if="quote.comboDiscountTotal > 0"><dt>Combo & mua kèm deal sốc</dt><dd>-{{ formatVnd(quote.comboDiscountTotal) }}</dd></template>
             <template v-if="quote.shopDiscountTotal > 0"><dt>Voucher của Shop</dt><dd>-{{ formatVnd(quote.shopDiscountTotal) }}</dd></template>
             <template v-if="quote.platformDiscountTotal > 0"><dt>Shoppi Voucher</dt><dd>-{{ formatVnd(quote.platformDiscountTotal) }}</dd></template>
+            <template v-if="quote.coinDiscountTotal > 0"><dt>Shoppi Xu</dt><dd>-{{ formatVnd(quote.coinDiscountTotal) }}</dd></template>
             <dt class="grand">Tổng thanh toán</dt><dd class="grand">{{ formatVnd(quote.total) }}</dd>
+            <template v-if="quote.coinsToEarn > 0"><dt>Xu nhận được khi đơn hoàn tất<template v-if="quote.coinMultiplierPercent > 100"> (hạng {{ quote.membershipTier }} x{{ quote.coinMultiplierPercent / 100 }})</template></dt><dd>🪙 {{ quote.coinsToEarn.toLocaleString('vi-VN') }}</dd></template>
           </dl>
 
           <div class="place-row">
             <span class="text-muted small">Nhấn "Đặt hàng" đồng nghĩa với việc bạn đồng ý tuân theo Điều khoản Shoppi</span>
             <p v-if="error" class="error">{{ error }}</p>
-            <button class="btn lg place" :disabled="placing || updating || !address" @click="onPlace">
+            <button class="btn lg place" :disabled="placing || updating || !address || walletShort" @click="onPlace">
               {{ placing ? 'Đang đặt hàng...' : 'Đặt hàng' }}
             </button>
           </div>
@@ -176,6 +194,7 @@ import { getPaymentMethods, vnpayUrl } from '../../api/payments'
 
 const METHODS = [
   { value: 'COD', label: 'Thanh toán khi nhận hàng', note: 'Thanh toán bằng tiền mặt cho nhân viên giao hàng khi nhận hàng.' },
+  { value: 'SHOPPI_PAY', label: 'Ví ShoppiPay', note: 'Trừ thẳng vào số dư ví khi đặt hàng. Nếu đơn bị hủy hoặc trả hàng, tiền được hoàn lại vào ví.' },
   { value: 'E_WALLET', label: 'Ví điện tử', note: 'Bạn sẽ được chuyển tới cổng thanh toán của ví sau khi đặt hàng (môi trường mô phỏng).' },
   { value: 'CARD', label: 'Thẻ Tín dụng/Ghi nợ', note: 'Hỗ trợ Visa, Mastercard, JCB. Nhập thông tin thẻ ở bước tiếp theo (môi trường mô phỏng).' },
   { value: 'BANK_TRANSFER', label: 'Chuyển khoản ngân hàng', note: 'Bạn sẽ nhận thông tin tài khoản và nội dung chuyển khoản sau khi đặt hàng.' }
@@ -206,6 +225,7 @@ const addresses = ref([])
 const addressId = ref(null)
 const parts = ref([])                 // per shop: { cartItemIds, voucherCode, shippingOption, note }
 const platformVoucherCode = ref(null)
+const useCoins = ref(false)
 const paymentMethod = ref('COD')
 const paymentProvider = ref('MOMO')
 const vouchers = ref([])
@@ -217,6 +237,7 @@ const platformOpen = ref(false)
 const placeholder = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="%23f0f0f0"/></svg>'
 
 const address = computed(() => addresses.value.find(a => a.id === addressId.value) || null)
+const walletShort = computed(() => paymentMethod.value === 'SHOPPI_PAY' && !!quote.value && Number(quote.value.walletBalance) < Number(quote.value.total))
 const vouchersForShop = (shopId) => vouchers.value.filter(v => v.scope === 'SHOP' && v.shopId === shopId)
 
 const fmt = (d) => new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
@@ -228,7 +249,8 @@ function body() {
     addressId: addressId.value,
     paymentMethod: paymentMethod.value,
     paymentProvider: paymentMethod.value === 'E_WALLET' ? paymentProvider.value : null,
-    platformVoucherCode: platformVoucherCode.value
+    platformVoucherCode: platformVoucherCode.value,
+    useCoins: useCoins.value
   }
 }
 
@@ -307,7 +329,7 @@ async function onPlace() {
   }
 }
 
-watch([addressId, platformVoucherCode, paymentMethod, paymentProvider,
+watch([addressId, platformVoucherCode, useCoins, paymentMethod, paymentProvider,
   () => parts.value.map(p => `${p.voucherCode}|${p.shippingOption}`).join(',')], (now, before) => {
   if (before !== undefined) refresh()
 })
@@ -384,6 +406,8 @@ onMounted(async () => {
 
 .voucher-card { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .voucher-card .link { margin-left: auto; }
+.coin-toggle { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--color-primary); cursor: pointer; }
+.coin-toggle input { margin: 0; width: auto; }
 
 .pay-card { padding: 0; }
 .pay-head { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 20px 28px; border-bottom: 1px dashed rgba(0, 0, 0, 0.09); }
@@ -395,6 +419,7 @@ onMounted(async () => {
 .wallet { display: flex; align-items: center; gap: 8px; }
 .wallet-logo { width: 26px; height: 26px; border-radius: 6px; color: white; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .pay-note { padding: 12px 28px 0; margin: 0; font-size: 13px; color: var(--color-text-muted); }
+.pay-note.short { color: #d33; }
 
 .totals { display: grid; grid-template-columns: 1fr 180px; gap: 12px 24px; justify-items: end; padding: 20px 28px; margin: 0; font-size: 14px; color: var(--color-text-muted); }
 .totals dd { margin: 0; color: var(--color-text); }

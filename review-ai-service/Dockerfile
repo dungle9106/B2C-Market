@@ -5,5 +5,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 # the trained model is written here: mount a volume to keep it across restarts
 ENV MODEL_PATH=/app/models/review_model.joblib
+ENV RETURN_MODEL_PATH=/app/models/return_risk.joblib
+ENV RECO_MODEL_PATH=/app/models/recommender.joblib
+ENV CHURN_MODEL_PATH=/app/models/churn.joblib
+ENV FRAUD_MODEL_PATH=/app/models/fraud.joblib
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

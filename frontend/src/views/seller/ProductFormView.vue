@@ -50,6 +50,15 @@
           <option v-for="sub in c.children" :key="sub.id" :value="sub.id">{{ sub.name }}</option>
         </optgroup>
       </select>
+      <!-- computer vision: categories the cover photo looks like (MobileNetV2 + a classifier trained on Shoppi's photos) -->
+      <div v-if="visionLoading || visionItems.length" class="vision">
+        <span class="vision-label">📷 AI nhận diện từ ảnh bìa:</span>
+        <span v-if="visionLoading" class="hint">đang xem ảnh...</span>
+        <button v-for="v in visionItems" :key="v.categoryId" type="button" class="vision-chip"
+          :class="{ on: form.categoryId === v.categoryId }" @click="form.categoryId = v.categoryId">
+          {{ v.path }} <small>{{ Math.round(v.probability * 100) }}%</small>
+        </button>
+      </div>
     </section>
 
     <!-- AI: seller-side description generator. Seller fills quick facts,
@@ -186,13 +195,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MediaUploader from '../../components/MediaUploader.vue'
 import { createProduct, updateProduct, myProduct, categoryTree as fetchCategoryTree, myShopCategories } from '../../api/products'
 import VariantEditor from '../../components/product/VariantEditor.vue'
 import { emptyVariantModel, toVariantModel, fromVariantModel, validateVariantModel } from '../../utils/variants'
-import { generateDescription } from '../../api/ai'
+import { categoryFromImage, generateDescription } from '../../api/ai'
 import PriceSuggestion from '../../components/product/PriceSuggestion.vue'
 import { getMyShop } from '../../api/shop'
 import { extractError } from '../../utils/apiError'
@@ -222,6 +231,27 @@ const form = ref({
 })
 const variantModel = ref(emptyVariantModel())
 const shopCategories = ref([])
+
+// "Goi y danh muc tu anh": asked again whenever the cover photo changes; the seller clicks a suggestion to use it
+const visionItems = ref([])
+const visionLoading = ref(false)
+let visionFor = ''
+watch(() => form.value.imageUrls[0], async (url) => {
+  if (!url || url === visionFor || /\.(mp4|webm)$/i.test(url)) {
+    if (!url) visionItems.value = []
+    return
+  }
+  visionFor = url
+  visionLoading.value = true
+  try {
+    const { data } = await categoryFromImage(url)
+    if (visionFor === url) visionItems.value = data.items || []
+  } catch {
+    visionItems.value = []
+  } finally {
+    visionLoading.value = false
+  }
+})
 
 // MediaUploader works with a list; the product has at most one video
 const videoList = computed({
@@ -412,4 +442,10 @@ async function loadProduct() {
 .mod-banner.PENDING { background: #fff8e6; color: #8a5a00; border: 1px solid #ffe2a8; }
 .mod-banner.REJECTED, .mod-banner.REMOVED { background: #fdecea; color: #b42318; border: 1px solid #f5c2bd; }
 .mod-hint { font-size: 13px; }
+.vision { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; }
+.vision-label { color: var(--color-text-muted); }
+.vision-chip { border: 1px solid var(--color-border); background: #fff; border-radius: 14px; padding: 3px 10px; cursor: pointer; font-size: 13px; }
+.vision-chip small { color: var(--color-text-faint); margin-left: 2px; }
+.vision-chip:hover { border-color: var(--color-primary); }
+.vision-chip.on { border-color: var(--color-primary); color: var(--color-primary); background: #fff4f1; }
 </style>

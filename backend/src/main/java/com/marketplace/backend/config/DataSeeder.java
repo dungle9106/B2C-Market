@@ -1,6 +1,7 @@
 package com.marketplace.backend.config;
 
 import com.marketplace.backend.entity.Category;
+import com.marketplace.backend.entity.PlatformSetting;
 import com.marketplace.backend.entity.Role;
 import com.marketplace.backend.entity.User;
 import com.marketplace.backend.entity.Voucher;
@@ -8,6 +9,7 @@ import com.marketplace.backend.entity.VoucherScope;
 import com.marketplace.backend.entity.VoucherType;
 import com.marketplace.backend.util.TextNormalizer;
 import com.marketplace.backend.repository.CategoryRepository;
+import com.marketplace.backend.repository.PlatformSettingRepository;
 import com.marketplace.backend.repository.ProductRepository;
 import com.marketplace.backend.repository.VoucherRepository;
 import com.marketplace.backend.repository.UserRepository;
@@ -35,6 +37,7 @@ public class DataSeeder implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final ProductRepository productRepository;
     private final VoucherRepository voucherRepository;
+    private final PlatformSettingRepository settingRepository;
 
     @Override
     @Transactional
@@ -76,6 +79,7 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         seedSubCategories();
+        seedExtendedCatalog();
         seedPlatformVouchers();
 
         // products created before search normalisation existed
@@ -121,6 +125,57 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     // old unaccented seed name -> display name
+    // more top-level categories (with their sub-categories), added once: a key in platform_settings marks it done,
+    // so categories the admin deletes or renames later are not brought back on the next start
+    private static final String EXTENDED_CATALOG_KEY = "seed.categories.extended.v1";
+
+    private void seedExtendedCatalog() {
+        if (settingRepository.existsById(EXTENDED_CATALOG_KEY)) return;
+        int order = categoryRepository.findByParentIsNull().size();
+        for (Map.Entry<String, List<String>> e : EXTENDED_CATALOG.entrySet()) {
+            String name = e.getKey();
+            Category parent = categoryRepository.findByParentIsNull().stream()
+                    .filter(c -> c.getName().equalsIgnoreCase(name)).findFirst()
+                    .orElseGet(() -> categoryRepository.save(Category.builder().name(name).build()));
+            if (parent.getSortOrder() == null || parent.getSortOrder() == 0) {
+                parent.setSortOrder(order++);
+                categoryRepository.save(parent);
+            }
+            List<Category> existing = categoryRepository.findByParentId(parent.getId());
+            for (String child : e.getValue()) {
+                if (existing.stream().noneMatch(c -> c.getName().equalsIgnoreCase(child)))
+                    categoryRepository.save(Category.builder().name(child).parent(parent).build());
+            }
+        }
+        settingRepository.save(new PlatformSetting(EXTENDED_CATALOG_KEY, "done", LocalDateTime.now(), null));
+        System.out.println(">> Seeded extended categories: " + EXTENDED_CATALOG.keySet());
+    }
+
+    private static final Map<String, List<String>> EXTENDED_CATALOG = new LinkedHashMap<>();
+    static {
+        EXTENDED_CATALOG.put("Thời trang", List.of());
+        EXTENDED_CATALOG.put("Điện tử", List.of());
+        EXTENDED_CATALOG.put("Máy ảnh & Máy quay phim", List.of("Máy ảnh", "Camera hành trình & Action cam", "Camera giám sát", "Ống kính & Phụ kiện máy ảnh"));
+        EXTENDED_CATALOG.put("Đồng hồ", List.of("Đồng hồ nam", "Đồng hồ nữ", "Đồng hồ thông minh", "Phụ kiện đồng hồ"));
+        EXTENDED_CATALOG.put("Thiết bị điện gia dụng", List.of("Đồ điện nhà bếp", "Máy lọc không khí & Quạt", "Máy hút bụi", "Bàn ủi & Máy may"));
+        EXTENDED_CATALOG.put("Đồ gia dụng", List.of());
+        EXTENDED_CATALOG.put("Mỹ phẩm", List.of());
+        EXTENDED_CATALOG.put("Sức khỏe", List.of("Thực phẩm chức năng", "Vật tư y tế", "Chăm sóc cá nhân", "Dụng cụ hỗ trợ sức khỏe"));
+        EXTENDED_CATALOG.put("Mẹ & Bé", List.of("Sữa & Đồ ăn dặm", "Tã bỉm", "Đồ dùng cho bé", "Đồ chơi cho bé"));
+        EXTENDED_CATALOG.put("Thời trang trẻ em", List.of("Quần áo bé trai", "Quần áo bé gái", "Giày dép trẻ em"));
+        EXTENDED_CATALOG.put("Balo & Túi ví", List.of("Balo", "Túi xách", "Ví", "Vali & Túi du lịch"));
+        EXTENDED_CATALOG.put("Trang sức & Phụ kiện", List.of("Nhẫn", "Dây chuyền & Vòng cổ", "Bông tai", "Kính mắt"));
+        EXTENDED_CATALOG.put("Thể thao & Du lịch", List.of("Dụng cụ tập luyện", "Quần áo thể thao", "Đồ cắm trại & Dã ngoại", "Xe đạp thể thao"));
+        EXTENDED_CATALOG.put("Ô tô & Xe máy & Xe đạp", List.of("Phụ kiện ô tô", "Phụ kiện xe máy", "Mũ bảo hiểm", "Dầu nhớt & Chăm sóc xe"));
+        EXTENDED_CATALOG.put("Bách hóa online", List.of("Đồ ăn vặt", "Đồ uống", "Gia vị & Nguyên liệu", "Đồ khô"));
+        EXTENDED_CATALOG.put("Sách & Văn phòng phẩm", List.of());
+        EXTENDED_CATALOG.put("Đồ chơi", List.of("Mô hình & Đồ sưu tầm", "Đồ chơi giáo dục", "Board game & Xếp hình"));
+        EXTENDED_CATALOG.put("Chăm sóc thú cưng", List.of("Thức ăn thú cưng", "Phụ kiện thú cưng", "Vệ sinh cho thú cưng"));
+        EXTENDED_CATALOG.put("Giặt giũ & Chăm sóc nhà cửa", List.of("Nước giặt & Nước xả", "Nước rửa chén", "Chất tẩy rửa", "Giấy & Khăn giấy"));
+        EXTENDED_CATALOG.put("Dụng cụ & Thiết bị tiện ích", List.of("Dụng cụ cầm tay", "Dụng cụ điện", "Thiết bị chiếu sáng", "Thiết bị điện & Ổ cắm"));
+        EXTENDED_CATALOG.put("Game & Giải trí", List.of("Máy chơi game", "Tay cầm & Phụ kiện game", "Nhạc cụ"));
+    }
+
     private static final Map<String, String> ACCENTED_CATEGORY_NAMES = new LinkedHashMap<>();
     static {
         ACCENTED_CATEGORY_NAMES.put("Thoi trang", "Thời trang");

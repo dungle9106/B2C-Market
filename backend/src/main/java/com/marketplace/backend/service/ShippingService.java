@@ -14,20 +14,34 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Simulated shipping rates (no real carrier API): a fee table by method and by
- * whether the shop and the buyer are in the same province, plus a small
- * per-carrier surcharge. Delivery dates are counted from today.
+ * Simulated shipping rates: a fee table by method and by whether the shop and the buyer are in the same province,
+ * plus a per-carrier surcharge and extra days. Delivery dates are counted from today. Carriers connected through
+ * their real API (service/shipping/CarrierGateway: GHN, GHTK) re-price their options with it at checkout.
  */
 @Service
 public class ShippingService {
 
-    public record Carrier(String code, String name, int surcharge, Set<ShippingMethod> methods) {}
+    /** surcharge in VND (may be negative: a cheaper carrier), extraDays added to the delivery estimate. */
+    public record Carrier(String code, String name, int surcharge, int extraDays, Set<ShippingMethod> methods, String note) {
+        /** Instant couriers (Ahamove, GrabExpress) only deliver within the same city. */
+        public boolean instantOnly() {
+            return methods.equals(Set.of(ShippingMethod.SAME_DAY));
+        }
+    }
+
+    private static final Set<ShippingMethod> STANDARD = Set.of(ShippingMethod.ECONOMY, ShippingMethod.EXPRESS);
+    private static final Set<ShippingMethod> ALL = Set.of(ShippingMethod.ECONOMY, ShippingMethod.EXPRESS, ShippingMethod.SAME_DAY);
 
     public static final List<Carrier> CARRIERS = List.of(
-            new Carrier("GHTK", "Giao Hàng Tiết Kiệm", 0, Set.of(ShippingMethod.ECONOMY, ShippingMethod.EXPRESS)),
-            new Carrier("GHN", "Giao Hàng Nhanh", 3000, Set.of(ShippingMethod.ECONOMY, ShippingMethod.EXPRESS, ShippingMethod.SAME_DAY)),
-            new Carrier("JT", "J&T Express", 1000, Set.of(ShippingMethod.ECONOMY, ShippingMethod.EXPRESS)),
-            new Carrier("VTP", "Viettel Post", 2000, Set.of(ShippingMethod.ECONOMY, ShippingMethod.EXPRESS, ShippingMethod.SAME_DAY))
+            new Carrier("GHTK", "Giao Hàng Tiết Kiệm", 0, 0, STANDARD, "Giá rẻ, phủ toàn quốc"),
+            new Carrier("GHN", "Giao Hàng Nhanh", 3000, 0, ALL, "Nhanh, có giao hỏa tốc nội tỉnh"),
+            new Carrier("JT", "J&T Express", 1000, 0, STANDARD, "Lấy hàng tận nơi cả cuối tuần"),
+            new Carrier("VTP", "Viettel Post", 2000, 0, ALL, "Mạng lưới bưu cục rộng"),
+            new Carrier("NJV", "Ninja Van", 1500, 0, STANDARD, "Giao tiêu chuẩn toàn quốc"),
+            new Carrier("SPX", "SPX Express", -1000, 1, STANDARD, "Giá rẻ nhất, giao chậm hơn 1 ngày"),
+            new Carrier("VNP", "VNPost (EMS)", 2500, 1, STANDARD, "Bưu điện Việt Nam, phủ cả vùng sâu vùng xa"),
+            new Carrier("AHA", "Ahamove", 5000, 0, Set.of(ShippingMethod.SAME_DAY), "Giao hỏa tốc trong 1–2 giờ, chỉ nội tỉnh"),
+            new Carrier("GRAB", "GrabExpress", 8000, 0, Set.of(ShippingMethod.SAME_DAY), "Giao hỏa tốc trong 1–2 giờ, chỉ nội tỉnh")
     );
 
     // [same province, other province] base fee in VND
@@ -83,9 +97,15 @@ public class ShippingService {
                 if (m == ShippingMethod.SAME_DAY && !same) continue; // same-day only within a province
                 int fee = BASE_FEE.get(m)[same ? 0 : 1] + c.surcharge() + extra;
                 int[] days = DAYS.get(m)[same ? 0 : 1];
+                int late = m == ShippingMethod.SAME_DAY ? 0 : c.extraDays();
                 list.add(new ShippingOption(c.code() + "_" + m.name(), c.code(), c.name(), m, METHOD_NAMES.get(m),
-                        BigDecimal.valueOf(fee), today.plusDays(days[0]), today.plusDays(days[1])));
+                        BigDecimal.valueOf(fee), today.plusDays(days[0] + late), today.plusDays(days[1] + late)));
             }
+        }
+        // only instant couriers picked and the buyer is in another province: offer the standard carriers instead
+        if (list.isEmpty() && !carriers.containsAll(carrierCodes(null))) {
+            return options(shopProvince, buyerProvince, itemCount, carrierCodes(null).stream()
+                    .filter(code -> CARRIERS.stream().anyMatch(c -> c.code().equals(code) && !c.instantOnly())).toList(), handlingDays);
         }
         list.sort((a, b) -> a.getFee().compareTo(b.getFee()));
         return list;

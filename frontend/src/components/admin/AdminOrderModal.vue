@@ -48,6 +48,7 @@
         <template v-if="d.order.shopDiscount > 0"><dt>Voucher shop {{ d.order.shopVoucherCode }}</dt><dd>-{{ formatVnd(d.order.shopDiscount) }}</dd></template>
         <template v-if="d.order.platformDiscount > 0"><dt>Shoppi Voucher {{ d.order.platformVoucherCode }}</dt><dd>-{{ formatVnd(d.order.platformDiscount) }}</dd></template>
         <dt>Phí vận chuyển</dt><dd>{{ formatVnd(d.order.shippingFee - (d.order.shippingDiscount || 0)) }}</dd>
+        <template v-if="d.order.coinDiscount > 0"><dt>Shoppi Xu (sàn tài trợ)</dt><dd>-{{ formatVnd(d.order.coinDiscount) }}</dd></template>
         <dt class="b">Tổng thanh toán</dt><dd class="b total">{{ formatVnd(d.order.total) }}</dd>
       </dl>
       <p v-if="d.order.cancelReason" class="note">Lý do hủy ({{ d.order.cancelledBy === 'BUYER' ? 'người mua' : d.order.cancelledBy === 'SELLER' ? 'người bán' : 'hệ thống/Shoppi' }}): {{ d.order.cancelReason }}</p>

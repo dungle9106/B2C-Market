@@ -66,6 +66,10 @@
           <input type="checkbox" :checked="filters.onSale" @change="update({ onSale: !filters.onSale || null })" />
           Đang giảm giá
         </label>
+        <label class="check">
+          <input type="checkbox" :checked="filters.mall" @change="update({ mall: !filters.mall || null })" />
+          Shoppi Mall
+        </label>
       </section>
 
       <button class="btn block clear" type="button" :disabled="!hasFilters" @click="clearAll">XÓA TẤT CẢ</button>
@@ -100,9 +104,7 @@
         </span>
       </div>
 
-      <div v-if="loading && !result.items.length" class="grid-products">
-        <div v-for="i in 10" :key="i" class="skeleton"></div>
-      </div>
+      <SkeletonGrid v-if="loading && !result.items.length" :count="10" />
       <div v-else-if="!result.items.length" class="empty">
         <svg width="72" height="72" viewBox="0 0 24 24" fill="none"><path d="M21 21l-5.5-5.5M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
         <p>Không tìm thấy sản phẩm phù hợp</p>
@@ -121,6 +123,7 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import SkeletonGrid from './SkeletonGrid.vue'
 import ProductCard from './ProductCard.vue'
 import StarRating from './StarRating.vue'
 import PaginationBar from './PaginationBar.vue'
@@ -158,6 +161,7 @@ const filters = computed(() => {
     provinces: toArray(q.provinces),
     freeShipping: q.freeShipping === 'true',
     onSale: q.onSale === 'true',
+    mall: q.mall === 'true',
     sort: q.sort || props.defaultSort,
     page: Math.max(0, toNum(q.page) || 0)
   }
@@ -165,12 +169,12 @@ const filters = computed(() => {
 
 const hasFilters = computed(() => {
   const f = filters.value
-  return f.minPrice != null || f.maxPrice != null || f.minRating != null || f.provinces.length > 0 || f.freeShipping || f.onSale
+  return f.minPrice != null || f.maxPrice != null || f.minRating != null || f.provinces.length > 0 || f.freeShipping || f.onSale || f.mall
 })
 const activeFilterCount = computed(() => {
   const f = filters.value
   return (f.minPrice != null || f.maxPrice != null ? 1 : 0) + (f.minRating != null ? 1 : 0) +
-    f.provinces.length + (f.freeShipping ? 1 : 0) + (f.onSale ? 1 : 0)
+    f.provinces.length + (f.freeShipping ? 1 : 0) + (f.onSale ? 1 : 0) + (f.mall ? 1 : 0)
 })
 
 // change some filters (null removes a param) and go back to page 1
@@ -213,7 +217,7 @@ function applyPrice() {
 
 function clearAll() {
   const query = { ...route.query }
-  ;['minPrice', 'maxPrice', 'minRating', 'provinces', 'freeShipping', 'onSale', 'page'].forEach(k => delete query[k])
+  ;['minPrice', 'maxPrice', 'minRating', 'provinces', 'freeShipping', 'onSale', 'mall', 'page'].forEach(k => delete query[k])
   router.push({ query })
 }
 
@@ -235,6 +239,7 @@ async function load() {
       provinces: f.provinces.length ? f.provinces : undefined,
       freeShipping: f.freeShipping || undefined,
       onSale: f.onSale || undefined,
+      mall: f.mall || undefined,
       sort: f.sort,
       page: f.page,
       size: PAGE_SIZE
@@ -292,8 +297,6 @@ watch([filters, () => props.base], load, { immediate: true, deep: true })
 .filter-toggle { display: none; background: white; }
 
 .dim { opacity: 0.6; transition: opacity 0.15s; }
-.skeleton { aspect-ratio: 0.62; background: linear-gradient(90deg, #f2f2f2 25%, #e9e9e9 50%, #f2f2f2 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 2px; }
-@keyframes shimmer { to { background-position: -200% 0; } }
 .empty { text-align: center; padding: 60px 0; color: var(--color-text-muted); }
 .empty svg { color: #ddd; }
 

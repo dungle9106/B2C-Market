@@ -48,6 +48,9 @@ public class VoucherRequest {
     @Size(max = 100, message = "Tối đa 100 sản phẩm")
     private List<Long> productIds;
 
+    // shop vouchers: ALL | FOLLOWERS | NEW_CUSTOMERS | RETURNING_CUSTOMERS (null = ALL)
+    private com.marketplace.backend.entity.VoucherAudience audience;
+
     // ---- Shoppi Vouchers only ----
     @Size(max = 50, message = "Tối đa 50 ngành hàng")
     private List<Long> categoryIds;    // empty = every category

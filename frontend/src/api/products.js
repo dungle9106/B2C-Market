@@ -10,10 +10,19 @@ export const searchProducts = (params) => http.get('/products/search', {
 export const suggestProducts = (q) => http.get('/products/suggest', { params: { q } })
 export const flashSaleProducts = (limit = 12) => http.get('/products/flash-sale', { params: { limit } })
 export const topSelling = () => http.get('/products/top-selling')
+export const hotKeywords = (limit = 8) => http.get('/products/hot-keywords', { params: { limit } })      // [{ keyword, searches }]
+export const topSearches = (limit = 6) => http.get('/products/top-searches', { params: { limit } })    // [{ keyword, searches, imageUrl, soldCount }]
 // "tìm theo ý nghĩa" (embeddings + pgvector); [] when AI is not configured
+// "tim bang hinh anh": { description, keywords, engine, items: [{ product, similarity, matchedText }] }
+export const imageSearch = (file, limit = 30) => {
+  const form = new FormData()
+  form.append('file', file)
+  return http.post('/products/image-search', form, { params: { limit } })
+}
 export const semanticProducts = (q, limit = 12) => http.get('/products/semantic', { params: { q, limit } })
 export const getProduct = (id) => http.get(`/products/${id}`)
 export const similarProducts = (id) => http.get(`/products/${id}/similar`)
+export const productShipping = (id, province) => http.get(`/products/${id}/shipping`, { params: { province } })
 
 export const listCategories = () => http.get('/categories')
 export const categoryTree = () => http.get('/categories/tree')

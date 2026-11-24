@@ -15,7 +15,7 @@
             <span class="stub-text">{{ v.scope === 'PLATFORM' ? 'SHOPPI' : v.shopName }}</span>
           </div>
           <div class="info">
-            <div class="v-title">{{ v.title }}</div>
+            <div class="v-title">{{ v.title }}<span v-if="v.saved" class="saved-tag">Đã lưu</span></div>
             <div class="v-min">Đơn tối thiểu {{ formatVnd(v.minOrder || 0) }}</div>
             <div class="v-meta">
               <span class="v-code">{{ v.code }}</span>
@@ -89,4 +89,5 @@ function applyTyped() {
 .v-code { font-weight: 600; color: var(--color-text-muted); }
 .reason { color: #d33; font-size: 12px; margin-top: 4px; }
 .voucher input { width: 18px; margin: auto 16px; accent-color: var(--color-primary); }
+.saved-tag { margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--color-primary); border: 1px solid var(--color-primary); border-radius: 2px; padding: 0 4px; }
 </style>

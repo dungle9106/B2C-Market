@@ -162,6 +162,7 @@ public class PaymentService {
             case CARD -> "thẻ " + provider + (p.getCardLast4() != null ? " •••• " + p.getCardLast4() : "");
             case BANK_TRANSFER -> "chuyển khoản ngân hàng";
             case VNPAY -> "VNPay";
+            case SHOPPI_PAY -> "ví ShoppiPay";
             default -> p.getMethod().name();
         };
     }

@@ -105,6 +105,19 @@ public class AdminShopService {
         return view(s);
     }
 
+    /** "Shoppi Mall" is the platform's guarantee of an official store: only for active, verified shops. */
+    public Map<String, Object> setMall(Long id, boolean mall) {
+        Shop s = find(id);
+        if (mall && s.getStatus() != ShopStatus.APPROVED) throw bad("Chỉ shop đang hoạt động mới được cấp Shoppi Mall");
+        if (mall && !s.isVerified()) throw bad("Shop cần được xác minh giấy tờ trước khi cấp Shoppi Mall");
+        if (s.isMall() == mall) return view(s);
+        s.setMall(mall);
+        notifySeller(s, mall ? "Shop của bạn đã trở thành Shoppi Mall 🎉" : "Shop của bạn không còn là Shoppi Mall",
+                mall ? "\"" + s.getName() + "\" đã có huy hiệu Mall trên trang shop và sản phẩm." : "Liên hệ Trung tâm hỗ trợ nếu bạn cần biết thêm chi tiết.");
+        auditService.log(mall ? "GRANT_MALL" : "REVOKE_MALL", "SHOP", s.getId(), s.getName(), mall ? "Cấp Shoppi Mall" : "Thu hồi Shoppi Mall");
+        return view(s);
+    }
+
     // ---- seller side ----
 
     /** A new shop: approved at once, or PENDING (hidden) when the platform requires approval. */
@@ -143,7 +156,7 @@ public class AdminShopService {
         Map<String, Object> m = AdminUserService.map("id", s.getId(), "name", s.getName(), "logoUrl", s.getLogoUrl(),
                 "description", s.getDescription(), "province", s.getProvince(), "pickupAddress", s.getPickupAddress(),
                 "pickupPhone", s.getPickupPhone(), "status", s.getStatus().name(), "statusReason", s.getStatusReason(),
-                "statusChangedAt", s.getStatusChangedAt(), "active", s.isActive(), "verified", s.isVerified(), "createdAt", s.getCreatedAt(),
+                "statusChangedAt", s.getStatusChangedAt(), "active", s.isActive(), "verified", s.isVerified(), "mall", s.isMall(), "createdAt", s.getCreatedAt(),
                 "products", productRepository.countByShopId(s.getId()),
                 "verification", verificationRepository.findFirstByShopIdOrderByIdDesc(s.getId()).map(v -> v.getStatus().name()).orElse(null),
                 "seller", AdminUserService.map("id", seller.getId(), "fullName", seller.getFullName(), "email", seller.getEmail(),

@@ -138,6 +138,12 @@ public class AdminController {
         return ResponseEntity.ok(shopService.reinstate(id));
     }
 
+    // body: { mall: true|false }
+    @PostMapping("/shops/{id}/mall")
+    public ResponseEntity<Map<String, Object>> setMall(@PathVariable Long id, @RequestBody Map<String, Boolean> body) {
+        return ResponseEntity.ok(shopService.setMall(id, Boolean.TRUE.equals(body.get("mall"))));
+    }
+
     // ==== platform settings ====
 
     @GetMapping("/settings")

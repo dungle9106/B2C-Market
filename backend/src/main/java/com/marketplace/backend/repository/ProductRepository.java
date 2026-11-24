@@ -19,6 +19,10 @@ import java.util.List;
 
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
+    /** Row locks on these products, always taken in id order (see StockService.lockProducts). */
+    @Query(value = "SELECT id FROM products WHERE id IN (:ids) ORDER BY id FOR UPDATE", nativeQuery = true)
+    List<Long> lockInIdOrder(@Param("ids") java.util.Collection<Long> ids);
+
     List<Product> findByShopId(Long shopId);
 
     long countByShopIdAndActiveTrue(Long shopId);
@@ -88,6 +92,10 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
                                          @Param("excludeProductId") Long excludeProductId);
 
     List<Product> findTop10ByActiveTrueOrderBySoldCountDesc();
+
+    // the words of the catalogue, for the chatbot's typo correction
+    @Query("SELECT p.searchText FROM Product p WHERE p.active = true AND p.searchText IS NOT NULL")
+    List<String> activeSearchTexts();
 
     // flash sales running right now, ending soonest first
     @Query("SELECT p FROM Product p JOIN p.shop s WHERE p.active = true AND s.active = true " +

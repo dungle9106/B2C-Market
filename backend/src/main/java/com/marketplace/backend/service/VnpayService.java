@@ -75,6 +75,8 @@ public class VnpayService {
     private final PlatformConfig config;
     private final AdminAuditService auditService;
     private final WebClient webClient;
+    // the public https address set on the admin page (shared with the social sign-in): shows the real IPN URL
+    private final com.marketplace.backend.security.SocialLoginSettings publicUrl;
 
     @Value("${VNPAY_TMN_CODE:}")
     private String envTmn;
@@ -286,7 +288,7 @@ public class VnpayService {
         Settings s = settings();
         return AdminUserService.map("enabled", s.enabled(), "tmnCode", s.tmnCode(), "secretSet", s.secret() != null && !s.secret().isBlank(),
                 "payUrl", s.payUrl(), "apiUrl", s.apiUrl(), "ready", s.ready(), "sandbox", s.payUrl().contains("sandbox"),
-                "returnUrl", frontendUrl + "/payment/vnpay-return", "ipnUrl", "<địa chỉ backend công khai>/api/payments/vnpay/ipn",
+                "returnUrl", frontendUrl + "/payment/vnpay-return", "ipnUrl", Objects.requireNonNullElse(publicUrl.publicUrl(), "<địa chỉ backend công khai>") + "/api/payments/vnpay/ipn",
                 "source", get(TMN) != null ? "ADMIN" : envTmn != null && !envTmn.isBlank() ? "ENV" : "NONE");
     }
 

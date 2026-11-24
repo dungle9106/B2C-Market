@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
@@ -12,17 +13,21 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+// Identity is the id: Lombok's default hashCode would walk order -> payment -> order forever when Hibernate
+// compares a flushed items collection.
 // One Order = one shop's portion of a checkout (multi-vendor cart is split into
 // one Order per shop so each seller only ever sees/manages their own orders).
 @Entity
 @Table(name = "orders")
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class Order {
 
     @Id
+    @EqualsAndHashCode.Include
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -67,6 +72,18 @@ public class Order {
     @Builder.Default
     @Column(precision = 12, scale = 2, columnDefinition = "numeric(12,2) default 0")
     private BigDecimal platformDiscount = BigDecimal.ZERO;
+
+    // "Shoppi Xu" used on this order (1 xu = 1 VND); funded by Shoppi, like the platform voucher
+    @Builder.Default
+    @Column(precision = 12, scale = 2, columnDefinition = "numeric(12,2) default 0")
+    private BigDecimal coinDiscount = BigDecimal.ZERO;
+
+    // reward fixed at checkout, credited by CoinService when the return window ends
+    @Builder.Default
+    @Column(columnDefinition = "integer default 0")
+    private Integer coinsToEarn = 0;
+
+    private LocalDateTime coinsAwardedAt;
 
     @Builder.Default
     @Column(precision = 12, scale = 2)

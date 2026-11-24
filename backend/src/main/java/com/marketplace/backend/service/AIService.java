@@ -67,6 +67,45 @@ public class AIService {
         return answer.trim();
     }
 
+    /** The model's answer about an image, or null (AI off / over budget / no vision / failed): callers fall back. */
+    public String describeImageOrNull(String systemPrompt, String userPrompt, byte[] image, String mime) {
+        AiSettings s = ops.settings();
+        String feature = AiOpsService.featureOfCaller();
+        String blocked = ops.blockReason(s);
+        if (blocked != null) {
+            if (s.configured()) ops.record(feature, s, null, 0, blocked);
+            return null;
+        }
+        long start = System.nanoTime();
+        AIProvider.Completion c = provider(s).callWithImage(s, systemPrompt, userPrompt, image, mime);
+        ops.record(feature, s, c, (int) ((System.nanoTime() - start) / 1_000_000), null);
+        return c.error() != null || c.text() == null || c.text().isBlank() ? null : c.text().trim();
+    }
+
+    /** Function calling is available: AI on, configured, within budget, and a provider that supports tools. */
+    public boolean supportsTools() {
+        AiSettings s = ops.settings();
+        return ops.blockReason(s) == null && !s.huggingFace();
+    }
+
+    /** One step of a conversation with tools (ShoppingAgent). Never null; a failure comes back with error set. */
+    public com.marketplace.backend.service.ai.Agent.Reply converse(String systemPrompt,
+                                                                  java.util.List<com.marketplace.backend.service.ai.Agent.Msg> messages,
+                                                                  java.util.List<com.marketplace.backend.service.ai.Agent.Tool> tools) {
+        AiSettings s = ops.settings();
+        String feature = AiOpsService.featureOfCaller();
+        String blocked = ops.blockReason(s);
+        if (blocked != null) {
+            if (s.configured()) ops.record(feature, s, null, 0, blocked);
+            return com.marketplace.backend.service.ai.Agent.Reply.failed(blocked);
+        }
+        long start = System.nanoTime();
+        var reply = provider(s).converse(s, systemPrompt, messages, tools);
+        ops.record(feature, s, new AIProvider.Completion(reply.text(), reply.promptTokens(), reply.completionTokens(), false, reply.error()),
+                (int) ((System.nanoTime() - start) / 1_000_000), null);
+        return reply;
+    }
+
     /** Admin "Kiem tra ket noi": one tiny call with the current settings, even when AI is switched off. */
     public Map<String, Object> testConnection() {
         AiSettings s = ops.settings();

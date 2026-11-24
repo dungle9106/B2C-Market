@@ -49,12 +49,7 @@
             </p>
           </form>
 
-          <div class="or-divider"><span>HOẶC</span></div>
-
-          <GoogleLoginButton
-            :label="isLogin ? 'Đăng nhập với Google' : 'Đăng ký với Google'"
-            :redirect="route.query.redirect || null"
-          />
+          <SocialLoginButtons :verb="isLogin ? 'Đăng nhập' : 'Đăng ký'" :redirect="route.query.redirect || null" />
 
           <p class="terms">
             Bằng việc {{ isLogin ? 'đăng nhập' : 'đăng ký' }}, bạn đồng ý với Shoppi về
@@ -89,7 +84,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import AuthHeader from '../components/auth/AuthHeader.vue'
 import PasswordInput from '../components/auth/PasswordInput.vue'
-import GoogleLoginButton from '../components/auth/GoogleLoginButton.vue'
+import SocialLoginButtons from '../components/auth/SocialLoginButtons.vue'
 import TwoFactorStep from '../components/auth/TwoFactorStep.vue'
 import { validateLogin, validateRegister, extractError, homeForRole } from '../utils/authForm'
 

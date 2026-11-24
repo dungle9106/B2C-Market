@@ -22,8 +22,11 @@ public class ShopPublicResponse {
     private boolean active;
     private LocalDateTime joinedAt;
     private boolean verified;
+    private boolean favorite;          // "Shop Yeu Thich" badge
+    private boolean mall;              // "Shoppi Mall" badge
     private BusinessType businessType; // only when verified
     private long productCount;
+    private long followerCount;     // "Nguoi theo doi"
     private Double ratingAvg;          // buyers' shop-service stars
     private long ratingCount;
     // chat, last 30 days (null = not enough conversations yet)
@@ -48,6 +51,8 @@ public class ShopPublicResponse {
         r.setActive(s.isActive());
         r.setJoinedAt(s.getCreatedAt());
         r.setVerified(s.isVerified());
+        r.setFavorite(s.isFavorite());
+        r.setMall(s.isMall());
         r.setBusinessType(s.isVerified() ? s.getBusinessType() : null);
         r.setProductCount(productCount);
         r.setRatingAvg(ratingAvg);

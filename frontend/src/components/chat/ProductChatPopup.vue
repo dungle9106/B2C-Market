@@ -1,6 +1,6 @@
 <template>
   <!-- chat with the shop without leaving the product page; the product rides along with the first message -->
-  <section class="tw-fixed tw-bottom-0 tw-right-4 tw-z-50 tw-flex tw-h-[480px] tw-max-h-[calc(100vh-16px)] tw-w-[360px] tw-max-w-[calc(100vw-32px)]
+  <section class="tw-fixed tw-bottom-0 tw-right-4 tw-z-50 tw-flex tw-h-[480px] tw-max-h-[calc(var(--vh)-16px)] tw-w-[360px] tw-max-w-[calc(100vw-32px)]
                   tw-flex-col tw-overflow-hidden tw-rounded-t-lg tw-bg-white tw-shadow-2xl max-sm:tw-right-0 max-sm:tw-w-full max-sm:tw-max-w-full"
            role="dialog" :aria-label="`Chat với ${shopName}`">
     <header class="tw-flex tw-items-center tw-gap-2 tw-bg-primary tw-px-3 tw-py-2.5 tw-text-white">

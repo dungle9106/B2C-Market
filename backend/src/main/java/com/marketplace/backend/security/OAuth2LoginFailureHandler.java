@@ -22,9 +22,9 @@ public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                                         AuthenticationException exception) throws IOException {
-        log.warn("Google OAuth2 login failed: {}", exception.getMessage());
+        log.warn("Social login failed: {}", exception.getMessage());
 
-        String target = frontendRedirect.buildUrl(request, "error=Đăng nhập Google thất bại, vui lòng thử lại");
+        String target = frontendRedirect.buildUrl(request, "error=Đăng nhập thất bại hoặc đã bị hủy, vui lòng thử lại");
         if (request.getSession(false) != null) {
             request.getSession(false).invalidate();
         }

@@ -80,14 +80,14 @@
               <form v-else novalidate @submit.prevent="onLogin">
                 <input v-model.trim="account.email" type="email" placeholder="Email" autocomplete="username" />
                 <PasswordInput v-model="account.password" />
+                <router-link :to="{ name: 'forgot-password', query: { from: 'seller' } }" class="forgot">Quên mật khẩu?</router-link>
                 <p v-if="error" class="error">{{ error }}</p>
                 <button class="btn block lg submit" type="submit" :disabled="!account.email || !account.password || loading">
                   {{ loading ? 'ĐANG XỬ LÝ...' : 'ĐĂNG NHẬP' }}
                 </button>
               </form>
-              <div class="or-divider"><span>HOẶC</span></div>
               <!-- a BUYER landing on /seller is sent on to the shop step by the router guard -->
-              <GoogleLoginButton label="Đăng nhập với Google" :redirect="route.query.redirect || '/seller'" />
+              <SocialLoginButtons :redirect="route.query.redirect || '/seller'" />
               <p class="terms">
                 Bằng việc đăng nhập, bạn đồng ý với
                 <span class="text-primary">Điều khoản dịch vụ</span> &amp;
@@ -114,8 +114,7 @@
                   {{ loading ? 'ĐANG XỬ LÝ...' : 'TIẾP THEO' }}
                 </button>
               </form>
-              <div class="or-divider"><span>HOẶC</span></div>
-              <GoogleLoginButton label="Đăng ký với Google" redirect="/seller/register" />
+              <SocialLoginButtons verb="Đăng ký" redirect="/seller/register" />
               <p class="terms">
                 Bằng việc đăng ký, bạn đã đồng ý với Shoppi về
                 <span class="text-primary">Điều khoản dịch vụ</span> &amp;
@@ -178,7 +177,7 @@ import { useAuthStore } from '../../stores/auth'
 import { becomeSeller } from '../../api/shop'
 import AuthHeader from '../../components/auth/AuthHeader.vue'
 import PasswordInput from '../../components/auth/PasswordInput.vue'
-import GoogleLoginButton from '../../components/auth/GoogleLoginButton.vue'
+import SocialLoginButtons from '../../components/auth/SocialLoginButtons.vue'
 import TwoFactorStep from '../../components/auth/TwoFactorStep.vue'
 import { validateLogin, validateRegister, extractError } from '../../utils/authForm'
 import { PROVINCES } from '../../utils/provinces'
@@ -298,6 +297,7 @@ const skyline = [
 </script>
 
 <style scoped>
+.forgot { display: block; text-align: right; font-size: 13px; color: #2673dd; margin: -4px 0 8px; }
 .auth-main { position: relative; overflow: hidden; }
 .login-bg { background: var(--color-surface); }
 .register-bg { background: linear-gradient(180deg, #fff 0%, #fdf1ee 100%); }

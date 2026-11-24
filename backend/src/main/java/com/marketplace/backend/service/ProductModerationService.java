@@ -65,6 +65,7 @@ public class ProductModerationService {
             "chuyen khoan truoc", "telegram", "messenger");
     private static final int REPORTS_TO_ALERT = 3;
 
+    private final ShopPerformanceService performanceService;
     private final ProductRepository productRepository;
     private final ProductReportRepository reportRepository;
     private final UserRepository userRepository;
@@ -73,6 +74,23 @@ public class ProductModerationService {
     private final NotificationService notificationService;
 
     // ==================== automatic content check ====================
+
+    /** Why a free text such as a video caption can't be published as is (banned words, contact off the platform), or null. */
+    public String textProblem(String text) {
+        String raw = text == null ? "" : text;
+        String words = " " + TextNormalizer.normalize(raw).replaceAll("[^a-z0-9]+", " ").trim() + " ";
+        List<String> hits = settings.bannedKeywords().stream()
+                .filter(k -> {
+                    String n = TextNormalizer.normalize(k).replaceAll("[^a-z0-9]+", " ").trim();
+                    return !n.isEmpty() && words.contains(" " + n + " ");
+                }).toList();
+        if (!hits.isEmpty()) return "Chứa từ khóa cấm: " + hits.stream().map(h -> "“" + h + "”").collect(Collectors.joining(", "));
+        String digits = raw.replaceAll("(?<=\\d)[ .\\-](?=\\d)", "");
+        if (PHONE.matcher(digits).find() || CONTACT_WORDS.stream().anyMatch(w -> words.contains(" " + w + " "))) {
+            return "Không được ghi số điện thoại, Zalo hay link liên hệ ngoài sàn";
+        }
+        return null;
+    }
 
     List<Flag> check(Product p) {
         List<Flag> flags = new ArrayList<>();
@@ -286,6 +304,7 @@ public class ProductModerationService {
         notifySeller(p, "Sản phẩm bị gỡ do vi phạm chính sách", "\"" + p.getName() + "\" – " + VIOLATIONS.get(violation) + ": " + r
                 + ". Sản phẩm đã bị ẩn khỏi sàn; bạn có thể sửa và gửi duyệt lại.");
         auditService.log("REMOVE_PRODUCT", "PRODUCT", p.getId(), p.getName(), VIOLATIONS.get(violation) + " – " + r);
+        performanceService.onListingRemoved(p, violation, VIOLATIONS.get(violation));   // penalty points ("Sao Qua Ta")
         return row(p, 0);
     }
 
@@ -298,6 +317,7 @@ public class ProductModerationService {
         p.setActive(true);
         notifySeller(p, "Sản phẩm đã được khôi phục", "\"" + p.getName() + "\" đã hiển thị trở lại với người mua.");
         auditService.log("RESTORE_PRODUCT", "PRODUCT", p.getId(), p.getName(), "Khôi phục sản phẩm");
+        performanceService.onListingRestored(p);
         return row(p, 0);
     }
 

@@ -53,6 +53,22 @@ docker compose up --build     # http://localhost:3000  (RabbitMQ console: http:/
 Gồm PostgreSQL 16 + pgvector, Redis 7, RabbitMQ 3.13, backend (Spring Boot) và frontend (nginx, chuyển
 `/api`, `/ws`, `/uploads` sang backend). Dữ liệu và ảnh tải lên nằm trong volume `db-data`, `uploads`.
 
+### Dữ liệu demo bằng 1 lệnh
+
+Sau khi backend chạy (database mới, chưa có dữ liệu demo):
+
+```bash
+node scripts/seed-demo.mjs            # backend ở http://localhost:8081, PostgreSQL cài trên máy (cần psql)
+node scripts/seed-demo.mjs --docker   # stack docker compose (http://localhost:3000, dùng psql trong container db)
+```
+
+Tạo 4 shop (2 shop Mall), 24 sản phẩm có phân loại, 40 người mua và khoảng 3.600 đơn hàng trải đều 120 ngày (có xu hướng
+tăng/giảm, cuối tuần bán chạy hơn), hơn 2.000 đánh giá, yêu cầu trả hàng (có 1 người mua có dấu hiệu lạm dụng), Flash Sale
+đang chạy và theo dõi giá. Mọi thứ đi qua API thật, sau đó ngày tháng được lùi về quá khứ bằng SQL. Mất khoảng 1-2 phút.
+Tài khoản (mật khẩu `Demo@1234`): `buyer01@shoppi.demo` ... `buyer40@shoppi.demo`, `seller.fashion@shoppi.demo`,
+`seller.tech@shoppi.demo`, `seller.home@shoppi.demo`, `seller.beauty@shoppi.demo`. Chạy lại trên database đã có dữ liệu demo
+thì script tự dừng. Tùy chọn: `--api <url>`, `--days <30..180>`; biến `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE/PSQL`.
+
 ## Chạy backend (không dùng Docker)
 
 Yêu cầu: JDK 17+, Maven, PostgreSQL.
@@ -111,6 +127,148 @@ Lưu ý: ổ đĩa của Render gói miễn phí không bền, ảnh tải lên 
   (chỉ người đã nhận hàng mới đánh giá được, mỗi sản phẩm trong đơn một lần)
 - **Upload ảnh/video**: `POST /api/uploads`, lưu ở thư mục `app.upload.dir` (mặc định `uploads/` trong thư mục
   chạy backend, đổi bằng biến `UPLOAD_DIR`). Chỉ nhận JPG/PNG/WEBP/GIF ≤ 5MB và MP4/WEBM ≤ 30MB.
+
+### Trợ lý mua sắm AI biết hành động (LLM + tool calling)
+
+Trang `/chatbot` (web) và màn Trợ lý AI (app). Khi provider ở trang **AI & chi phí LLM** là OpenAI hoặc Claude và đã có API key,
+mô hình **tự chọn công cụ cần dùng** thay vì chỉ đọc một khối context cố định (`ShoppingAgent.java`, tối đa 6 vòng gọi công cụ mỗi câu):
+
+| Công cụ | Làm gì |
+|---|---|
+| `search_products` | tìm theo từ khóa không dấu + theo ý nghĩa (pgvector), lọc khoảng giá, sắp xếp |
+| `get_product` | mô tả, phân loại (màu/size) với giá và tồn kho riêng, thời hạn đổi trả |
+| `recommend_for_me` | gợi ý từ **mô hình gợi ý tự huấn luyện** (mục dưới), kèm lý do "vì bạn đã xem ..." |
+| `similar_products` | sản phẩm được cùng nhóm người quan tâm / cùng loại |
+| `my_orders`, `my_vouchers` | đơn hàng (trạng thái, vận đơn, có hủy được không) và Kho Voucher của chính người hỏi |
+| `add_to_cart` | thêm vào giỏ thật (dễ hoàn tác), chỉ khi người mua yêu cầu rõ; sản phẩm có phân loại thì phải hỏi lại |
+| `propose_cancel_order` | **không tự hủy**: hiện nút "Xác nhận hủy đơn" để người mua tự bấm |
+| `handoff_to_human` | hiện nút Chat với Shop / Gửi yêu cầu hỗ trợ |
+
+Mỗi công cụ chỉ đọc/ghi dữ liệu của người đang đăng nhập và đi qua đúng service của ứng dụng (cùng luật tồn kho, hủy đơn...).
+Dưới câu trả lời hiện dòng "🔧 Đã tra cứu: ..." cho biết trợ lý đã dùng công cụ nào. Chưa có API key, provider là Hugging Face,
+hoặc gọi API lỗi thì tự quay về chatbot RAG/luật như cũ. Kiểm thử vòng lặp agent bằng mô hình giả: `ShoppingAgentTest`.
+
+### Mô hình gợi ý sản phẩm (tự huấn luyện)
+
+"Gợi ý cho bạn" ở trang chủ, "Sản phẩm tương tự" và công cụ `recommend_for_me` của trợ lý dùng mô hình **học từ hành vi mua sắm**
+(`review-ai-service/app/recommender.py`, cần `REVIEW_AI_URL`), không còn chỉ là luật "cùng danh mục":
+
+1. Trọng số hành vi: xem 1, thích 2, thêm giỏ 3, mua 5, đánh giá 4-5 sao +2, đánh giá 1-2 sao −3 (`RecommendationService`).
+2. **Item-based collaborative filtering**: độ tương đồng cosine giữa các sản phẩm trên ma trận người mua × sản phẩm (log trọng số,
+   hệ số co cho cặp ít người chung, giữ 50 láng giềng), cộng một phần "cùng danh mục" (β) và "độ phổ biến" (γ) cho sản phẩm mới.
+3. **Đánh giá leave-last-out**: giấu sản phẩm cuối cùng của mỗi người mua; β, γ chọn trên tập validation, điểm báo cáo trên tập test.
+   So sánh với 2 luật cũ bằng HitRate@10, NDCG@10 và độ phủ danh mục. Trang admin **Mô hình gợi ý sản phẩm** (`/admin/reco`)
+   hiện các số này cho dữ liệu thật và có nút huấn luyện; tự huấn luyện lại 3:40 mỗi đêm. Cần ít nhất 10 người mua và 50 lượt tương tác.
+4. Chưa huấn luyện hoặc dịch vụ tắt thì quay về luật cũ (cùng danh mục đã xem, rồi bán chạy).
+
+Benchmark trên **dữ liệu mô phỏng** (1000 người mua, 400 sản phẩm, 20 danh mục; dùng khi DB thật còn ít dữ liệu), chạy `cd review-ai-service && python -m app.benchmark`:
+
+| Cách gợi ý | HitRate@10 | NDCG@10 | Độ phủ |
+|---|---|---|---|
+| Bán chạy nhất (luật cũ) | 0.127 | 0.067 | 4.3% |
+| Cùng danh mục đã xem (luật cũ) | 0.180 | 0.101 | 38.5% |
+| **Mô hình học từ hành vi** | **0.214** | **0.127** | **96.8%** |
+
+### AI phát hiện gian lận đơn hàng (tự huấn luyện)
+
+Mỗi đơn mới được chấm điểm rủi ro 0-100 trong vòng 2 phút sau khi đặt (`service/risk/FraudService.java`). Trang admin
+**AI phát hiện gian lận đơn** (`/admin/fraud`, quyền ORDERS) liệt kê đơn bị gắn cờ, lý do và nút kết luận **An toàn / Gian lận**.
+
+1. **15 đặc trưng** chỉ tính từ dữ liệu có trước lúc đặt đơn: giá trị đơn và tỉ lệ so với thói quen của người mua, tuổi tài khoản,
+   số đơn trong 1 giờ / 24 giờ, COD, tỉ lệ bom hàng trước đó, số tài khoản khác dùng cùng SĐT nhận hàng, tỉ lệ giảm giá, số lượng,
+   đăng nhập từ thiết bị mới, số lần nhập sai mật khẩu, đặt lúc 0h-5h.
+2. **Luật thủ công** (`FraudRules.java`) là đường cơ sở và quyết định khi chưa có mô hình.
+3. **Isolation Forest** (không cần nhãn): đơn "khác thường" so với mọi đơn đã thấy được đẩy điểm lên.
+4. **Mô hình có giám sát**: hồi quy logistic và Gradient Boosting thi với nhau, chọn cái tốt hơn trên tập validation. Nhãn lấy
+   từ lịch sử: đơn bị từ chối nhận / hủy sau khi đã gửi (bom hàng) hoặc admin kết luận gian lận = 1; đơn giao thành công
+   hoặc admin kết luận an toàn = 0. Đánh giá theo thời gian: 60% đơn cũ nhất để học, 20% để chọn mô hình, 20% mới nhất để chấm.
+5. Điểm ≥ 60 thì báo cho admin. Không đơn nào bị hủy tự động; kết luận của admin thành dữ liệu huấn luyện. Tự huấn luyện lại 4:10 mỗi đêm.
+
+### AI dự đoán khách hàng rời bỏ & giữ chân (tự huấn luyện)
+
+Trang admin **AI dự đoán rời bỏ** (`/admin/churn`, quyền VOUCHERS) chấm mọi người mua đã từng đặt đơn
+(`service/risk/ChurnService.java`):
+
+1. **Tua lại lịch sử**: tại 12 mốc thời gian trong quá khứ (mỗi tháng), lấy hành vi của từng người mua tính đến mốc đó
+   (số ngày chưa mua, nhịp mua thường ngày, số đơn, tổng chi, lượt xem / thêm giỏ / thích / đăng nhập 30 ngày, tỉ lệ hủy,
+   trả hàng, đánh giá xấu, thâm niên). Nhãn = **không đặt đơn nào trong 60 ngày sau mốc**.
+2. Hồi quy logistic / Gradient Boosting học quy luật, so với luật "càng lâu chưa mua càng dễ rời bỏ". Tự huấn luyện lại mỗi thứ Hai.
+3. Danh sách người mua xếp theo nguy cơ hoặc theo **doanh thu có nguy cơ mất** (xác suất × tổng chi), kèm lý do.
+4. **Voucher giữ chân**: chọn người mua, đặt mức giảm, hệ thống tạo một mã ẩn (`GIUCHAN…`), bỏ thẳng vào ví voucher của từng
+   người và gửi thông báo đẩy. Mỗi người nhận tối đa 1 lần trong 14 ngày.
+5. **Nhắc giỏ hàng bị bỏ quên** (tự động mỗi giờ): sản phẩm nằm trong giỏ từ 1 đến 7 ngày mà chưa đặt được nhắc, tối đa 3 ngày một lần.
+   Tắt bằng `app.retention.cart-reminder=false`.
+6. Mọi hành động được lưu (`retention_actions`) để trang admin đo **tỉ lệ người mua quay lại trong 30 ngày** sau khi được nhắc / tặng voucher.
+
+Benchmark trên **dữ liệu mô phỏng** (DB thật còn quá ít đơn để huấn luyện), chạy `cd review-ai-service && python -m app.benchmark_risk`.
+Chấm trên 20% trường hợp mới nhất mà mô hình chưa thấy:
+
+| Bài toán | Cách chấm | ROC-AUC | PR-AUC | Độ chính xác top 10% | Bắt được trong top 10% |
+|---|---|---|---|---|---|
+| Rời bỏ (3000 người mua) | Luật: số ngày chưa mua | 0.694 | 0.477 | 56.7% | 19.8% |
+| | **Mô hình (hồi quy logistic)** | **0.842** | **0.733** | **88.3%** | **30.8%** |
+| Gian lận (6000 đơn, 8% gian lận) | Luật thủ công | 0.880 | 0.711 | 66.7% | 77.7% |
+| | Chỉ Isolation Forest | 0.902 | 0.632 | 53.3% | 62.1% |
+| | **Mô hình (Gradient Boosting)** | **0.995** | **0.976** | **83.3%** | **97.1%** |
+
+Lưu ý khi viết báo cáo: dữ liệu mô phỏng có quy luật rõ hơn dữ liệu thật, nên con số thật sẽ thấp hơn; điều cần chứng minh là
+quy trình (đặc trưng không rò rỉ tương lai, chia tập theo thời gian, so với luật) và mô hình hơn luật trên cùng một tập test.
+
+### AI phát hiện lạm dụng đổi trả
+
+Trang `/admin/return-risk` (quyền Đơn hàng), và bảng phân tích ngay trong màn hình Tranh chấp. Chỉ admin thấy; **AI không tự từ chối yêu cầu**.
+
+1. **Luật trên lịch sử ca** (`ReturnRiskRules`) cho điểm 0-100 giải thích được: tần suất và tỷ lệ trả hàng, khiếu nại từng bị bác, ảnh bằng chứng dùng lại
+   hoặc trùng tài khoản khác hoặc trùng ảnh đăng bán (SHA-256 + dHash), mô tả sao chép, nhiều tài khoản chung số nhận hàng. Có cả luật **giảm điểm**: nhiều người
+   cùng trả một sản phẩm, shop có tỷ lệ trả hàng cao, lịch sử mua tốt.
+2. **FastAPI** (`review-ai-service/app/return_risk.py`, cần `REVIEW_AI_URL`): Isolation Forest tìm ca bất thường; khi admin đã kết luận đủ (mỗi loại ít nhất 5 ca)
+   thêm Logistic Regression học từ kết luận đó. Cần ít nhất 30 ca để huấn luyện; tự huấn luyện lại mỗi đêm hoặc bấm trên trang admin.
+3. **OpenAI/Claude** (provider đang chọn ở trang AI, chỉ cho ca từ 40 điểm): tóm tắt ca, nêu điểm đáng ngờ và điểm có lợi cho người mua, đọc ảnh bằng chứng.
+   Nhận xét này **không làm thay đổi điểm**, nên chữ người mua viết để đánh lừa AI không hạ được rủi ro. Không gửi tên, email, số điện thoại lên LLM.
+
+Không có FastAPI hoặc LLM thì phần luật vẫn chạy. Yêu cầu mới được chấm trong vòng khoảng 30 giây và chấm lại khi trở thành tranh chấp.
+
+**Tạm giữ hoàn tiền:** yêu cầu rủi ro cao còn chờ shop xử lý thì shop chưa bấm "Đồng ý hoàn" được (vẫn từ chối được) cho đến khi admin
+bấm "Cho phép shop xử lý" hoặc kết luận "Hợp lệ"; quá 48 giờ thì tự bỏ giữ để người mua thật không bị treo. Nếu shop bấm trước khi
+yêu cầu được chấm, hệ thống chấm ngay lúc đó (lỗi ở bước này thì vẫn cho hoàn tiền). Thông báo cho shop và người mua chỉ ghi "Shoppi đang kiểm tra".
+
+### Shoppi Video
+
+- **Người mua** (`/videos`, có lối vào ở thanh đầu trang và trang chủ): lướt video dọc, video đang xem tự phát (tắt tiếng, chạm để bật),
+  thả tim, bấm thẻ sản phẩm để mua ngay. Tab Nổi bật / Mới nhất; trang sản phẩm có nút xem video gắn sản phẩm đó.
+- **Người bán** (Kênh Marketing → Shoppi Video): tải video MP4/WEBM (tối đa 30MB), viết mô tả, gắn 1–6 sản phẩm đang bán của shop;
+  xem lượt xem, lượt thích; sửa, xóa. Tối đa 50 video đang hiển thị mỗi shop.
+- **Kiểm duyệt**: mô tả qua bộ lọc từ khóa cấm và số điện thoại / Zalo / link ngoài sàn như tin đăng sản phẩm; chỉ dùng được video
+  tải lên Shoppi. Admin (Sản phẩm → Kiểm duyệt Shoppi Video) ẩn video kèm lý do gửi shop, hoặc hiện lại. Video của shop bị đình chỉ tự ẩn.
+
+### Shoppi Xu & Shoppi Mall
+
+- **Shoppi Xu** (`CoinService`, trang `/account/coins`): 1 Xu = 1₫. Tích 1% tiền hàng thực trả mỗi đơn, chốt lúc đặt và cộng
+  sau thời gian giữ tiền nếu không có khiếu nại mở (`coin.earnPercent`); dùng tối đa 50% giá trị đơn (`coin.maxSpendPercent`).
+  Sàn tài trợ nên tiền đối soát của shop không đổi. Hủy đơn hoàn lại Xu; trả một phần hoàn tiền mặt và Xu theo tỷ lệ đã trả.
+- **Điểm danh hàng ngày**: chu kỳ 7 ngày (100, 100, 200, 100, 100, 100, 500 Xu), bỏ lỡ một ngày tính lại từ đầu.
+- **Ví ShoppiPay** (`ShoppiPayService`, trang `/account/wallet`): số dư trả thẳng khi đặt hàng, đơn hủy hoặc trả hàng được hoàn ngay vào ví.
+  Nạp tiền hiện là **mô phỏng**, cần nối cổng thanh toán thật trước khi dùng với tiền thật.
+- **Hạng thành viên** (`MembershipService`): tính từ tiền đã trả cho đơn đã giao trong 6 tháng gần nhất. Bạc từ 2 triệu (Xu x1,25),
+  Vàng từ 10 triệu (x1,5), Kim Cương từ 30 triệu (x2).
+- **Shoppi Mall**: admin cấp cho shop đã xác minh giấy tờ (`POST /api/admin/shops/{id}/mall`); huy hiệu Mall trên sản phẩm
+  và trang shop, bộ lọc `mall=true` khi tìm kiếm.
+
+### Vòng quay may mắn
+
+- Trang `/account/lucky-spin` (web) và màn "Vòng quay may mắn" (app): mỗi người mua **1 lượt miễn phí mỗi ngày** (giờ Việt Nam),
+  trúng 10 / 20 / 50 / 100 / 500 / 2.000 Xu, voucher Freeship 15K (lưu thẳng vào Kho Voucher) hoặc "chúc may mắn lần sau".
+- Server bốc giải bằng `SecureRandom` theo tỷ lệ công khai trên trang; trình duyệt chỉ quay bánh xe tới đúng ô được trả về.
+  Khóa duy nhất (người mua, ngày) chặn quay 2 lần kể cả khi bấm cùng lúc.
+- **Ngân sách Xu mỗi ngày** cho toàn sàn (admin chỉnh ở Cài đặt, mặc định 100.000 Xu): giải Xu lớn vượt ngân sách tự đổi sang
+  giải lớn nhất còn vừa. Trung bình một lượt tốn khoảng 37 Xu. Bảng "Người may mắn" hiện tên đã che (`Ng***h`).
+
+### Báo khi giảm giá
+
+- Nút chuông **"Báo khi giảm giá"** trên trang sản phẩm (web và app): theo dõi mọi lần giảm, hoặc chỉ báo khi giá xuống tới mức
+  người mua chọn. Trang `/account/price-watches` liệt kê sản phẩm đang theo dõi và đã giảm bao nhiêu % từ lúc theo dõi.
+- `PriceWatchService` quét giá mỗi 5 phút (`shoppi.price-watch.check-ms`): giảm từ 1% (người bán hạ giá hoặc Flash Sale bắt đầu)
+  thì gửi thông báo; mỗi lần giảm chỉ báo một lần, cùng sản phẩm tối đa 1 lần/12 giờ trừ khi giá giảm sâu hơn. Tối đa 100 sản phẩm/người.
 
 ### Giỏ hàng & Đặt hàng
 
@@ -243,6 +401,19 @@ với **kỳ trước cùng độ dài**. Biểu đồ vẽ bằng SVG, không d
   hồi, đánh giá có ảnh/video; phân bố số sao, đánh giá dịch vụ shop và vận chuyển, xu hướng theo thời gian, sản phẩm
   điểm thấp nhất. Shop xem mọi đánh giá (lọc theo chưa phản hồi / tiêu cực / số sao / sản phẩm) và **trả lời**
   (tối đa 255 ký tự, sửa được). Câu trả lời hiện trên trang sản phẩm; người mua nhận thông báo ở lần trả lời đầu tiên.
+
+### Người bán: Dự báo nhập hàng (AI)
+
+- Trang **Kênh Người Bán > Dự Báo Nhập Hàng (AI)** (`InventoryForecastService`, `StockForecaster`): dự báo nhu cầu từng mã hàng
+  (sản phẩm hoặc từng phân loại) từ lịch sử bán 120 ngày.
+- Mô hình: thử Holt (làm mượt hàm mũ có xu hướng giảm dần) với nhiều tham số và trung bình trượt 28/56 ngày, nhân hệ số theo ngày
+  trong tuần; chọn mô hình dự đoán đúng nhất trên các tuần đã qua (rolling origin, tầm 14 ngày) rồi kết hợp với trung bình 28 ngày.
+- Từ dự báo: số ngày còn đủ bán và ngày hết hàng, tồn kho an toàn = z × độ lệch × √(thời gian chờ hàng), điểm đặt hàng lại,
+  số lượng nên nhập để đủ bán thêm N ngày. Trạng thái: Hết hàng / Nhập gấp / Đến lúc nhập / Ổn / Tồn nhiều / Bán chậm.
+- Người bán chỉnh thời gian chờ hàng về, số ngày muốn đủ hàng, mức an toàn 90/95/99%. Biểu đồ đã bán + dự báo + mức cao từng mã.
+- Độ chính xác đo trên chính dữ liệu của shop (ẩn 14 ngày gần nhất rồi dự đoán), hiển thị cạnh cách lấy trung bình đơn giản để so sánh
+  trung thực. Với hàng bán ít, độ ngẫu nhiên của nhu cầu giới hạn độ chính xác của mọi mô hình; mô hình có lợi rõ khi có xu hướng.
+- Nút **"AI tư vấn nhập hàng"**: LLM (nếu bật) viết lời khuyên từ bảng dự báo; không có AI thì dùng lời khuyên theo quy tắc.
 
 ### Người bán: Tương tác khách hàng
 
@@ -588,13 +759,34 @@ Quyền **"Cấu hình & vận hành hệ thống"** (`PERM_SETTINGS`, trước 
 
 - Email được đưa vào hàng đợi (bảng `email_messages`) và gửi nền mỗi 5 giây. Nếu lỗi, hệ thống gửi lại sau 1, 5 rồi
   30 phút.
-- Các loại email: xác thực email khi đăng ký, quên/đặt lại mật khẩu (link dùng 1 lần, hết hạn), cảnh báo bảo mật (đăng
-  nhập thiết bị mới, đổi mật khẩu, bật/tắt 2FA), các bước của đơn hàng.
+- Các loại email: xác thực email khi đăng ký, quên/đặt lại mật khẩu (mã 6 số và link dùng 1 lần, hết hạn), cảnh báo bảo
+  mật (đăng nhập thiết bị mới, đổi mật khẩu, bật/tắt 2FA, liên kết / gỡ tài khoản mạng xã hội), các bước của đơn hàng.
 - Cấu hình SMTP ở **`/admin/email`** (mật khẩu được mã hóa), dự phòng bằng biến `MAIL_HOST`, `MAIL_PORT`,
   `MAIL_USERNAME`, `MAIL_PASSWORD`. Trang này cũng cho gửi thử và xem *Hộp thư đi* (xem trước nội dung, gửi lại).
   **Chưa cấu hình SMTP thì email chỉ được lưu lại, không gửi đi.**
 - Dùng Gmail: `smtp.gmail.com`, cổng 587, STARTTLS. Mật khẩu là **Mật khẩu ứng dụng** của Google (cần bật xác minh
   2 bước), không phải mật khẩu Gmail.
+
+### Thông báo đẩy (Web Push + app điện thoại)
+
+- Mọi thông báo trong app (đơn hàng, tin nhắn, khuyến mãi, hỗ trợ, thông báo toàn sàn) đồng thời được **đẩy tới
+  trình duyệt và điện thoại** của người dùng, kể cả khi họ không mở Shoppi. Bấm vào thông báo sẽ mở đúng trang
+  (chi tiết đơn, khung chat...).
+- **Web:** bật ở chuông thông báo hoặc trang *Thông báo* (nút *Bật*, *Gửi thử*, *Tắt*). Backend tự viết chuẩn Web
+  Push bằng JDK, không dùng thư viện ngoài: mã hóa nội dung `aes128gcm` (RFC 8291, có unit test đối chiếu ví dụ
+  mẫu của RFC) và ký VAPID ES256 (RFC 8292). Khóa VAPID được tạo tự động lần đầu và lưu mã hóa trong
+  `platform_settings`, nên **không cần cấu hình gì**. Trình duyệt cần `https` hoặc `localhost`.
+- **App điện thoại** (`expo-notifications`): backend gửi qua dịch vụ push của Expo. Thông báo của người bán
+  (link `/seller/...`) chỉ tới app Người Bán, còn lại tới app Shoppi. Muốn app nhận được push thì phải build có
+  Firebase:
+  1. Tạo project trên [Firebase](https://console.firebase.google.com), thêm 2 app Android `vn.shoppi.buyer` và
+     `vn.shoppi.seller`, tải `google-services.json` đặt vào `mobile/`.
+  2. Trong `mobile/` chạy `npx eas init` để lấy *project id*, rồi tải khóa FCM V1 (Firebase → Project settings →
+     Service accounts → Generate new private key) lên Expo bằng `npx eas credentials`.
+  3. Build APK với biến `EAS_PROJECT_ID=<project id>`.
+  Thiếu các bước này (hoặc chạy trong Expo Go) thì app vẫn chạy bình thường, chỉ là không có push.
+- Thiết bị được lưu ở bảng `push_subscriptions`. Đăng xuất thì thiết bị đó ngừng nhận thông báo của tài khoản;
+  thiết bị đã gỡ app / chặn thông báo được tự xóa khi dịch vụ push báo không còn tồn tại.
 
 ### Thanh toán VNPay (cổng thật, API 2.1.0)
 
@@ -610,9 +802,44 @@ Quyền **"Cấu hình & vận hành hệ thống"** (`PERM_SETTINGS`, trước 
 - **Cấu hình** ở `/admin/gateways` (hash secret được mã hóa), dự phòng bằng `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`.
   Đăng ký sandbox tại <https://sandbox.vnpayment.vn/devreg/> để nhận TMN code và hash secret.
   Thẻ test của sandbox: NCB `9704198526191432198`, chủ thẻ `NGUYEN VAN A`, ngày phát hành `07/15`, OTP `123456`.
+  Các bước đăng ký chi tiết: [docs/HUONG-DAN-KET-NOI-THAT.md](docs/HUONG-DAN-KET-NOI-THAT.md).
 - **Lưu ý**: VNPay không gọi được IPN vào `localhost`. Khi chạy local, kết quả được ghi nhận qua return URL (có kiểm tra
   chữ ký). Khi triển khai thật, hãy khai báo IPN URL công khai (hoặc dùng ngrok) trong trang merchant VNPay.
 - Các ví MoMo/ZaloPay, thẻ và chuyển khoản vẫn là cổng **mô phỏng** như trước.
+
+### Đơn vị vận chuyển
+
+9 đơn vị, người bán chọn trong *Chính sách shop*; trang *Thanh toán & vận chuyển* của admin có bảng tổng quan:
+
+| Đơn vị | Dịch vụ | Phí & hành trình |
+| --- | --- | --- |
+| Giao Hàng Nhanh (GHN) | Tiết kiệm, Nhanh, Hỏa tốc | **API thật** (khi đã kết nối) |
+| Giao Hàng Tiết Kiệm (GHTK) | Tiết kiệm, Nhanh | **API thật** (khi đã kết nối) |
+| J&T Express, Viettel Post, Ninja Van, SPX Express, VNPost (EMS) | Tiết kiệm, Nhanh (Viettel Post có Hỏa tốc) | Mô phỏng |
+| Ahamove, GrabExpress | Hỏa tốc 1–2 giờ, chỉ nội tỉnh | Mô phỏng |
+
+- Phí mô phỏng = bảng phí theo gói và cùng/khác tỉnh, cộng phụ phí riêng từng hãng (SPX rẻ hơn nhưng chậm hơn 1 ngày, VNPost
+  chậm hơn 1 ngày, GrabExpress đắt nhất trong nhóm hỏa tốc). Shop không thể chỉ bật Ahamove/GrabExpress: phải có ít nhất một
+  đơn vị giao toàn quốc.
+- Kiến trúc: mỗi hãng có API thật là một lớp `CarrierGateway` (`service/shipping/`): báo giá ở bước thanh toán, tạo vận đơn
+  khi người bán bấm *Chuẩn bị hàng*, hủy vận đơn, cấu hình ở trang admin, cùng một webhook nhận trạng thái. Thêm hãng mới chỉ
+  cần thêm một lớp như vậy. Viettel Post, J&T, Ninja Van, SPX, VNPost, GrabExpress chỉ cấp API khi ký hợp đồng đối tác; Ahamove
+  cần tọa độ GPS của địa chỉ, nên các hãng này đang dùng bảng phí và hành trình mô phỏng.
+
+### Vận chuyển Giao Hàng Tiết Kiệm (GHTK, API thật)
+
+- **Cấu hình** ở `/admin/gateways`: API Token (được mã hóa) và mã đối tác (`X-Client-Source`), dự phòng bằng `GHTK_TOKEN`,
+  `GHTK_PARTNER_CODE`. Mặc định dùng môi trường thử nghiệm `https://services-staging.ghtklab.com`. Có nút *Kiểm tra kết nối*.
+- **Phí ship thật** (`GET /services/shipment/fee`): gói Tiết kiệm = đường bộ, gói Nhanh = đường bay; phí = phí vận chuyển +
+  phí bảo hiểm. GHTK báo không giao tới địa chỉ thì ẩn lựa chọn GHTK; GHTK không trả lời thì dùng bảng phí mô phỏng.
+- **Tạo vận đơn** (`POST /services/shipment/order`): địa chỉ gửi theo tên tỉnh/quận/phường, thu hộ COD (`pick_money`),
+  khai giá trị hàng, người mua đã trả phí ship (`is_freeship`), *Gửi tại bưu cục* = `pick_option: post`. Mã vận đơn = label
+  GHTK. Nếu GHTK đã hủy vận đơn trước đó, lần tạo lại dùng mã đơn mới (`<mã đơn>-2`) vì GHTK không cho dùng lại mã cũ.
+- **Hủy vận đơn** khi đơn bị hủy trước lúc lấy hàng (`POST /services/shipment/cancel/{label}`).
+- **Webhook** `POST /api/shipping/ghtk/webhook?key=…` (nhận cả form và JSON): 12 đang lấy hàng, 3 đã lấy hàng → đang giao,
+  4 đang giao, 5/6 đã giao (thu COD), 7/8 lấy hàng chưa thành công, 9/10 giao không thành công, 20 đang hoàn, 21/11 đã hoàn →
+  hủy đơn và nhập lại kho, -1 GHTK hủy vận đơn → người bán tạo lại. Các mã do shipper tự báo (45, 49, 123, 127, 128, 410) chỉ
+  mang tính tham khảo nên được bỏ qua.
 
 ### Vận chuyển Giao Hàng Nhanh (GHN, API thật)
 
@@ -629,6 +856,40 @@ Quyền **"Cấu hình & vận hành hệ thống"** (`PERM_SETTINGS`, trước 
   trên hành trình đơn: *picked* → đang giao, *delivered* → đã giao (thu COD), *delivery_fail*, *returned* → hệ thống hủy
   đơn và nhập lại kho, *cancel* → người bán tạo lại vận đơn. Đơn GHN không còn dùng bộ mô phỏng hành trình.
 - Shop cần nhập **Quận/Huyện, Phường/Xã lấy hàng** trong *Hồ sơ shop*. Webhook cũng cần backend có địa chỉ công khai.
+
+### Tính năng bổ sung theo Shopee
+
+- **Yêu thích sản phẩm** (♥ dưới ảnh sản phẩm, trang `/account/likes`) và **Theo dõi shop** (nút trên trang shop và trang
+  sản phẩm, trang `/account/following`, số người theo dõi trên trang shop). Bảng `product_likes`, `shop_follows`.
+- **Voucher theo đối tượng** (voucher của shop): mọi khách, **người theo dõi shop**, khách mua lần đầu tại shop, khách đã
+  từng mua (có đơn đã giao). Voucher cho người theo dõi chỉ được báo cho người theo dõi; trang shop nhắc "Theo dõi shop để
+  dùng N voucher". Người không đủ điều kiện được báo lý do khi thanh toán.
+- **Mua Kèm Deal Sốc / Mua để nhận quà** (Kênh Marketing → Mua Kèm Deal Sốc, `/seller/addon-deals`): mua một sản phẩm chính
+  thì sản phẩm mua kèm có giá sốc, hoặc mua sản phẩm chính đủ số tiền thì quà được miễn phí, tối đa N mỗi loại trong một
+  đơn. Trang sản phẩm chính hiện khối mua kèm / quà, bước thanh toán tự áp dụng và giải thích khoản tiết kiệm. Khoản giảm là
+  khuyến mãi do shop tài trợ (gộp với combo) nên đối soát và báo cáo đã tính đúng. Dòng đã được combo giảm không bị giảm hai lần.
+- **Hiệu quả hoạt động shop & điểm phạt (Sao Quả Tạ)** (người bán: Dữ Liệu → Hiệu Quả Hoạt Động; admin: Shop → Hiệu quả &
+  điểm phạt, quyền SHOPS):
+  - chỉ số 30 ngày: tỷ lệ đơn không thành công (do shop hủy), tỷ lệ giao hàng trễ (giao cho ĐVVC sau thời gian chuẩn bị
+    hàng + 1 ngày), tỷ lệ phản hồi chat, đánh giá shop;
+  - điểm phạt tính theo quý: mỗi thứ Hai, tuần trước có tỷ lệ hủy hoặc giao trễ ≥ 10% (từ 5 đơn) thì +1 điểm mỗi chỉ số;
+    sản phẩm bị admin gỡ do vi phạm +1 (hàng giả, hàng cấm +2; khôi phục thì điểm được hủy); admin phạt thủ công 1–5 điểm
+    hoặc hủy điểm (ghi nhật ký quản trị);
+  - mức xử lý: 3 điểm mất nhãn Yêu thích, 6 điểm không được đăng ký Flash Sale Shoppi, 12 điểm báo admin xem xét đình chỉ;
+  - **nhãn Shop Yêu Thích** xét tự động mỗi ngày (hoạt động ≥ 30 ngày, ≥ 20 đơn giao thành công / 30 ngày, đánh giá ≥ 4,5★,
+    hủy ≤ 5%, giao trễ ≤ 5%, phản hồi chat ≥ 70%, không có điểm phạt). Admin chỉnh các ngưỡng; nhãn hiện trên trang shop,
+    trang sản phẩm và thẻ sản phẩm.
+- **Tìm kiếm bằng hình ảnh** (biểu tượng 📷 trong ô tìm kiếm, `/search/image`, `POST /api/products/image-search`):
+  - luôn có: so sánh ảnh tải lên với ảnh bìa mọi sản phẩm theo màu sắc (histogram RGB 64 ô, bỏ nền trắng, chia phiếu mềm)
+    và hình dáng (dHash 64 bit). Ảnh bìa được lập chỉ mục nền mỗi 2 phút khi đổi ảnh (bảng `product_image_index`), admin có
+    nút "Lập chỉ mục ngay" ở trang AI;
+  - khi bật AI (OpenAI hoặc Claude, mô hình đọc được ảnh) và người dùng đã đăng nhập: AI nhận diện sản phẩm trong ảnh thành
+    mô tả và từ khóa, sản phẩm khớp mô tả được xếp trước, kèm % giống. Lượt gọi được ghi vào chi phí AI ("Tìm kiếm bằng
+    hình ảnh"). Khách chưa đăng nhập chỉ dùng so sánh hình ảnh (không tốn phí).
+- **Kho Voucher** (`/account/vouchers`): nút **Lưu** trên voucher của shop / trang sản phẩm và mục gợi ý (Shoppi Voucher,
+  voucher của shop đang theo dõi); lưu voucher riêng tư bằng cách nhập mã. Mỗi voucher hiện trạng thái (dùng được, chưa đến
+  giờ, đã dùng hết lượt, hết hạn). Voucher đã lưu đứng đầu danh sách ở bước thanh toán (voucher riêng tư đã lưu cũng chọn
+  được). Voucher đã lưu sắp hết hạn trong 24 giờ được nhắc một lần.
 
 ### Trung tâm đánh giá (AI quản lý đánh giá & phản hồi)
 
@@ -704,26 +965,30 @@ Giá theo token của model Claude nhập ở bảng giá trên cùng trang đ�
   Có pgvector: cột `vector(256)` + chỉ mục HNSW, CSDL tự tìm láng giềng gần nhất (`<=>`); chưa có: lưu `real[]`
   và tính cosine trong Java. Trạng thái chỉ mục xem ở *AI & chi phí LLM*.
 
-### Đăng nhập bằng Google (OAuth2 + Spring Security)
+### Đăng nhập bằng Google, Facebook, GitHub (OAuth2 + Spring Security)
 
-Có 2 cách đăng nhập:
-1. **Email/mật khẩu** đăng ký trực tiếp trong app: `POST /api/auth/register`, `POST /api/auth/login`
-   (mật khẩu băm BCrypt, xác thực qua `AuthenticationManager`), trả về JWT.
-2. **Google OAuth2** (Authorization Code flow, `spring-boot-starter-oauth2-client` + `oauth2Login()`):
-   nút "Đăng nhập với Google" → `GET /oauth2/authorization/google` → Google → callback
-   `/login/oauth2/code/google` → `OAuth2LoginSuccessHandler` tạo/tìm user, cấp JWT và redirect về
-   `http://localhost:5173/oauth2/redirect#token=...&refresh=...` (hoặc `#challenge=...` nếu tài khoản bật 2FA) → frontend gọi `GET /api/auth/me`.
-   Email Google chưa có trong DB sẽ được tự tạo tài khoản BUYER.
+- **Cách đăng nhập**: email/mật khẩu (`POST /api/auth/register`, `/api/auth/login`, mật khẩu băm BCrypt) hoặc nút
+  **Tiếp tục với Google / Facebook / GitHub** trên web và cả 3 app (Authorization Code flow, `oauth2Login()`).
+- **Luồng**: `GET /oauth2/authorization/{google|facebook|github}` → trang của nhà cung cấp → callback
+  `/login/oauth2/code/{provider}` → `OAuth2LoginSuccessHandler` tìm/tạo tài khoản, cấp JWT và chuyển về
+  `/oauth2/redirect#token=...&refresh=...` (web) hoặc `shoppi://oauth2/redirect#token=...` (app, mở bằng trình duyệt hệ thống),
+  `#challenge=...` nếu tài khoản bật 2FA. Token nằm sau dấu `#` nên không bị ghi vào log máy chủ.
+- **Nhiều tài khoản liên kết** (bảng `user_oauth_accounts`): một tài khoản Shoppi gắn được cả Google, Facebook, GitHub, nhận
+  diện theo mã người dùng của nhà cung cấp (đổi email bên đó vẫn đăng nhập được). Lần đầu: email đã xác minh trùng tài khoản có sẵn
+  thì gắn vào tài khoản đó, chưa có thì tạo tài khoản Người mua. Email *chưa xác minh* không được dùng để nhận tài khoản. Trang
+  *Bảo mật tài khoản* có mục **Tài khoản liên kết** (liên kết thêm / gỡ; không gỡ được cách đăng nhập cuối cùng khi chưa có mật khẩu).
+- **Facebook / GitHub**: `SocialOAuth2UserService` chuẩn hóa hồ sơ; GitHub lấy email *primary, verified* từ `/user/emails`.
+- **Khóa cấu hình ngay trên trang quản trị** `/admin/gateways` (secret được mã hóa, không cần khởi động lại):
+  `SocialLoginSettings` vừa lưu khóa vừa là `ClientRegistrationRepository` của Spring Security. Dự phòng bằng biến
+  `GOOGLE_CLIENT_ID/SECRET`, `FACEBOOK_CLIENT_ID/SECRET`, `GITHUB_CLIENT_ID/SECRET`. Nhà cung cấp chưa có khóa thì nút không hiện.
+- **Địa chỉ công khai** (`OAUTH2_PUBLIC_URL` hoặc trang admin, ví dụ ngrok): Google/Facebook không nhận callback về IP nội bộ,
+  nên app điện thoại cần địa chỉ `https` công khai. Cùng địa chỉ này hiện sẵn IPN URL của VNPay.
+- **Quên mật khẩu**: email chứa **mã 6 số** (30 phút, băm BCrypt, sai 5 lần phải xin mã mới) và liên kết đặt lại.
+  `POST /api/auth/forgot-password` → `POST /api/auth/reset-password/verify-code` (trả token 10 phút) →
+  `POST /api/auth/reset-password`. Tài khoản tạo bằng mạng xã hội dùng cách này hoặc *Tạo mật khẩu* để có thêm mật khẩu.
 
-Cấu hình một lần:
-1. Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID (loại **Web application**)
-2. Thêm **Authorized redirect URI**: `http://localhost:8081/login/oauth2/code/google`
-3. Đặt biến môi trường trước khi chạy backend:
-   ```bash
-   export GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
-   export GOOGLE_CLIENT_SECRET=GOCSPX-xxxx
-   ```
-   (Trong IntelliJ: Run Configuration → Environment variables.)
+Hướng dẫn đăng ký khóa từng nhà cung cấp (và Gmail, VNPay, GHN, ngrok):
+**[docs/HUONG-DAN-KET-NOI-THAT.md](docs/HUONG-DAN-KET-NOI-THAT.md)**.
 
 **Lưu ý:** nếu chưa đặt `OPENAI_API_KEY`, các endpoint AI vẫn hoạt động (không lỗi) nhưng trả
 về thông báo "AI chưa được cấu hình" thay vì câu trả lời thật.
@@ -752,6 +1017,33 @@ Frontend chạy ở `http://localhost:5173`, tự động proxy các request `/a
 4. Đăng nhập lại bằng Seller → "Đơn hàng" → xác nhận đơn vừa đặt → xem "Tổng quan" cập nhật
    thống kê
 
+## Kiểm thử
+
+**Unit test (JUnit 5 + Mockito)**: `cd backend && mvn test`, không cần database. 51 ca:
+
+| Phần | File test | Kiểm tra |
+|---|---|---|
+| Chia tiền giảm giá giữa các shop | `CheckoutSplitTest` | chia theo tỷ lệ, cộng lại đúng từng đồng, phần lẻ cho shop lớn nhất |
+| Shoppi Xu | `CoinRulesTest` | 1% tiền thực trả, hệ số hạng thành viên, làm tròn xuống |
+| Thẻ thanh toán | `PaymentRulesTest` | kiểm tra Luhn, nhận diện VISA / Mastercard / JCB |
+| Báo khi giảm giá | `PriceWatchServiceTest` | ngưỡng 1%, giá mong muốn, không báo lặp trong 12 giờ |
+| AI lạm dụng đổi trả | `ReturnRiskRulesTest` | người mua bình thường, người lạm dụng, sản phẩm lỗi bảo vệ người mua, ngưỡng mức rủi ro |
+| AI phân loại đánh giá | `ReviewTextAnalyzerTest`, `ReviewFileParserTest` | 14 đánh giá mẫu có nhãn chuẩn, cảm xúc, từ khóa nghiêm trọng, đọc file CSV/Excel |
+| Dự báo nhập hàng | `StockForecasterTest`, `InventoryForecastParamsTest` | nhu cầu đều / tăng / theo cuối tuần, tham số, lời khuyên |
+| Vòng quay may mắn | `LuckySpinRulesTest` | tỷ lệ cộng đủ 100%, bốc đúng tỷ lệ, chi phí trung bình, ngân sách hạ giải, che tên |
+
+**Kiểm thử tích hợp qua API thật**: chạy khi backend đang chạy (database bất kỳ, mỗi lần dùng tài khoản mới):
+
+```bash
+node scripts/test-e2e.mjs                                   # backend ở http://localhost:8081
+node scripts/test-e2e.mjs --api http://localhost:3000/api   # stack docker compose
+```
+
+51 kiểm tra: tính tiền đơn hàng và voucher, chia voucher sàn cho nhiều shop, hủy đơn trả lại kho và Xu, ví ShoppiPay
+(trừ tiền, hoàn tiền, không đủ số dư), **6 người cùng tranh mua 3 sản phẩm cuối** (đúng 3 người mua được, không bán âm kho,
+không lỗi hệ thống), luồng giao hàng → đánh giá → trả hàng, phân quyền giữa người mua / người bán / shop khác, báo khi giảm giá, vòng quay (bấm 2 lần cùng lúc chỉ được 1 lượt).
+Script tạm nâng giới hạn tạo tài khoản mỗi IP trong lúc chạy và trả lại giá trị cũ khi xong.
+
 ## Tài liệu & công cụ
 
 - **ERD**: `docs/ERD.md` (Mermaid, sinh từ các entity). Đưa vào draw.io: *Arrange → Insert → Advanced → Mermaid*.
@@ -774,7 +1066,7 @@ Backend đã hỗ trợ chuyển đổi giữa 2 nguồn AI chỉ bằng 1 dòng
 
 ## Kiến trúc AI (để viết vào báo cáo)
 
-- **Không tự train model.** Gọi thẳng OpenAI Chat Completions API qua `AIService.java`
+- **Phần ngôn ngữ không tự train mô hình lớn.** Gọi thẳng OpenAI Chat Completions API (hoặc Claude) qua `AIService.java`
   (dùng `WebClient`), đúng cách tiếp cận phổ biến trong công nghiệp hiện nay.
 - **Chatbot buyer = RAG thủ công 3 bước** (`ChatbotService.java`):
   1. *Retrieval*: chuẩn hóa câu hỏi về dạng không dấu, tách khoảng giá và chủ đề (đơn hàng, đổi trả...),
@@ -786,5 +1078,36 @@ Backend đã hỗ trợ chuyển đổi giữa 2 nguồn AI chỉ bằng 1 dòng
   3. *Generation*: gọi LLM, ràng buộc chỉ trả lời trong phạm vi context được cung cấp
 - **Gợi ý mô tả (seller)**: prompt engineering đơn giản, không cần retrieval
   (`SellerAIController.java`)
-- **Recommendation**: rule-based trên `ViewHistory` + cùng category
-  (`RecommendationController.java`, `ProductService.recommendSimilar`)
+- **Trợ lý biết hành động** (`ShoppingAgent.java`): LLM + function calling. `AIProvider.converse` chuyển một hội thoại
+  có công cụ (`service/ai/Agent.java`) sang định dạng của OpenAI (`tools` / `tool_calls`) hoặc Claude (`tool_use` / `tool_result`);
+  vòng lặp: gọi mô hình → chạy công cụ mô hình yêu cầu → gửi kết quả → lặp đến khi có câu trả lời. Hành động khó hoàn tác
+  (hủy đơn) chỉ được đề xuất, người mua bấm xác nhận.
+- **Recommendation (tự train)**: item-based collaborative filtering trên hành vi thật (`review-ai-service/app/recommender.py`,
+  `service/reco/RecommendationService.java`), đánh giá HitRate@10 / NDCG@10 so với luật cũ; luật cũ là phương án dự phòng.
+- **Gian lận đơn & rời bỏ (tự train)**: mô hình dạng bảng (`review-ai-service/app/tabular.py`): hồi quy logistic và
+  Gradient Boosting thi với nhau, Isolation Forest cho phát hiện bất thường không cần nhãn; chia tập theo thời gian, so với luật
+  thủ công bằng ROC-AUC, PR-AUC, precision / recall trong top 10% (`service/risk/`).
+- **Thị giác máy tính (tự train, transfer learning)**: MobileNetV2 (ONNX, chạy bằng `onnxruntime` trên CPU) trích 1.280 đặc trưng
+  của ảnh sản phẩm, hồi quy logistic học trên ảnh của sàn để đoán danh mục (`review-ai-service/app/vision.py`). Người bán tải ảnh bìa
+  lên là form đăng sản phẩm gợi ý danh mục (`VisionCategoryService`). Kiểm định theo sản phẩm (5 phần): đúng ngành hàng 79%
+  (top-3: 94%), cách so màu cũ 25%.
+- **Tìm kiếm bằng ảnh bằng MobileNetV2**: mỗi ảnh bìa được lưu vector 1.280 số (`product_image_index.embedding`, tự lập chỉ mục
+  mỗi 2 phút); ảnh người mua tải lên được so cosine với các vector đó, cộng điểm cho danh mục mà mô hình thị giác đoán được
+  (`ImageSearchService`, endpoint `/vision/embed`). Thử trên 256 ảnh phụ của sản phẩm tìm trong 206 ảnh bìa: đúng sản phẩm ở vị trí
+  đầu 79% (top-5: 94%), so màu cũ 38% (60%). MobileNet đọc được cả ảnh WEBP mà chỉ mục so màu của Java bỏ qua. Dịch vụ AI tắt thì
+  tự quay về so màu sắc và hình dáng.
+- **Tự train trên máy bằng Python**: `cd review-ai-service && pip install -r requirements-train.txt && python train_from_db.py`
+  đọc dữ liệu thật từ PostgreSQL, train 5 mô hình (gợi ý, rời bỏ, gian lận, phân loại đánh giá, thị giác máy tính), so với luật cũ,
+  ghi biểu đồ + bảng vào `review-ai-service/reports/` và nạp mô hình mới vào dịch vụ đang chạy.
+- **Kiểm thử chatbot tự động**: `node scripts/chatbot-eval.mjs` gửi 70 hội thoại (`scripts/demo-data/chatbot-cases.mjs`) qua API thật,
+  viết như khách thật gõ: không dấu, viết tắt / teen code ("đt", "kcn", "mk", "ko"), sai chính tả ("samsug", "ao khaoc"), đổi ý
+  giữa chừng ("à thôi, đổi sang loa"), câu nối tiếp chỉ hiểu được nhờ câu trước ("dưới 5 triệu thôi"), chính sách, đơn hàng, cần
+  người thật, hỏi thứ sàn không bán. Mỗi câu được chấm tự động (đúng loại hàng, đúng khoảng giá, nhắc đúng chính sách, có đơn hàng,
+  có chuyển hỗ trợ, không đưa hàng không liên quan); ca sai được ghi lại để sửa tiếp (`review-ai-service/reports/chatbot-eval.md`).
+  Chạy được cả khi chưa có API key (RAG theo luật) lẫn khi có (agent, chấm thêm thêm vào giỏ / gợi ý). Kết quả với RAG theo luật:
+  75% trước khi sửa, sau khi thêm `ChatQuery` (viết tắt, sửa chính tả theo từ điển của chính danh mục hàng, bỏ từ đệm khi đổi ý,
+  nhớ chủ đề cho câu nối tiếp, cần khớp ít nhất nửa số từ) đạt 100% bộ đã dùng để sửa và **87% bộ giữ lại** (câu mới viết sau,
+  không dùng để sửa: con số trung thực về câu khách thật hỏi).
+- **Hai loại AI trong dự án**: (1) gọi API mô hình lớn có sẵn + RAG + tool calling cho phần cần hiểu và sinh ngôn ngữ;
+  (2) tự huấn luyện mô hình học máy nhỏ trên dữ liệu của sàn (gợi ý sản phẩm, phân loại đánh giá, phát hiện lạm dụng đổi trả,
+  phát hiện gian lận đơn, dự đoán rời bỏ, dự báo nhập hàng) cho phần cần con số đo được, chạy nhanh trên CPU, không tốn phí API.

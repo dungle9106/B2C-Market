@@ -17,6 +17,9 @@ import java.util.Optional;
 public interface ShopRepository extends JpaRepository<Shop, Long> {
     Optional<Shop> findBySellerId(Long sellerId);
 
+    // "Shoppi Mall" on the home page
+    List<Shop> findTop12ByMallTrueAndActiveTrueOrderByIdAsc();
+
     // shop names are unique on the platform (case-insensitive)
     boolean existsByNameIgnoreCase(String name);
 

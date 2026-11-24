@@ -35,6 +35,10 @@ import java.util.stream.Collectors;
 //   3. Generation: call the LLM (via AIService) constrained to that context
 // When no LLM is configured a rule-based answer is built from the same context,
 // so the feature still works in a demo without an API key.
+//
+// With a model that can call tools (OpenAI, Claude) the turn goes to ShoppingAgent instead: the model chooses
+// what to look up (products, the buyer's orders and vouchers, the trained recommendation model) and can act
+// (add to cart, prepare a cancellation the buyer confirms). If that fails, the RAG pipeline above answers.
 @Slf4j
 @Service
 public class ChatbotService {
@@ -49,12 +53,14 @@ public class ChatbotService {
     private final AIService aiService;
     private final TransactionTemplate readTx;
     private final com.marketplace.backend.service.search.SemanticSearchService semanticSearch;
+    private final ShoppingAgent agent;
 
     public ChatbotService(ProductRepository productRepository, OrderRepository orderRepository,
                           ChatHistoryRepository chatHistoryRepository, UserRepository userRepository,
                           AIService aiService, PlatformTransactionManager txManager,
-                          com.marketplace.backend.service.search.SemanticSearchService semanticSearch) {
+                          com.marketplace.backend.service.search.SemanticSearchService semanticSearch, ShoppingAgent agent) {
         this.semanticSearch = semanticSearch;
+        this.agent = agent;
         this.productRepository = productRepository;
         this.orderRepository = orderRepository;
         this.chatHistoryRepository = chatHistoryRepository;
@@ -66,34 +72,73 @@ public class ChatbotService {
 
     // what the retrieval step found; built inside a short read-only transaction so the
     // (slow) LLM call below doesn't hold a database connection
+    // the catalogue's words (typo correction), rebuilt every 10 minutes
+    private volatile Set<String> vocabulary = Set.of();
+    private volatile long vocabularyAt;
+
     private record Context(String normalized, List<Product> products, List<ProductResponse> productCards,
                           List<Order> orders, List<ChatbotResponse.OrderRef> orderRefs,
-                          String ordersText, List<ChatHistory> history, Topic topic, boolean wantsHuman) {}
+                          String ordersText, List<ChatHistory> history, Topic topic, boolean wantsHuman, PriceRange price) {}
 
     public ChatbotResponse chat(String userMessage) {
         Long userId = CurrentUser.id();
         String message = userMessage.trim();
+
+        if (agent.available()) {
+            List<ChatHistory> history = readTx.execute(s -> {
+                List<ChatHistory> h = new ArrayList<>(chatHistoryRepository.findTop10ByUserIdOrderByCreatedAtDesc(userId));
+                Collections.reverse(h);
+                return h;
+            });
+            ShoppingAgent.Result r = agent.run(userId, message, history, this::searchForAgent);
+            if (r != null) {
+                ChatHistory saved = save(userId, message, r.reply());
+                return new ChatbotResponse(r.reply(), r.products(), r.orders(), r.suggestSupport(),
+                        saved != null ? saved.getCreatedAt() : null, r.actions(), r.steps());
+            }
+        }
+
         Context ctx = readTx.execute(s -> retrieve(userId, message));
 
         String reply = aiService.isConfigured()
                 ? aiService.complete(buildSystemPrompt(ctx), message)
                 : ruleBasedReply(ctx);
 
-        // best-effort logging of the conversation turn (also feeds the next turn's context)
-        ChatHistory saved = null;
+        ChatHistory saved = save(userId, message, reply);
+        boolean couldNotHelp = ctx.products().isEmpty() && ctx.orders().isEmpty() && ctx.topic() == null;
+        return new ChatbotResponse(reply, ctx.productCards(), ctx.orderRefs(),
+                ctx.wantsHuman() || couldNotHelp, saved != null ? saved.getCreatedAt() : null, List.of(), List.of());
+    }
+
+    // best-effort logging of the conversation turn (also feeds the next turn's context)
+    private ChatHistory save(Long userId, String message, String reply) {
         try {
-            saved = chatHistoryRepository.save(ChatHistory.builder()
+            return chatHistoryRepository.save(ChatHistory.builder()
                     .user(userRepository.getReferenceById(userId))
                     .message(NotificationService.cut(message, 2000))
                     .response(NotificationService.cut(reply, 4000))
                     .build());
         } catch (Exception e) {
             log.warn("Could not save chatbot history: {}", e.getMessage());
+            return null;
         }
+    }
 
-        boolean couldNotHelp = ctx.products().isEmpty() && ctx.orders().isEmpty() && ctx.topic() == null;
-        return new ChatbotResponse(reply, ctx.productCards(), ctx.orderRefs(),
-                ctx.wantsHuman() || couldNotHelp, saved != null ? saved.getCreatedAt() : null);
+    /** The agent's search_products tool: the same keyword + meaning search as below, with an explicit price range. */
+    private List<Product> searchForAgent(String query, BigDecimal min, BigDecimal max, int limit) {
+        String raw = TextNormalizer.normalize(query);
+        PriceRange price = min == null && max == null ? parsePrice(raw) : new PriceRange(min, max);
+        List<Product> products = findProducts(stripPrice(understand(raw)), price, null, limit);
+        if (products.size() < limit) {
+            Map<Long, Product> merged = new LinkedHashMap<>();
+            products.forEach(p -> merged.put(p.getId(), p));
+            for (Product p : semanticSearch.nearestProducts(query, limit * 2)) {
+                if (merged.size() >= limit) break;
+                if (p.isActive() && p.getShop().isActive() && (price == null || price.contains(p.getEffectivePrice()))) merged.putIfAbsent(p.getId(), p);
+            }
+            products = List.copyOf(merged.values());
+        }
+        return products;
     }
 
     /** Previous turns, oldest first, to restore the chat window. */
@@ -116,15 +161,38 @@ public class ChatbotService {
     // ==================== 1. retrieval ====================
 
     private Context retrieve(Long userId, String message) {
-        String norm = TextNormalizer.normalize(message);
-        PriceRange price = parsePrice(norm);
+        List<ChatHistory> history = new ArrayList<>(chatHistoryRepository.findTop10ByUserIdOrderByCreatedAtDesc(userId)
+                .stream().limit(HISTORY_TURNS).toList());
+        Collections.reverse(history);
+
+        // how buyers type: prices read first ("200 k"), then abbreviations, change-of-mind fillers and typos (ChatQuery)
+        String raw = TextNormalizer.normalize(message);
+        PriceRange price = parsePrice(raw);
+        String norm = understand(raw);
         Topic topic = Topic.detect(norm);
+        boolean offTopic = ChatQuery.offTopic(raw) || ChatQuery.offTopic(norm);
 
         // topic phrases are not product words: "don hang dang o dau" must not match "dau goi"
-        List<Product> products = findProducts(Topic.strip(stripPrice(norm)), price, topic);
+        String query = Topic.strip(stripPrice(norm));
+        boolean followUp = false;
+        // a follow-up with no product of its own ("dưới 5 triệu thôi", "có cái nào rẻ hơn 1tr ko", "tầm 2 triệu"):
+        // the product is the one of the previous message, the price is the new one
+        if (topic == null && !offTopic && productWords(query).isEmpty() && !history.isEmpty()
+                && (price != null || ChatQuery.rewrite(query).matches(".*\\b(loai|cai nao|re hon|mau|size)\\b.*"))) {
+            String before = understand(TextNormalizer.normalize(history.get(history.size() - 1).getMessage()));
+            String previous = Topic.strip(stripPrice(before));
+            if (Topic.detect(before) == null && !productWords(previous).isEmpty()) {
+                query = previous;
+                if (price == null) price = parsePrice(TextNormalizer.normalize(history.get(history.size() - 1).getMessage()));
+                followUp = true;
+            }
+        }
+        // "gợi ý vài món đi" (ChatQuery drops "gợi ý" so it can't match "dầu gội"): best sellers, as before
+        if (!followUp && productWords(query).isEmpty() && containsAny(raw, "goi y")) query = query + " ban chay";
+        List<Product> products = offTopic ? List.of() : findProducts(query, price, topic, MAX_CONTEXT_PRODUCTS, followUp);
         // RAG, step 2: too few keyword matches ("quà cho mẹ", "đồ đi biển"): add the products closest in meaning
         // (embeddings + pgvector), still within the price range
-        if (products.size() < MAX_CONTEXT_PRODUCTS && topic == null) {
+        if (products.size() < MAX_CONTEXT_PRODUCTS && topic == null && !offTopic) {
             Map<Long, Product> merged = new LinkedHashMap<>();
             products.forEach(p -> merged.put(p.getId(), p));
             for (Product p : semanticSearch.nearestProducts(message, 10)) {
@@ -143,13 +211,36 @@ public class ChatbotService {
                 .map(o -> new ChatbotResponse.OrderRef(o.getId(), o.getCode(), o.getStatus().name(), o.getShop().getName()))
                 .toList();
 
-        List<ChatHistory> history = new ArrayList<>(chatHistoryRepository.findTop10ByUserIdOrderByCreatedAtDesc(userId)
-                .stream().limit(HISTORY_TURNS).toList());
-        Collections.reverse(history);
-
         boolean wantsHuman = containsAny(norm, "nhan vien", "gap nguoi", "tong dai", "khieu nai", "to cao", "lua dao", "ho tro truc tiep");
         return new Context(norm, products, products.stream().map(ProductResponse::from).toList(),
-                orders, refs, ordersText, history, topic, wantsHuman);
+                orders, refs, ordersText, history, topic, wantsHuman, price);
+    }
+
+    /** Abbreviations, fillers and typos fixed (ChatQuery); prices are kept as typed. */
+    private String understand(String norm) {
+        String r = ChatQuery.rewrite(norm);
+        Set<String> keep = new HashSet<>(STOPWORDS);
+        for (Topic t : Topic.values()) for (String k : t.keys) keep.addAll(Arrays.asList(k.split(" ")));
+        keep.addAll(List.of("khong", "duoc", "minh", "bao", "nhieu", "nhan", "vien", "khieu", "thoi", "tiet", "chuyen", "trieu"));
+        return ChatQuery.correct(r, vocabulary(), keep);
+    }
+
+    private Set<String> vocabulary() {
+        if (System.currentTimeMillis() - vocabularyAt > 600_000) {
+            Set<String> words = new TreeSet<>();
+            for (String t : productRepository.activeSearchTexts()) {
+                for (String w : t.split("[^a-z0-9]+")) if (w.length() >= 2) words.add(w);
+            }
+            vocabulary = words;
+            vocabularyAt = System.currentTimeMillis();
+        }
+        return vocabulary;
+    }
+
+    private static List<String> productWords(String norm) {
+        return Arrays.stream(norm.split("[^a-z0-9]+"))
+                .filter(w -> !w.isBlank() && !STOPWORDS.contains(w) && !w.matches("\\d+"))
+                .distinct().limit(6).toList();
     }
 
     // common words that say nothing about *which* product is wanted (accent-free). Words whose
@@ -158,16 +249,19 @@ public class ChatbotService {
     private static final Set<String> STOPWORDS = Set.of(
             "toi", "minh", "em", "anh", "chi", "ban", "shop", "ad", "admin", "oi", "a", "nhe", "nha", "ha", "ah", "vay", "the",
             "can", "muon", "tim", "kiem", "mua", "xem", "cho", "co", "khong", "ko", "k", "nao", "gi", "la", "va", "voi", "cua",
-            "duoc", "giup", "y", "tu", "van", "gia", "re", "dat", "dep", "tot", "nhat", "loai", "mot", "cai", "chiec",
+            "duoc", "giup", "y", "van", "gia", "re", "dat", "dep", "tot", "nhat", "loai", "mot", "cai", "chiec",
             "doi", "bo", "nhung", "cac", "hay", "di", "ve", "de", "thi", "nay", "dang", "nhu", "ra", "sao", "bao", "nhieu",
             "hang", "san", "pham", "sp", "xin", "chao", "hello", "hi", "duoi", "tren", "khoang", "tam", "nghin", "ngan", "trieu",
             "tr", "vnd", "dong", "d", "con", "khac", "them", "nua", "lam", "ai", "o", "nen", "hon", "ma", "thich",
             "phu", "ok", "oke", "uh", "roi", "chua", "gium", "dum", "lay", "chay", "moi", "don");
 
-    private List<Product> findProducts(String norm, PriceRange price, Topic topic) {
-        List<String> words = Arrays.stream(norm.split("[^a-z0-9]+"))
-                .filter(w -> !w.isBlank() && !STOPWORDS.contains(w) && !w.matches("\\d+"))
-                .distinct().limit(6).toList();
+    private List<Product> findProducts(String norm, PriceRange price, Topic topic, int limit) {
+        return findProducts(norm, price, topic, limit, false);
+    }
+
+    /** relaxed: a follow-up on an earlier subject, one matching word is enough (ChatQuery.enough). */
+    private List<Product> findProducts(String norm, PriceRange price, Topic topic, int limit, boolean relaxed) {
+        List<String> words = productWords(norm);
 
         if (words.isEmpty()) {
             // "goi y vai mon duoi 200k", "san pham ban chay": best sellers within the range
@@ -175,7 +269,7 @@ public class ChatbotService {
             if (!browsing || topic != null) return List.of();
             return productRepository.findTop10ByActiveTrueOrderBySoldCountDesc().stream()
                     .filter(p -> p.getShop().isActive() && (price == null || price.contains(p.getEffectivePrice())))
-                    .limit(MAX_CONTEXT_PRODUCTS).toList();
+                    .limit(limit).toList();
         }
 
         // candidates: every product containing at least one keyword as a whole word
@@ -189,20 +283,23 @@ public class ChatbotService {
         List<String> pairs = new ArrayList<>();
         for (int i = 0; i + 1 < words.size(); i++) pairs.add(words.get(i) + " " + words.get(i + 1));
 
-        record Scored(Product p, int score) {}
+        record Scored(Product p, int score, int matched) {}
         return candidates.values().stream()
                 .filter(p -> price == null || price.contains(p.getEffectivePrice()))
                 .map(p -> {
                     String text = " " + (p.getSearchText() != null ? p.getSearchText() : TextNormalizer.normalize(p.getName())) + " ";
-                    int score = 0;
-                    for (String w : words) if (text.contains(" " + w + " ")) score += 2;
+                    int score = 0, matched = 0;
+                    for (String w : words) if (text.contains(" " + w + " ")) { score += 2; matched++; }
+                    // the first word is usually the kind of product ("túi xách nữ": a bag, not anything "nữ")
+                    if (text.contains(" " + words.get(0) + " ")) score += 2;
                     for (String pair : pairs) if (text.contains(" " + pair + " ")) score += 3;
-                    return new Scored(p, score);
+                    return new Scored(p, score, matched);
                 })
-                .filter(s -> s.score() > 0)
+                // at least half of the words: "tủ lạnh samsung" is not a Samsung phone
+                .filter(s -> ChatQuery.enough(s.matched(), words.size(), relaxed))
                 .sorted(Comparator.comparingInt(Scored::score).reversed()
                         .thenComparing(s -> s.p().getSoldCount(), Comparator.reverseOrder()))
-                .limit(MAX_CONTEXT_PRODUCTS)
+                .limit(limit)
                 .map(Scored::p)
                 .toList();
     }
@@ -222,7 +319,7 @@ public class ChatbotService {
     }
 
     // "1.500.000" (thousands separators) or "1,5" / "1.5" (decimals, with a unit)
-    private static final String AMOUNT = "(\\d{1,3}(?:[.,]\\d{3})+|\\d+(?:[.,]\\d+)?)\\s*(k|nghin|ngan|tr|trieu|cu)?";
+    private static final String AMOUNT = "(\\d{1,3}(?:[.,]\\d{3})+|\\d+(?:[.,]\\d+)?)\\s*(trieu|nghin|ngan|tr|cu|k)?\\b";   // longest unit first: "5 trieu" must not leave "ieu"
     private static final Pattern BETWEEN = Pattern.compile("(?:tu|khoang)\\s*" + AMOUNT + "\\s*(?:den|toi|-)\\s*" + AMOUNT);
     private static final Pattern MAX = Pattern.compile("(?:duoi|nho hon|it hon|khong qua|toi da|re hon|<)\\s*" + AMOUNT);
     private static final Pattern MIN = Pattern.compile("(?:tren|lon hon|nhieu hon|it nhat|toi thieu|>)\\s*" + AMOUNT);
@@ -267,7 +364,8 @@ public class ChatbotService {
     // ---- topics the platform's policies answer ----
 
     private enum Topic {
-        ORDER("don hang", "don cua", "ma don", "van don", "giao chua", "bao gio nhan", "khi nao nhan", "dang o dau", "trang thai don", "theo doi don", "giao den dau"),
+        ORDER("don hang", "don cua", "ma don", "van don", "giao chua", "bao gio nhan", "khi nao nhan", "dang o dau", "trang thai don", "theo doi don", "giao den dau",
+                "don gan nhat", "don moi nhat", "kiem tra don", "don cua minh", "don cua toi"),
         CANCEL("huy don", "huy dat", "muon huy"),
         RETURN("tra hang", "hoan tien", "doi hang", "doi tra", "bi loi", "hang loi", "giao sai", "thieu hang"),
         SHIPPING("phi ship", "van chuyen", "giao hang", "freeship", "mien phi van chuyen", "phi giao", "hoa toc", "bao lau"),
@@ -292,7 +390,7 @@ public class ChatbotService {
     }
 
     // Shoppi's rules, given to the LLM as ground truth (and used for the rule-based answers)
-    private static final Map<Topic, String> POLICY = new EnumMap<>(Map.of(
+    static final Map<Topic, String> POLICY = new EnumMap<>(Map.of(
             Topic.SHIPPING, "Vận chuyển: Shoppi hợp tác với GHN, GHTK, J&T Express, Viettel Post. Có 3 gói: Tiết kiệm, Nhanh, "
                     + "Hỏa tốc (Hỏa tốc chỉ khi shop và người nhận cùng tỉnh). Phí ship tính theo cùng tỉnh/khác tỉnh. "
                     + "Sản phẩm có nhãn Freeship được miễn phí vận chuyển tối đa bằng phí gói Tiết kiệm; ngoài ra có voucher giảm phí ship.",
@@ -402,7 +500,7 @@ public class ChatbotService {
         }
         if (!ctx.products().isEmpty()) {
             if (!sb.isEmpty()) sb.append("\n");
-            PriceRange price = parsePrice(ctx.normalized());
+            PriceRange price = ctx.price();
             sb.append("Mình tìm được ").append(ctx.products().size()).append(" sản phẩm phù hợp")
                     .append(price != null ? " (giá " + price.describe() + ")" : "").append(":\n");
             for (Product p : ctx.products()) {
@@ -421,7 +519,7 @@ public class ChatbotService {
 
     // ==================== helpers ====================
 
-    private static String statusName(OrderStatus s) {
+    static String statusName(OrderStatus s) {
         return switch (s) {
             case AWAITING_PAYMENT -> "Chờ thanh toán";
             case PENDING -> "Chờ xác nhận";

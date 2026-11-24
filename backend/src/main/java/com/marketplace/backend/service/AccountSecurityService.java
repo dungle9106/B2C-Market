@@ -2,9 +2,11 @@ package com.marketplace.backend.service;
 
 import com.marketplace.backend.entity.AuthProvider;
 import com.marketplace.backend.entity.LoginEvent;
+import com.marketplace.backend.entity.OAuthAccount;
 import com.marketplace.backend.entity.User;
 import com.marketplace.backend.exception.ApiException;
 import com.marketplace.backend.repository.LoginEventRepository;
+import com.marketplace.backend.repository.OAuthAccountRepository;
 import com.marketplace.backend.repository.UserRepository;
 import com.marketplace.backend.security.*;
 import lombok.RequiredArgsConstructor;
@@ -37,11 +39,15 @@ public class AccountSecurityService {
     private final TotpService totp;
     private final SecretCipher cipher;
     private final ApplicationEventPublisher events;
+    private final OAuthAccountRepository oauthAccounts;
+    private final SocialLoginSettings socialLogin;
+    private final OAuth2FrontendRedirect frontendRedirect;
 
     @Transactional(readOnly = true)
     public Map<String, Object> overview() {
         User u = me();
         return AdminUserService.map("email", u.getEmail(), "emailVerified", u.isEmailVerified(), "provider", u.getAuthProvider().name(),
+                "hasPassword", u.usesPassword(), "linkedAccounts", linkedAccounts(u),
                 "passwordChangedAt", u.getPasswordChangedAt(), "twoFactorEnabled", u.isTotpEnabled(),
                 "backupCodesLeft", u.getBackupCodes() == null || u.getBackupCodes().isBlank() ? 0 : u.getBackupCodes().split(",").length,
                 "sessions", sessionService.list(u.getId(), CurrentUser.sessionId()),
@@ -51,15 +57,65 @@ public class AccountSecurityService {
     /** The other devices are signed out; this one stays signed in. */
     public Map<String, Object> changePassword(String current, String next) {
         User u = me();
-        if (u.getAuthProvider() == AuthProvider.GOOGLE) throw bad("Tài khoản đăng nhập bằng Google không dùng mật khẩu Shoppi");
-        if (current == null || !passwordEncoder.matches(current, u.getPassword())) throw bad("Mật khẩu hiện tại không đúng");
+        // an account created by a social sign-in sets its first password without a current one
+        boolean first = !u.usesPassword();
+        if (!first && (current == null || !passwordEncoder.matches(current, u.getPassword()))) throw bad("Mật khẩu hiện tại không đúng");
         PasswordPolicy.check(next, u.getEmail());
-        if (passwordEncoder.matches(next, u.getPassword())) throw bad("Mật khẩu mới phải khác mật khẩu hiện tại");
+        if (!first && passwordEncoder.matches(next, u.getPassword())) throw bad("Mật khẩu mới phải khác mật khẩu hiện tại");
         u.setPassword(passwordEncoder.encode(next));
+        u.setPasswordSet(true);
         u.setPasswordChangedAt(LocalDateTime.now());
         int ended = sessionService.revokeAll(u.getId(), CurrentUser.sessionId(), "PASSWORD_CHANGED");
         events.publishEvent(new SecurityEvent(u.getId(), "PASSWORD_CHANGED", Map.of("device", RequestInfo.current().deviceLabel())));
         return AdminUserService.map("signedOutDevices", ended);
+    }
+
+    // ==================== linked accounts (Google / Facebook / GitHub) ====================
+
+    private List<Map<String, Object>> linkedAccounts(User u) {
+        Map<AuthProvider, OAuthAccount> mine = new EnumMap<>(AuthProvider.class);
+        oauthAccounts.findByUserIdOrderByIdAsc(u.getId()).forEach(a -> mine.put(a.getProvider(), a));
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (SocialLoginSettings.Provider p : SocialLoginSettings.PROVIDERS) {
+            AuthProvider ap = AuthProvider.valueOf(p.id().toUpperCase());
+            OAuthAccount a = mine.get(ap);
+            // a provider that is not set up is only listed when the account is already linked to it
+            if (a == null && !socialLogin.ready(p.id())) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", p.id());
+            m.put("name", p.name());
+            m.put("available", socialLogin.ready(p.id()));
+            m.put("linked", a != null);
+            if (a != null) {
+                m.put("email", a.getEmail());
+                m.put("displayName", a.getName());
+                m.put("linkedAt", a.getCreatedAt());
+                m.put("lastUsedAt", a.getLastUsedAt());
+            }
+            list.add(m);
+        }
+        return list;
+    }
+
+    /** A one-time token (5 minutes) the page passes to /oauth2/authorization/{provider}?link=... */
+    public Map<String, Object> linkToken() {
+        return AdminUserService.map("token", frontendRedirect.issueLinkToken(me().getId()), "startBase", socialLogin.publicUrl());
+    }
+
+    /** Gỡ liên kết: never the last way to sign in. */
+    public Map<String, Object> unlink(String provider) {
+        User u = me();
+        SocialLoginSettings.Provider p = SocialLoginSettings.provider(provider);
+        if (p == null) throw bad("Không hỗ trợ " + provider);
+        AuthProvider ap = AuthProvider.valueOf(p.id().toUpperCase());
+        OAuthAccount a = oauthAccounts.findByUserIdAndProvider(u.getId(), ap).orElseThrow(() -> bad("Tài khoản chưa liên kết với " + p.name()));
+        long links = oauthAccounts.findByUserIdOrderByIdAsc(u.getId()).size();
+        if (!u.usesPassword() && links <= 1) {
+            throw bad("Đây là cách đăng nhập duy nhất của bạn. Hãy tạo mật khẩu Shoppi trước khi gỡ liên kết " + p.name());
+        }
+        oauthAccounts.delete(a);
+        events.publishEvent(new SecurityEvent(u.getId(), "SOCIAL_UNLINKED", Map.of("device", p.name())));
+        return overview();
     }
 
     // ==================== two-step verification ====================
@@ -94,7 +150,7 @@ public class AccountSecurityService {
     public void disableTwoFactor(String password, String code) {
         User u = me();
         if (!u.isTotpEnabled()) throw bad("Xác thực 2 lớp đang tắt");
-        if (u.getAuthProvider() == AuthProvider.LOCAL && (password == null || !passwordEncoder.matches(password, u.getPassword()))) {
+        if (u.usesPassword() && (password == null || !passwordEncoder.matches(password, u.getPassword()))) {
             throw bad("Mật khẩu không đúng");
         }
         if (!totp.verify(cipher.decrypt(u.getTotpSecret()), code)) throw bad("Mã xác thực không đúng");

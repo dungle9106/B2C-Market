@@ -73,6 +73,11 @@ public class ShopController {
 
     // ---- public ----
 
+    @GetMapping("/api/shops/mall")
+    public ResponseEntity<java.util.List<Map<String, Object>>> mallShops() {
+        return ResponseEntity.ok(shopService.mallShops());
+    }
+
     @GetMapping("/api/shops/{id}")
     public ResponseEntity<ShopPublicResponse> publicShop(@PathVariable Long id) {
         return ResponseEntity.ok(shopService.publicShop(id));

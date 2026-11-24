@@ -88,7 +88,7 @@ const TABS = [
   { key: 'DELIVERED', label: 'Đã giao' }, { key: 'RETURN_REQUESTED', label: 'Trả hàng' }, { key: 'REFUNDED', label: 'Đã hoàn tiền' },
   { key: 'CANCELLED', label: 'Đã hủy' }
 ]
-const METHODS = { COD: 'Thanh toán khi nhận hàng', E_WALLET: 'Ví điện tử', CARD: 'Thẻ', BANK_TRANSFER: 'Chuyển khoản' }
+const METHODS = { COD: 'Thanh toán khi nhận hàng', E_WALLET: 'Ví điện tử', CARD: 'Thẻ', BANK_TRANSFER: 'Chuyển khoản', SHOPPI_PAY: 'Ví ShoppiPay' }
 const PRESETS = [{ days: 7, label: '7 ngày' }, { days: 30, label: '30 ngày' }, { days: 90, label: '90 ngày' }]
 
 const route = useRoute()

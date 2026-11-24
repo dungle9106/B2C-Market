@@ -5,11 +5,13 @@ import com.marketplace.backend.dto.request.RegisterRequest;
 import com.marketplace.backend.dto.response.AuthResponse;
 import com.marketplace.backend.entity.AuthProvider;
 import com.marketplace.backend.entity.LoginEvent;
+import com.marketplace.backend.entity.OAuthAccount;
 import com.marketplace.backend.entity.Role;
 import com.marketplace.backend.entity.User;
 import com.marketplace.backend.entity.UserSession;
 import com.marketplace.backend.exception.ApiException;
 import com.marketplace.backend.repository.LoginEventRepository;
+import com.marketplace.backend.repository.OAuthAccountRepository;
 import com.marketplace.backend.repository.UserRepository;
 import com.marketplace.backend.security.*;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +53,7 @@ public class AuthService {
     private final TotpService totp;
     private final SecretCipher cipher;
     private final ApplicationEventPublisher events;
+    private final OAuthAccountRepository oauthAccounts;
 
     public AuthResponse register(RegisterRequest request) {
         RequestInfo info = RequestInfo.current();
@@ -92,10 +95,10 @@ public class AuthService {
             record(null, email, LoginEvent.Result.UNKNOWN_EMAIL, "PASSWORD", info, false);
             throw wrongCredentials();
         }
-        if (user.getAuthProvider() == AuthProvider.GOOGLE) {
-            throw new ApiException(
-                    "Tài khoản này đăng nhập bằng Google, vui lòng chọn \"Đăng nhập với Google\"",
-                    HttpStatus.BAD_REQUEST);
+        if (!user.usesPassword()) {
+            String via = providerName(user.getAuthProvider());
+            throw new ApiException("Tài khoản này đăng nhập bằng " + via + ", vui lòng chọn \"Tiếp tục với " + via
+                    + "\" hoặc dùng \"Quên mật khẩu\" để tạo mật khẩu", HttpStatus.BAD_REQUEST);
         }
         checkTempLock(user, info, "PASSWORD");
 
@@ -129,43 +132,91 @@ public class AuthService {
             throw new ApiException("Mã xác thực không đúng", HttpStatus.UNAUTHORIZED);
         }
         user.setFailedLoginCount(0);
-        return complete(user, "GOOGLE".equals(method) ? "GOOGLE" : used, info, false);
+        return complete(user, OAUTH_METHODS.contains(method) ? method : used, info, false);
     }
 
-    /**
-     * Called by OAuth2LoginSuccessHandler once Spring Security has finished the
-     * Google OAuth2 / OpenID Connect flow. Logs the matching user in, or
-     * auto-creates a BUYER account on first Google sign-in (like Shopee's
-     * "Dang nhap voi Google" on both the login and signup pages).
-     */
-    public AuthResponse loginWithOAuth2(String email, String name, boolean emailVerified) {
-        if (email == null || !emailVerified) {
-            throw new ApiException("Không thể xác thực email của tài khoản Google này", HttpStatus.UNAUTHORIZED);
-        }
-        RequestInfo info = RequestInfo.current();
-        String normalizedEmail = email.trim().toLowerCase();
+    private static final java.util.Set<String> OAUTH_METHODS = java.util.Set.of("GOOGLE", "FACEBOOK", "GITHUB");
 
-        User user = userRepository.findByEmail(normalizedEmail).orElseGet(() -> {
-            User newUser = User.builder()
-                    .email(normalizedEmail)
-                    .fullName(name != null && !name.isBlank() ? name : normalizedEmail)
-                    // password is unusable via /api/auth/login (random hash, never
-                    // given to the user) since this account only signs in via Google
-                    .password(passwordEncoder.encode(UUID.randomUUID().toString()))
-                    .role(Role.BUYER)
-                    .authProvider(AuthProvider.GOOGLE)
-                    .enabled(true)
-                    .emailVerified(true)
-                    .build();
-            return userRepository.save(newUser);
-        });
-        if (!user.isEmailVerified()) user.setEmailVerified(true);   // Google checked the address
+    /**
+     * Called by OAuth2LoginSuccessHandler once Spring Security has finished the Google / Facebook / GitHub
+     * flow. The provider account already linked to a Shoppi account signs that account in; otherwise it is
+     * linked to the account with the same (provider-verified) e-mail, or a new BUYER account is created.
+     */
+    public AuthResponse loginWithOAuth2(AuthProvider provider, String subject, String email, String name, boolean emailVerified) {
+        RequestInfo info = RequestInfo.current();
+        String via = providerName(provider);
+        OAuthAccount link = oauthAccounts.findByProviderAndSubject(provider, subject).orElse(null);
+        User user;
+        if (link != null) {
+            user = userRepository.findById(link.getUserId())
+                    .orElseThrow(() -> new ApiException("Không tìm thấy tài khoản", HttpStatus.UNAUTHORIZED));
+        } else {
+            if (email == null || email.isBlank() || !emailVerified) {
+                throw new ApiException("Tài khoản " + via + " này chưa có email đã xác minh. Hãy thêm email trong " + via
+                        + " hoặc đăng ký bằng email", HttpStatus.UNAUTHORIZED);
+            }
+            String normalizedEmail = email.trim().toLowerCase();
+            user = userRepository.findByEmail(normalizedEmail).orElseGet(() -> {
+                User newUser = User.builder()
+                        .email(normalizedEmail)
+                        .fullName(name != null && !name.isBlank() ? cut(name.trim(), 100) : normalizedEmail)
+                        // never given to anyone: this account signs in with the provider until the user
+                        // creates a password through "Quen mat khau"
+                        .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                        .passwordSet(false)
+                        .role(Role.BUYER)
+                        .authProvider(provider)
+                        .enabled(true)
+                        .emailVerified(true)
+                        .build();
+                User saved = userRepository.save(newUser);
+                events.publishEvent(new SecurityEvent(saved.getId(), "REGISTERED", Map.of()));
+                return saved;
+            });
+            if (user.getDeletedAt() != null) throw new ApiException("Tài khoản đã bị xóa", HttpStatus.UNAUTHORIZED);
+            if (oauthAccounts.findByUserIdAndProvider(user.getId(), provider).isPresent()) {
+                throw new ApiException("Tài khoản Shoppi này đã liên kết với một tài khoản " + via + " khác", HttpStatus.UNAUTHORIZED);
+            }
+            link = oauthAccounts.save(OAuthAccount.builder().userId(user.getId()).provider(provider).subject(subject)
+                    .email(email).name(cut(name, 255)).createdAt(LocalDateTime.now()).build());
+            if (!user.isEmailVerified()) user.setEmailVerified(true);   // the provider checked the address
+        }
+        link.setLastUsedAt(LocalDateTime.now());
 
         if (!UserPrincipal.isActive(user, LocalDateTime.now())) {
-            record(user, normalizedEmail, LoginEvent.Result.LOCKED, "GOOGLE", info, false);
+            record(user, user.getEmail(), LoginEvent.Result.LOCKED, provider.name(), info, false);
             throw locked(user);
         }
-        return passwordOk(user, "GOOGLE", info);
+        return passwordOk(user, provider.name(), info);
+    }
+
+    /** "Lien ket tai khoan" on the security page: attach this provider account to the signed-in account. */
+    public void linkOAuth(Long userId, AuthProvider provider, String subject, String email, String name) {
+        String via = providerName(provider);
+        OAuthAccount existing = oauthAccounts.findByProviderAndSubject(provider, subject).orElse(null);
+        if (existing != null) {
+            if (existing.getUserId().equals(userId)) return;
+            throw new ApiException("Tài khoản " + via + " này đã liên kết với một tài khoản Shoppi khác", HttpStatus.BAD_REQUEST);
+        }
+        if (oauthAccounts.findByUserIdAndProvider(userId, provider).isPresent()) {
+            throw new ApiException("Bạn đã liên kết một tài khoản " + via + " khác, hãy gỡ liên kết trước", HttpStatus.BAD_REQUEST);
+        }
+        oauthAccounts.save(OAuthAccount.builder().userId(userId).provider(provider).subject(subject)
+                .email(email).name(cut(name, 255)).createdAt(LocalDateTime.now()).build());
+        events.publishEvent(new SecurityEvent(userId, "SOCIAL_LINKED", Map.of("device", via)));
+    }
+
+    public static String providerName(AuthProvider p) {
+        return switch (p) {
+            case GOOGLE -> "Google";
+            case FACEBOOK -> "Facebook";
+            case GITHUB -> "GitHub";
+            default -> "email";
+        };
+    }
+
+    private static String cut(String s, int max) {
+        return s == null ? null : s.length() > max ? s.substring(0, max) : s;
     }
 
     /** A new access token for the session of the refresh token (which is replaced). */

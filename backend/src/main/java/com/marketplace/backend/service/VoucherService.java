@@ -20,6 +20,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,6 +43,8 @@ public class VoucherService {
     private final CategoryRepository categoryRepository;
     private final PromoCampaignRepository campaignRepository;
     private final AdminAuditService auditService;
+    private final com.marketplace.backend.repository.ShopFollowRepository followRepository;
+    private final com.marketplace.backend.repository.SavedVoucherRepository savedRepository;
 
     // ==== seller: shop vouchers ====
 
@@ -99,9 +103,11 @@ public class VoucherService {
     public VoucherResponse createShopVoucher(VoucherRequest req) {
         Shop shop = myShop();
         Voucher v = create(req, VoucherScope.SHOP, shop);
-        // the shop has no followers yet, so "its customers" = everyone who has ordered from it
         if (v.isPublicVisible()) { // a hidden voucher is shared privately, never announced
-            notificationService.onShopVoucher(shop, v, orderRepository.findBuyerIdsOfShop(shop.getId()));
+            // followers always hear about it; the shop's past customers too, unless it is a follower-only voucher
+            Set<Long> to = new LinkedHashSet<>(followRepository.followerIds(shop.getId()));
+            if (v.getAudience() != VoucherAudience.FOLLOWERS) to.addAll(orderRepository.findBuyerIdsOfShop(shop.getId()));
+            notificationService.onShopVoucher(shop, v, to);
         }
         return VoucherResponse.from(v);
     }
@@ -208,6 +214,13 @@ public class VoucherService {
         v.setEndAt(req.getEndAt());
         v.setUsageLimit(limit);
         v.setPublicVisible(req.getPublicVisible() == null || req.getPublicVisible());
+        if (full) {
+            VoucherAudience audience = req.getAudience() == null ? VoucherAudience.ALL : req.getAudience();
+            if (v.getScope() == VoucherScope.PLATFORM && audience != VoucherAudience.ALL) {
+                throw bad("Đối tượng áp dụng chỉ dành cho voucher của shop (Shoppi Voucher dùng \"Khách hàng mới\")");
+            }
+            v.setAudience(audience);
+        }
         if (v.getScope() == VoucherScope.PLATFORM) {
             // budget and programme can change while it runs
             BigDecimal budget = req.getBudget() == null || req.getBudget().signum() == 0 ? null : req.getBudget();
@@ -272,14 +285,17 @@ public class VoucherService {
     public List<VoucherResponse> availableFor(Collection<Long> shopIds) {
         Long buyerId = CurrentUser.id();
         LocalDateTime now = LocalDateTime.now();
+        Set<Long> saved = new java.util.HashSet<>(savedRepository.savedIds(buyerId));
         return voucherRepository.findActiveForShops(shopIds.isEmpty() ? List.of(-1L) : shopIds).stream()
-                // hidden vouchers are only usable by typing their code
-                .filter(v -> v.isRunning(now) && !v.isUsedUp() && v.isPublicVisible())
-                .filter(v -> v.getScope() == VoucherScope.SHOP || platformProblem(v, buyerId) == null)
-                .sorted(Comparator.comparing((Voucher v) -> v.getScope() == VoucherScope.SHOP)
+                // hidden vouchers are only usable by typing their code, or once saved in the "Kho Voucher"
+                .filter(v -> v.isRunning(now) && !v.isUsedUp() && (v.isPublicVisible() || saved.contains(v.getId())))
+                .filter(v -> (v.getScope() == VoucherScope.SHOP ? audienceProblem(v, buyerId) : platformProblem(v, buyerId)) == null)
+                .sorted(Comparator.comparing((Voucher v) -> !saved.contains(v.getId()))
+                        .thenComparing((Voucher v) -> v.getScope() == VoucherScope.SHOP)
                         .thenComparing(Voucher::getEndAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(v -> {
                     VoucherResponse r = VoucherResponse.from(v);
+                    r.setSaved(saved.contains(v.getId()));
                     r.setUsedByMe((int) usesBy(v, buyerId));
                     return r;
                 })
@@ -297,7 +313,20 @@ public class VoucherService {
         if (v.getPerUserLimit() != null && v.getPerUserLimit() > 0 && usesBy(v, buyerId) >= v.getPerUserLimit()) {
             return "Bạn đã dùng hết lượt của voucher này";
         }
-        return v.getScope() == VoucherScope.PLATFORM ? platformProblem(v, buyerId) : null;
+        return v.getScope() == VoucherScope.PLATFORM ? platformProblem(v, buyerId) : audienceProblem(v, buyerId);
+    }
+
+    // shop voucher for a target group: followers, first-time or returning customers of the shop
+    private String audienceProblem(Voucher v, Long buyerId) {
+        Long shopId = v.getShop().getId();
+        return switch (v.getAudience()) {
+            case ALL -> null;
+            case FOLLOWERS -> followRepository.existsByUserIdAndShopId(buyerId, shopId) ? null
+                    : "Voucher chỉ dành cho người theo dõi shop. Hãy theo dõi " + v.getShop().getName() + " để sử dụng";
+            case NEW_CUSTOMERS -> orderRepository.hasOrderedFromShop(buyerId, shopId) ? "Voucher chỉ dành cho khách mua lần đầu tại shop" : null;
+            case RETURNING_CUSTOMERS -> orderRepository.hasReceivedFromShop(buyerId, shopId) ? null
+                    : "Voucher chỉ dành cho khách đã từng mua hàng tại shop";
+        };
     }
 
     // Shoppi Voucher rules: budget left, new buyers only

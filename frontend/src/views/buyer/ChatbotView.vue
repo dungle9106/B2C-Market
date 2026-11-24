@@ -10,7 +10,30 @@
 
         <div class="messages" ref="messagesEl">
           <template v-for="(m, idx) in messages" :key="idx">
+            <div v-if="m.steps?.length" class="steps">🔧 Đã tra cứu: {{ m.steps.join(' · ') }}</div>
             <div :class="['bubble', m.role]">{{ m.text }}</div>
+
+            <template v-for="(a, ai) in m.actions || []" :key="'a' + ai">
+              <div v-if="a.type === 'CART_ADDED'" class="action done">
+                🛒 Đã thêm <b>{{ a.name }}</b><span v-if="a.variant"> ({{ a.variant }})</span> × {{ a.quantity }} vào giỏ hàng
+                <router-link to="/cart">Xem giỏ hàng</router-link>
+              </div>
+              <div v-else-if="a.type === 'CANCEL_ORDER'" class="action confirm">
+                <div>
+                  {{ a.mode === 'CANCEL' ? 'Hủy đơn' : 'Gửi yêu cầu hủy đơn' }} <b>{{ a.code }}</b>?
+                  <span class="faint">Lý do: {{ a.reason }}</span>
+                </div>
+                <div v-if="a.state === 'done'" class="ok">✓ {{ a.mode === 'CANCEL' ? 'Đã hủy đơn' : 'Đã gửi yêu cầu hủy, chờ shop phản hồi' }}</div>
+                <div v-else-if="a.state === 'dismissed'" class="faint">Đã giữ lại đơn hàng</div>
+                <div v-else class="action-btns">
+                  <button type="button" class="btn sm" :disabled="a.state === 'busy'" @click="confirmCancel(a)">
+                    {{ a.mode === 'CANCEL' ? 'Xác nhận hủy đơn' : 'Gửi yêu cầu hủy' }}
+                  </button>
+                  <button type="button" class="btn sm ghost" :disabled="a.state === 'busy'" @click="a.state = 'dismissed'">Không hủy</button>
+                </div>
+                <div v-if="a.error" class="err">{{ a.error }}</div>
+              </div>
+            </template>
 
             <div v-if="m.products?.length" class="cards">
               <router-link v-for="p in m.products" :key="p.id" :to="`/products/${p.id}`" class="p-card">
@@ -56,11 +79,15 @@
 import { ref, nextTick, onMounted } from 'vue'
 import AppHeader from '../../components/AppHeader.vue'
 import { chatWithAI, chatbotHistory, clearChatbotHistory } from '../../api/ai'
+import { cancelOrder } from '../../api/orders'
+import { useCartStore } from '../../stores/cart'
+import { extractError } from '../../utils/apiError'
 import { formatVnd, formatCount } from '../../utils/format'
 import { statusLabel } from '../../utils/orderStatus'
 
-const GREETING = { role: 'ai', text: 'Xin chào! Tôi là trợ lý mua sắm của Shoppi. Tôi có thể gợi ý sản phẩm, kiểm tra đơn hàng hoặc giải đáp chính sách đổi trả, vận chuyển, thanh toán. Bạn cần gì hôm nay?' }
-const suggestions = ['Gợi ý sản phẩm bán chạy dưới 200k', 'Đơn hàng của tôi đang ở đâu?', 'Chính sách trả hàng hoàn tiền?', 'Phí vận chuyển tính thế nào?']
+const GREETING = { role: 'ai', text: 'Xin chào! Tôi là trợ lý mua sắm của Shoppi. Tôi có thể tìm và gợi ý sản phẩm hợp với bạn, thêm vào giỏ hàng, kiểm tra đơn hàng, voucher, hoặc giải đáp chính sách đổi trả, vận chuyển, thanh toán. Bạn cần gì hôm nay?' }
+const suggestions = ['Gợi ý sản phẩm hợp với tôi', 'Tìm sản phẩm bán chạy dưới 200k', 'Đơn hàng của tôi đang ở đâu?', 'Tôi có voucher nào dùng được?', 'Chính sách trả hàng hoàn tiền?']
+const cart = useCartStore()
 const placeholder = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="%23f0f0f0"/></svg>'
 
 const messages = ref([GREETING])
@@ -78,12 +105,29 @@ async function send(raw) {
 
   try {
     const { data } = await chatWithAI(text)
-    messages.value.push({ role: 'ai', text: data.reply, products: data.products, orders: data.orders, suggestSupport: data.suggestSupport })
+    messages.value.push({
+      role: 'ai', text: data.reply, products: data.products, orders: data.orders, suggestSupport: data.suggestSupport,
+      steps: data.steps, actions: (data.actions || []).map(a => ({ ...a, state: null, error: '' }))
+    })
+    if (data.actions?.some(a => a.type === 'CART_ADDED')) cart.fetchCart().catch(() => {})
   } catch (e) {
     messages.value.push({ role: 'ai', text: 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.', suggestSupport: true })
   } finally {
     loading.value = false
     await scrollDown()
+  }
+}
+
+// the assistant never cancels by itself: the buyer confirms here (same API as the order page)
+async function confirmCancel(a) {
+  a.state = 'busy'
+  a.error = ''
+  try {
+    await cancelOrder(a.orderId, a.reason)
+    a.state = 'done'
+  } catch (e) {
+    a.state = null
+    a.error = extractError(e)
   }
 }
 
@@ -111,7 +155,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.chat-shell { padding: 0; display: flex; flex-direction: column; height: min(640px, calc(100vh - 160px)); min-height: 440px; overflow: hidden; }
+.chat-shell { padding: 0; display: flex; flex-direction: column; height: min(640px, calc(var(--vh) - 160px)); min-height: 440px; overflow: hidden; }
 .chat-title { padding: 14px 16px; font-weight: 600; border-bottom: 1px solid var(--color-border); color: var(--color-primary); display: flex; justify-content: space-between; align-items: center; }
 .clear { background: none; border: none; color: var(--color-text-faint); font-size: 13px; cursor: pointer; }
 .clear:hover { color: var(--color-primary); }
@@ -138,6 +182,15 @@ onMounted(async () => {
 .order-chip { background: white; border: 1px solid var(--color-border); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
 .order-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
+.steps { font-size: 11px; color: var(--color-text-faint); margin: 0 0 4px 2px; }
+.action { font-size: 13px; background: white; border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 12px; margin: -2px 0 10px; max-width: 75%; width: fit-content; }
+.action.done { border-color: #bfe8e1; background: #f1fbf9; }
+.action a { color: #2673dd; margin-left: 6px; }
+.action.confirm { display: flex; flex-direction: column; gap: 6px; border-color: #ffd6cc; background: #fff8f6; }
+.action .faint { color: var(--color-text-faint); display: block; font-size: 12px; }
+.action-btns { display: flex; gap: 8px; }
+.action .ok { color: #1a8a7a; font-weight: 600; }
+.action .err { color: #d0011b; font-size: 12px; }
 .escalate { font-size: 13px; color: var(--color-text-muted); margin: -2px 0 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 .escalate a { color: #2673dd; }
 .escalate a:hover { text-decoration: underline; }

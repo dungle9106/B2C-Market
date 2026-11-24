@@ -39,13 +39,21 @@ public class User {
     private Role role;
 
     // LOCAL = registered with email/password directly in the app
-    // GOOGLE = first signed in (and auto-created) via "Login with Google"
+    // GOOGLE / FACEBOOK / GITHUB = auto-created by the first social sign-in
     @Enumerated(EnumType.STRING)
     // DB-level default so ddl-auto=update can add this NOT NULL column to a
     // users table that already has rows (they become LOCAL accounts)
     @Builder.Default
     @Column(nullable = false, length = 20, columnDefinition = "varchar(20) default 'LOCAL'")
     private AuthProvider authProvider = AuthProvider.LOCAL;
+
+    // false: created by a social sign-in and never given a password; null (older rows): derived from authProvider
+    private Boolean passwordSet;
+
+    /** Can this account sign in with e-mail + password? */
+    public boolean usesPassword() {
+        return passwordSet != null ? passwordSet : authProvider == AuthProvider.LOCAL;
+    }
 
     @Builder.Default
     private boolean enabled = true;

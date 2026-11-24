@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -44,6 +45,8 @@ public class ReturnService {
     private final OrderRepository orderRepository;
     private final ShopRepository shopRepository;
     private final OrderService orderService;
+    private final CoinService coinService;
+    private final com.marketplace.backend.service.returnrisk.ReturnRiskService riskService;
     private final TrackingService trackingService;
 
     // ==== buyer ====
@@ -82,10 +85,9 @@ public class ReturnService {
         // whole order back -> everything paid (incl. shipping); otherwise the items' prices
         boolean everything = order.getItems().stream().allMatch(i -> Objects.equals(qty.get(i.getId()), i.getQuantity()));
         BigDecimal refund = everything ? order.getTotal()
-                : qty.entrySet().stream()
+                : cashShare(order, qty.entrySet().stream()
                     .map(e -> lines.get(e.getKey()).getPriceAtPurchase().multiply(BigDecimal.valueOf(e.getValue())))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add)
-                    .min(order.getTotal());
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
 
         ReturnRequest rr = returnRepository.save(ReturnRequest.builder()
                 .order(order)
@@ -98,6 +100,7 @@ public class ReturnService {
                 .refundAmount(refund)
                 .status(ReturnStatus.REQUESTED)
                 .build());
+        riskService.fingerprintEvidence(rr);
         order.setStatus(OrderStatus.RETURN_REQUESTED);
         trackingService.add(order, "RETURN_REQUESTED", "Người mua đã gửi yêu cầu "
                 + (req.getType() == ReturnType.REFUND_ONLY ? "hoàn tiền" : "trả hàng/hoàn tiền") + " " + vnd(refund), null);
@@ -127,16 +130,34 @@ public class ReturnService {
         return ReturnResponse.from(rr);
     }
 
+    // the items were paid partly with Shoppi Xu: that part goes back as coins (refund()), the rest as money
+    private static BigDecimal cashShare(Order order, BigDecimal value) {
+        BigDecimal coins = order.getCoinDiscount();
+        if (coins.signum() == 0) return value.min(order.getTotal());
+        BigDecimal paid = order.getTotal().add(coins);
+        BigDecimal capped = value.min(paid);
+        return capped.subtract(capped.multiply(coins).divide(paid, 0, RoundingMode.DOWN)).min(order.getTotal());
+    }
+
     // ==== seller ====
 
     @Transactional(readOnly = true)
     public List<ReturnResponse> forMyShop() {
-        return returnRepository.findByOrderShopIdOrderByCreatedAtDesc(myShop().getId()).stream().map(ReturnResponse::from).toList();
+        List<ReturnResponse> list = returnRepository.findByOrderShopIdOrderByCreatedAtDesc(myShop().getId()).stream().map(ReturnResponse::from).toList();
+        Map<Long, LocalDateTime> holds = riskService.holds(list.stream().filter(r -> r.getStatus() == ReturnStatus.REQUESTED).map(ReturnResponse::getId).toList());
+        list.forEach(r -> r.setHeldUntil(holds.get(r.getId())));
+        return list;
     }
 
     public ReturnResponse approve(Long returnId) {
         ReturnRequest rr = ofMyShop(returnId);
         if (rr.getStatus() != ReturnStatus.REQUESTED) throw bad("Yêu cầu không còn chờ xử lý");
+        riskService.ensureAssessed(returnId);
+        LocalDateTime heldUntil = riskService.holdUntil(returnId);
+        if (heldUntil != null) {
+            throw bad("Shoppi đang kiểm tra yêu cầu này, bạn có thể đồng ý hoàn tiền sau khi kiểm tra xong (chậm nhất "
+                    + heldUntil.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM")) + "). Bạn vẫn có thể từ chối nếu yêu cầu không hợp lệ.");
+        }
         refund(rr, "Người bán đã chấp nhận yêu cầu");
         return ReturnResponse.from(rr);
     }
@@ -225,6 +246,13 @@ public class ReturnService {
         }
         refundService.create(order, rr.getId(), rr.getRefundAmount(),
                 rr.getComplaint() != null ? Refund.Source.DISPUTE : Refund.Source.RETURN, title);
+        // a compromise is the amount decided, nothing more; otherwise coins go back in step with the money
+        if (!partial && order.getTotal().signum() > 0) {
+            long coins = order.getCoinDiscount().multiply(rr.getRefundAmount())
+                    .divide(order.getTotal(), 0, RoundingMode.DOWN).longValue();
+            coinService.giveBack(order, Math.min(coins, order.getCoinDiscount().longValue()), "RT" + rr.getId(),
+                    "Hoàn Xu đơn trả hàng " + order.getCode());
+        }
         trackingService.add(order, "REFUNDED", title + ". Đã hoàn " + vnd(rr.getRefundAmount()) + " cho Người mua", null);
     }
 

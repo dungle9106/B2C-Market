@@ -38,6 +38,7 @@
           <div class="title">
             <router-link :to="`/shop/${s.id}`" target="_blank" class="name">{{ s.name }}</router-link>
             <span class="st" :class="s.status">{{ SHOP_STATUS[s.status] }}</span>
+            <span v-if="s.mall" class="tag ok">Shoppi Mall</span>
             <span v-if="s.verified" class="tag ok">✓ Đã xác minh</span>
             <span v-else-if="s.verification === 'PENDING'" class="tag">Giấy tờ chờ xác minh</span>
             <span v-if="s.status === 'APPROVED' && !s.active" class="tag bad">Đang ẩn (tài khoản người bán bị khóa)</span>
@@ -59,7 +60,8 @@
             <button type="button" class="btn sm" :disabled="busyId === s.id" @click="onApprove(s)">Duyệt</button>
             <button type="button" class="btn sm ghost" @click="openReason('reject', s)">Từ chối</button>
           </template>
-          <button v-else-if="s.status === 'REJECTED'" type="button" class="btn sm ghost" :disabled="busyId === s.id" @click="onApprove(s)">Duyệt</button>
+          <button v-if="s.status === 'APPROVED' && (s.mall || s.verified)" type="button" class="btn sm ghost" :disabled="busyId === s.id" @click="onToggleMall(s)">{{ s.mall ? 'Thu hồi Mall' : 'Cấp Mall' }}</button>
+          <button v-if="s.status === 'REJECTED'" type="button" class="btn sm ghost" :disabled="busyId === s.id" @click="onApprove(s)">Duyệt</button>
           <button v-else-if="s.status === 'APPROVED'" type="button" class="btn sm ghost warn" @click="openReason('suspend', s)">Đình chỉ</button>
           <button v-else-if="s.status === 'SUSPENDED' && !s.seller.deleted" type="button" class="btn sm" :disabled="busyId === s.id" @click="onReinstate(s)">Mở lại</button>
         </div>
@@ -80,7 +82,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import PaginationBar from '../../components/PaginationBar.vue'
 import ReasonDialog from '../../components/admin/ReasonDialog.vue'
-import { adminShops, adminShopCounts, approveShop, rejectShop, suspendShop, reinstateShop, saveAdminSettings } from '../../api/admin'
+import { adminShops, adminShopCounts, approveShop, rejectShop, suspendShop, reinstateShop, setShopMall, saveAdminSettings } from '../../api/admin'
 import { useAdminMe } from '../../composables/useAdminMe'
 import { formatDateTime } from '../../utils/format'
 import { extractError } from '../../utils/apiError'
@@ -143,6 +145,7 @@ async function run(id, fn) {
 }
 const onApprove = (s) => run(s.id, () => approveShop(s.id))
 const onReinstate = (s) => confirm(`Mở lại shop "${s.name}"?`) && run(s.id, () => reinstateShop(s.id))
+const onToggleMall = (s) => confirm(`${s.mall ? 'Thu hồi' : 'Cấp'} Shoppi Mall cho "${s.name}"?`) && run(s.id, () => setShopMall(s.id, !s.mall))
 
 function openReason(mode, shop) {
   dialog.value = { mode, shop }

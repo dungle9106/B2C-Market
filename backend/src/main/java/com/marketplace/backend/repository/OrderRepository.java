@@ -6,6 +6,7 @@ import com.marketplace.backend.entity.PaymentMethod;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,6 +15,29 @@ import java.util.List;
 import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
+
+    // ---- case history of the return abuse checks ----
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.buyer.id = :buyerId AND o.status IN :statuses AND o.createdAt >= :since")
+    long countBuyerOrders(@Param("buyerId") Long buyerId, @Param("statuses") java.util.Collection<OrderStatus> statuses, @Param("since") LocalDateTime since);
+
+    @Query("SELECT COALESCE(SUM(o.total), 0) FROM Order o WHERE o.buyer.id = :buyerId AND o.status IN :statuses AND o.createdAt >= :since")
+    java.math.BigDecimal sumBuyerOrders(@Param("buyerId") Long buyerId, @Param("statuses") java.util.Collection<OrderStatus> statuses, @Param("since") LocalDateTime since);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.shop.id = :shopId AND o.status IN :statuses AND o.createdAt >= :since")
+    long countShopOrders(@Param("shopId") Long shopId, @Param("statuses") java.util.Collection<OrderStatus> statuses, @Param("since") LocalDateTime since);
+
+    // what a buyer paid for orders delivered since a date ("Hang thanh vien")
+    @Query("SELECT COALESCE(SUM(o.total), 0) FROM Order o WHERE o.buyer.id = :buyerId AND o.status = :delivered AND o.deliveredAt >= :since")
+    java.math.BigDecimal deliveredSpend(@Param("buyerId") Long buyerId, @Param("delivered") OrderStatus delivered, @Param("since") LocalDateTime since);
+
+    // delivered orders whose Shoppi Xu reward is due
+    @Query("SELECT o FROM Order o WHERE o.status = :delivered AND o.coinsToEarn > 0 AND o.coinsAwardedAt IS NULL AND o.deliveredAt < :cutoff")
+    List<Order> coinsDue(@Param("delivered") OrderStatus delivered, @Param("cutoff") LocalDateTime cutoff);
+
+    // 0 rows = already awarded
+    @Modifying
+    @Query("UPDATE Order o SET o.coinsAwardedAt = :now WHERE o.id = :id AND o.coinsAwardedAt IS NULL")
+    int markCoinsAwarded(@Param("id") Long id, @Param("now") LocalDateTime now);
 
     java.util.Optional<Order> findFirstByTrackingNumberAndShippingGateway(String trackingNumber, String shippingGateway);
     List<Order> findByBuyerIdOrderByCreatedAtDesc(Long buyerId);
@@ -69,6 +93,34 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT COUNT(o) > 0 FROM Order o WHERE o.buyer.id = :buyerId "
             + "AND o.status NOT IN (com.marketplace.backend.entity.OrderStatus.CANCELLED, com.marketplace.backend.entity.OrderStatus.AWAITING_PAYMENT)")
     boolean hasPlacedOrder(@Param("buyerId") Long buyerId);
+
+    // shop vouchers for first-time / returning customers: orders of the buyer at this shop that went through
+    @Query("SELECT COUNT(o) > 0 FROM Order o WHERE o.buyer.id = :buyerId AND o.shop.id = :shopId "
+            + "AND o.status NOT IN (com.marketplace.backend.entity.OrderStatus.CANCELLED, com.marketplace.backend.entity.OrderStatus.AWAITING_PAYMENT)")
+    boolean hasOrderedFromShop(@Param("buyerId") Long buyerId, @Param("shopId") Long shopId);
+
+    @Query("SELECT COUNT(o) > 0 FROM Order o WHERE o.buyer.id = :buyerId AND o.shop.id = :shopId "
+            + "AND o.status IN (com.marketplace.backend.entity.OrderStatus.DELIVERED, com.marketplace.backend.entity.OrderStatus.RETURN_REQUESTED)")
+    boolean hasReceivedFromShop(@Param("buyerId") Long buyerId, @Param("shopId") Long shopId);
+
+    // ---- shop performance ("Hieu qua hoat dong") ----
+    // orders that count: everything but checkouts auto-cancelled before being paid / confirmed
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.shop.id = :shopId AND o.createdAt >= :from AND o.createdAt < :to "
+            + "AND o.status <> com.marketplace.backend.entity.OrderStatus.AWAITING_PAYMENT "
+            + "AND NOT (o.cancelledBy = 'SYSTEM' AND o.confirmedAt IS NULL)")
+    long countForPerformance(@Param("shopId") Long shopId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    // "don khong thanh cong": cancelled by the seller
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.shop.id = :shopId AND o.createdAt >= :from AND o.createdAt < :to AND o.cancelledBy = 'SELLER'")
+    long countSellerCancelled(@Param("shopId") Long shopId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    // [createdAt, shippedAt] of the orders handed to the carrier in the window (late shipment rate)
+    @Query("SELECT o.createdAt, o.shippedAt FROM Order o WHERE o.shop.id = :shopId AND o.shippedAt >= :from AND o.shippedAt < :to")
+    List<Object[]> shippingTimes(@Param("shopId") Long shopId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.shop.id = :shopId AND o.deliveredAt >= :from "
+            + "AND o.status <> com.marketplace.backend.entity.OrderStatus.CANCELLED")
+    long countDeliveredSince(@Param("shopId") Long shopId, @Param("from") LocalDateTime from);
 
     // the chatbot's "where is my order" context
     List<Order> findTop5ByBuyerIdOrderByCreatedAtDesc(Long buyerId);

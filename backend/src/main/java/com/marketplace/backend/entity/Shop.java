@@ -141,6 +141,18 @@ public class Shop {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
+    // "Shop Yeu Thich": earned from the shop's performance, re-checked every day (ShopPerformanceService)
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean favorite = false;
+
+    private LocalDateTime favoriteSince;
+
+    // "Shoppi Mall": official store, granted by an admin to a verified shop
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean mall = false;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();

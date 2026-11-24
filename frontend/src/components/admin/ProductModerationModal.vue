@@ -140,7 +140,7 @@ watch(() => props.productId, load, { immediate: true })
 </script>
 
 <style scoped>
-.pm { width: min(760px, 88vw); max-height: 72vh; overflow-y: auto; font-size: 14px; }
+.pm { width: min(760px, 88vw); max-height: calc(var(--vh) * 0.72); overflow-y: auto; font-size: 14px; }
 .top { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
 .main { width: 240px; height: 240px; object-fit: cover; border-radius: 4px; background: #f5f5f5; }
 .thumbs { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
